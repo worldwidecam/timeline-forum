@@ -17,6 +17,7 @@ function CreateEvent() {
     title: '',
     content: '',
     event_date: '',
+    url: ''
   });
   const [error, setError] = useState('');
 
@@ -94,6 +95,17 @@ function CreateEvent() {
                   shrink: true,
                 }}
                 required
+              />
+              <TextField
+                fullWidth
+                label="URL (Optional)"
+                name="url"
+                type="url"
+                value={formData.url}
+                onChange={handleChange}
+                margin="normal"
+                placeholder="https://example.com"
+                helperText="Add a relevant link to this event"
               />
               <Box mt={2}>
                 <Button

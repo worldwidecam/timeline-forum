@@ -36,6 +36,7 @@ class Event(db.Model):
     title = db.Column(db.String(200), nullable=False)
     content = db.Column(db.Text)
     event_date = db.Column(db.DateTime, nullable=False)
+    url = db.Column(db.String(500))  # Add URL field
     timeline_id = db.Column(db.Integer, db.ForeignKey('timeline.id'))
     created_by = db.Column(db.Integer, db.ForeignKey('user.id'))
     created_at = db.Column(db.DateTime, default=datetime.now(timezone.utc))
@@ -67,6 +68,7 @@ def create_event(timeline_id):
             title=data['title'],
             content=data['content'],
             event_date=datetime.fromisoformat(data['event_date']),
+            url=data.get('url', ''),  # Add URL handling
             timeline_id=timeline_id,
             created_by=1  # Temporary default user ID
         )
@@ -80,6 +82,7 @@ def create_event(timeline_id):
                 'title': new_event.title,
                 'content': new_event.content,
                 'event_date': new_event.event_date.isoformat(),
+                'url': new_event.url,  # Include URL in response
                 'timeline_id': new_event.timeline_id
             }
         }), 201
@@ -96,6 +99,7 @@ def get_timeline_events(timeline_id):
         'title': event.title,
         'content': event.content,
         'event_date': event.event_date.isoformat(),
+        'url': event.url,  # Include URL in response
         'upvotes': event.upvotes
     } for event in events])
 
@@ -110,5 +114,6 @@ def get_timelines():
 
 if __name__ == '__main__':
     with app.app_context():
-        db.create_all()
+        db.drop_all()  # Drop all existing tables
+        db.create_all()  # Create new tables with updated schema
     app.run(debug=True)
