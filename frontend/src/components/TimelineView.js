@@ -312,7 +312,7 @@ function TimelineView() {
                       fontSize: '0.8rem'
                     }}
                   >
-                    Beginning
+                    Earliest Event
                   </Typography>
                   <Typography 
                     variant="body2" 
@@ -325,7 +325,7 @@ function TimelineView() {
                       fontSize: '0.8rem'
                     }}
                   >
-                    Present day
+                    Latest Event
                   </Typography>
                   {/* Main Timeline Line */}
                   <Box sx={{
@@ -389,7 +389,9 @@ function TimelineView() {
                           display: 'flex',
                           flexDirection: 'column',
                           alignItems: 'center',
-                          transform: 'translateX(-50%)'
+                          transform: 'translateX(-50%)',
+                          opacity: events.length >= 2 ? 1 : 0,
+                          transition: 'opacity 0.3s ease-in-out'
                         }}
                       >
                         <Typography 

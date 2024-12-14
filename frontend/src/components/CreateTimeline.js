@@ -7,7 +7,9 @@ import {
   TextField,
   Button,
   Box,
+  IconButton,
 } from '@mui/material';
+import CloseIcon from '@mui/icons-material/Close';
 import axios from 'axios';
 
 function CreateTimeline() {
@@ -45,7 +47,19 @@ function CreateTimeline() {
     <Container maxWidth="sm">
       <Box my={4}>
         <Paper elevation={3}>
-          <Box p={3}>
+          <Box p={3} position="relative">
+            <IconButton
+              aria-label="close"
+              onClick={() => navigate('/')}
+              sx={{
+                position: 'absolute',
+                right: 8,
+                top: 8,
+                color: '#ce93d8',
+              }}
+            >
+              <CloseIcon />
+            </IconButton>
             <Typography variant="h4" gutterBottom>
               Create Timeline
             </Typography>

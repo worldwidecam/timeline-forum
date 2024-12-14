@@ -7,7 +7,9 @@ import {
   TextField,
   Button,
   Box,
+  IconButton,
 } from '@mui/material';
+import CloseIcon from '@mui/icons-material/Close';
 import axios from 'axios';
 
 function CreateEvent() {
@@ -53,7 +55,19 @@ function CreateEvent() {
     <Container maxWidth="sm">
       <Box my={4}>
         <Paper elevation={3}>
-          <Box p={3}>
+          <Box p={3} position="relative">
+            <IconButton
+              aria-label="close"
+              onClick={() => navigate(`/timeline/${id}`)}
+              sx={{
+                position: 'absolute',
+                right: 8,
+                top: 8,
+                color: '#ce93d8',
+              }}
+            >
+              <CloseIcon />
+            </IconButton>
             <Typography variant="h4" gutterBottom>
               Create Event
             </Typography>
@@ -93,6 +107,19 @@ function CreateEvent() {
                 margin="normal"
                 InputLabelProps={{
                   shrink: true,
+                }}
+                sx={{
+                  '& .MuiInputAdornment-root .MuiSvgIcon-root': {
+                    color: '#ce93d8',
+                  },
+                  '& .MuiOutlinedInput-root': {
+                    '& .MuiInputAdornment-root': {
+                      color: '#ce93d8',
+                    },
+                    '& input::-webkit-calendar-picker-indicator': {
+                      filter: 'invert(0.8) sepia(1) saturate(1) hue-rotate(220deg)',
+                    }
+                  }
                 }}
                 required
               />
