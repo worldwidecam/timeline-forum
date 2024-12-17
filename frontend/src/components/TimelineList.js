@@ -7,12 +7,15 @@ import {
   CardContent,
   Typography,
   Button,
-  Box
+  Box,
+  Alert
 } from '@mui/material';
 import axios from 'axios';
+import { useAuth } from '../contexts/AuthContext';
 
 function TimelineList() {
   const [timelines, setTimelines] = useState([]);
+  const { user } = useAuth();
 
   useEffect(() => {
     const fetchTimelines = async () => {
@@ -32,41 +35,59 @@ function TimelineList() {
         <Typography variant="h4" component="h1">
           Timelines
         </Typography>
-        <Button
-          component={Link}
-          to="/create-timeline"
-          variant="contained"
-          color="primary"
-        >
-          Create Timeline
-        </Button>
+        {user ? (
+          <Button
+            component={Link}
+            to="/timeline/create"
+            variant="contained"
+            color="primary"
+          >
+            Create Timeline
+          </Button>
+        ) : (
+          <Button
+            component={Link}
+            to="/login"
+            variant="contained"
+            color="primary"
+          >
+            Login to Create Timeline
+          </Button>
+        )}
       </Box>
-      <Grid container spacing={3}>
-        {timelines.map((timeline) => (
-          <Grid item xs={12} sm={6} md={4} key={timeline.id}>
-            <Card>
-              <CardContent>
-                <Typography variant="h6" component="h2">
-                  {timeline.name}
-                </Typography>
-                <Typography color="textSecondary" gutterBottom>
-                  {timeline.description}
-                </Typography>
-                <Button
-                  component={Link}
-                  to={`/timeline/${timeline.id}`}
-                  variant="outlined"
-                  color="primary"
-                  fullWidth
-                  sx={{ mt: 2 }}
-                >
-                  View Timeline
-                </Button>
-              </CardContent>
-            </Card>
-          </Grid>
-        ))}
-      </Grid>
+      
+      {timelines.length === 0 ? (
+        <Alert severity="info" sx={{ mt: 2 }}>
+          No timelines yet. Be the first to create one!
+        </Alert>
+      ) : (
+        <Grid container spacing={3}>
+          {timelines.map((timeline) => (
+            <Grid item xs={12} sm={6} md={4} key={timeline.id}>
+              <Card>
+                <CardContent>
+                  <Typography variant="h6" component="h2" gutterBottom>
+                    {timeline.name}
+                  </Typography>
+                  <Typography color="textSecondary" gutterBottom>
+                    {timeline.description}
+                  </Typography>
+                  <Button
+                    component={Link}
+                    to={`/timeline/${timeline.id}`}
+                    variant="outlined"
+                    color="primary"
+                    fullWidth
+                    sx={{ mt: 2 }}
+                  >
+                    View Timeline
+                  </Button>
+                </CardContent>
+              </Card>
+            </Grid>
+          ))}
+        </Grid>
+      )}
     </Container>
   );
 }

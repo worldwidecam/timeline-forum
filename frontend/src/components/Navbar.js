@@ -1,20 +1,106 @@
 import React from 'react';
-import { AppBar, Toolbar, Typography, Button, Container } from '@mui/material';
-import { Link } from 'react-router-dom';
+import { Link as RouterLink, useNavigate } from 'react-router-dom';
+import {
+  AppBar,
+  Toolbar,
+  Typography,
+  Button,
+  Box,
+  Avatar,
+  Menu,
+  MenuItem,
+  IconButton,
+} from '@mui/material';
+import { useAuth } from '../contexts/AuthContext';
 
 function Navbar() {
+  const navigate = useNavigate();
+  const { user, logout } = useAuth();
+  const [anchorEl, setAnchorEl] = React.useState(null);
+
+  const handleMenu = (event) => {
+    setAnchorEl(event.currentTarget);
+  };
+
+  const handleClose = () => {
+    setAnchorEl(null);
+  };
+
+  const handleLogout = () => {
+    logout();
+    handleClose();
+    navigate('/');
+  };
+
   return (
     <AppBar position="static">
-      <Container>
-        <Toolbar>
-          <Typography variant="h6" component={Link} to="/" style={{ flexGrow: 1, textDecoration: 'none', color: 'white' }}>
-            Timeline Forum
-          </Typography>
-          <Button color="inherit" component={Link} to="/create-timeline">
-            Create Timeline
-          </Button>
-        </Toolbar>
-      </Container>
+      <Toolbar>
+        <Typography
+          variant="h6"
+          component={RouterLink}
+          to="/"
+          sx={{ flexGrow: 1, textDecoration: 'none', color: 'inherit' }}
+        >
+          Timeline Forum
+        </Typography>
+
+        <Box sx={{ display: 'flex', alignItems: 'center' }}>
+          {user ? (
+            <>
+              <Button
+                color="inherit"
+                component={RouterLink}
+                to="/timeline/create"
+                sx={{ mr: 2 }}
+              >
+                Create Timeline
+              </Button>
+              <IconButton onClick={handleMenu} sx={{ p: 0 }}>
+                <Avatar
+                  alt={user.username}
+                  src={user.avatar_url}
+                  sx={{ bgcolor: 'secondary.main' }}
+                >
+                  {user.username[0].toUpperCase()}
+                </Avatar>
+              </IconButton>
+              <Menu
+                anchorEl={anchorEl}
+                open={Boolean(anchorEl)}
+                onClose={handleClose}
+              >
+                <MenuItem
+                  component={RouterLink}
+                  to="/profile"
+                  onClick={handleClose}
+                >
+                  Profile
+                </MenuItem>
+                <MenuItem onClick={handleLogout}>Logout</MenuItem>
+              </Menu>
+            </>
+          ) : (
+            <>
+              <Button
+                color="inherit"
+                component={RouterLink}
+                to="/login"
+                sx={{ mr: 1 }}
+              >
+                Login
+              </Button>
+              <Button
+                color="inherit"
+                component={RouterLink}
+                to="/register"
+                variant="outlined"
+              >
+                Register
+              </Button>
+            </>
+          )}
+        </Box>
+      </Toolbar>
     </AppBar>
   );
 }

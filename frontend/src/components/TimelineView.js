@@ -6,12 +6,18 @@ import {
   Typography,
   Button,
   Box,
+  Dialog,
+  DialogContent,
 } from '@mui/material';
 import { format } from 'date-fns';
 import axios from 'axios';
+import EventDisplay from './EventDisplay';
+import TimelinePosts from './TimelinePosts';
+import { useAuth } from '../contexts/AuthContext';
 
 function TimelineView() {
   const { id } = useParams();
+  const { user } = useAuth();
   const [events, setEvents] = useState([]);
   const [timelineInfo, setTimelineInfo] = useState(null);
   const [selectedEvent, setSelectedEvent] = useState(null);
@@ -46,6 +52,19 @@ function TimelineView() {
   const handleMouseLeave = () => {
     setIsDragging(false);
   };
+
+  useEffect(() => {
+    const fetchTimelineInfo = async () => {
+      try {
+        const response = await axios.get(`http://localhost:5000/api/timeline/${id}`);
+        setTimelineInfo(response.data);
+      } catch (error) {
+        console.error('Error fetching timeline info:', error);
+      }
+    };
+
+    fetchTimelineInfo();
+  }, [id]);
 
   useEffect(() => {
     const fetchEvents = async () => {
@@ -193,25 +212,27 @@ function TimelineView() {
   };
 
   const handleEventClick = (event) => {
-    setSelectedEvent(selectedEvent?.id === event.id ? null : event);
-    
-    // Find the event container element
-    const eventElement = document.querySelector(`[data-event-id="${event.id}"]`);
-    if (eventElement) {
-      // Find the scrollable container
-      const scrollContainer = document.querySelector('.timeline-scroll-container');
-      if (scrollContainer) {
-        // Calculate the scroll position to center the event
-        const containerWidth = scrollContainer.offsetWidth;
-        const eventLeft = eventElement.offsetLeft;
-        const scrollLeft = eventLeft - (containerWidth / 2) + (eventElement.offsetWidth / 2);
-        
-        // Smooth scroll to the position
-        scrollContainer.scrollTo({
-          left: scrollLeft,
-          behavior: 'smooth'
-        });
-      }
+    setSelectedEvent(event);
+  };
+
+  const handleCloseEventDialog = () => {
+    setSelectedEvent(null);
+  };
+
+  const handleEditEvent = (event) => {
+    // Navigate to edit page
+    window.location.href = `/timeline/${id}/event/${event.id}/edit`;
+  };
+
+  const handleDeleteEvent = async (eventId) => {
+    try {
+      await axios.delete(`http://localhost:5000/api/event/${eventId}`);
+      // Refresh events
+      const response = await axios.get(`http://localhost:5000/api/timeline/${id}/events`);
+      setEvents(response.data);
+      setSelectedEvent(null);
+    } catch (error) {
+      console.error('Error deleting event:', error);
     }
   };
 
@@ -237,19 +258,36 @@ function TimelineView() {
           overflowX: 'hidden' 
         }}>
           <Box my={4}>
-            <Box display="flex" justifyContent="space-between" alignItems="center" mb={4}>
-              <Typography variant="h4" sx={{ color: '#fff' }}>
-                {timelineInfo?.name || 'Timeline View'}
-              </Typography>
-              <Button
-                variant="contained"
-                color="primary"
-                component={Link}
-                to={`/timeline/${id}/create-event`}
-                sx={{ color: '#fff' }}
-              >
-                Create Event
-              </Button>
+            <Box display="flex" justifyContent="space-between" alignItems="flex-start" mb={4}>
+              <Box>
+                <Typography variant="h4" component="h1" gutterBottom>
+                  {timelineInfo?.name || 'Loading...'}
+                </Typography>
+                <Typography variant="subtitle1" color="text.secondary">
+                  Timeline View
+                </Typography>
+              </Box>
+              {user ? (
+                <Button
+                  variant="contained"
+                  color="primary"
+                  component={Link}
+                  to={`/timeline/${id}/event/create`}
+                  sx={{ color: '#fff' }}
+                >
+                  Create Event
+                </Button>
+              ) : (
+                <Button
+                  variant="contained"
+                  color="primary"
+                  component={Link}
+                  to="/login"
+                  sx={{ color: '#fff' }}
+                >
+                  Login to Create Event
+                </Button>
+              )}
             </Box>
 
             {/* Timeline Container */}
@@ -639,6 +677,29 @@ function TimelineView() {
           </Box>
         </Container>
       </Box>
+      <Box sx={{ backgroundColor: '#121212', py: 4 }}>
+        <Container maxWidth="lg">
+          <TimelinePosts timelineId={id} />
+        </Container>
+      </Box>
+      {/* Event Dialog */}
+      <Dialog
+        open={Boolean(selectedEvent)}
+        onClose={handleCloseEventDialog}
+        maxWidth="md"
+        fullWidth
+      >
+        <DialogContent>
+          {selectedEvent && (
+            <EventDisplay
+              event={selectedEvent}
+              onEdit={handleEditEvent}
+              onDelete={handleDeleteEvent}
+              currentUserId={1} // TODO: Replace with actual logged-in user ID
+            />
+          )}
+        </DialogContent>
+      </Dialog>
       {/* Black space section */}
       <Box sx={{ 
         flex: 1,
