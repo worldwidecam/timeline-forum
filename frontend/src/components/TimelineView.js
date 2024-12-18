@@ -240,7 +240,7 @@ function TimelineView() {
     <Box sx={{ 
       display: 'flex',
       flexDirection: 'column',
-      minHeight: '150vh', 
+      minHeight: '100vh', 
       backgroundColor: '#000' 
     }}>
       <Box sx={{ 
@@ -249,7 +249,7 @@ function TimelineView() {
         backgroundColor: '#2c1b47',
         color: '#fff',
         minHeight: 'fit-content',
-        paddingBottom: '40px',
+        paddingBottom: '20px', 
         overflowX: 'hidden' 
       }}>
         <Container maxWidth={false} sx={{ 
@@ -261,6 +261,13 @@ function TimelineView() {
             <Box display="flex" justifyContent="space-between" alignItems="flex-start" mb={4}>
               <Box>
                 <Typography variant="h4" component="h1" gutterBottom>
+                  <Box component="span" sx={{ 
+                    fontWeight: 'bold',
+                    color: '#ce93d8',
+                    mr: 1
+                  }}>
+                    #
+                  </Box>
                   {timelineInfo?.name || 'Loading...'}
                 </Typography>
                 <Typography variant="subtitle1" color="text.secondary">
@@ -299,27 +306,27 @@ function TimelineView() {
               onMouseMove={handleMouseMove}
               onMouseLeave={handleMouseLeave}
               sx={{
-                position: 'relative',
                 width: '100%',
                 overflowX: 'auto',
-                overflowY: 'visible',
-                pb: 20,
+                overflowY: 'hidden',
+                position: 'relative',
+                height: '400px', // Reduced from default height
+                mt: 2,
+                mb: 2,
                 cursor: isDragging ? 'grabbing' : 'grab',
-                userSelect: 'none',
                 '&::-webkit-scrollbar': {
                   height: '8px',
                 },
                 '&::-webkit-scrollbar-track': {
-                  background: '#2c1b47',
-                  borderRadius: '4px',
+                  background: 'rgba(0,0,0,0.1)',
                 },
                 '&::-webkit-scrollbar-thumb': {
-                  background: '#ce93d8',
+                  background: 'rgba(156, 39, 176, 0.5)',
                   borderRadius: '4px',
                   '&:hover': {
-                    background: '#9c27b0',
-                  },
-                },
+                    background: 'rgba(156, 39, 176, 0.7)',
+                  }
+                }
               }}
             >
               {/* Timeline Content */}

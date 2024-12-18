@@ -198,6 +198,21 @@ class Post(db.Model):
     upvotes = db.Column(db.Integer, default=0)
     comments = db.relationship('Comment', backref='post', lazy=True)
     promoted_to_event = db.Column(db.Boolean, default=False)
+    promotion_score = db.Column(db.Float, default=0.0)
+    source_count = db.Column(db.Integer, default=0)
+    promotion_votes = db.Column(db.Integer, default=0)
+    last_score_update = db.Column(db.DateTime, default=datetime.now(timezone.utc))
+
+    def update_promotion_score(self):
+        base_score = self.upvotes
+        comment_bonus = len(self.comments) * 0.5
+        source_bonus = self.source_count * 2
+        content_bonus = min(len(self.content) / 500, 2)
+        promotion_bonus = self.promotion_votes * 1.5
+
+        self.promotion_score = base_score + comment_bonus + source_bonus + content_bonus + promotion_bonus
+        self.last_score_update = datetime.now(timezone.utc)
+        return self.promotion_score
 
 class Event(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -474,6 +489,142 @@ def create_post(timeline_id):
     except Exception as e:
         print(f"Error creating post: {str(e)}")  # Debug log
         db.session.rollback()
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/timeline/<int:timeline_id>/check-promotions', methods=['POST'])
+@jwt_required()
+def check_timeline_promotions(timeline_id):
+    try:
+        # Get timeline's posts ordered by promotion score
+        top_posts = Post.query.filter_by(
+            timeline_id=timeline_id,
+            promoted_to_event=False
+        ).order_by(Post.promotion_score.desc()).limit(5).all()
+
+        promoted_posts = []
+        for post in top_posts:
+            # Update the post's promotion score
+            current_score = post.update_promotion_score()
+            
+            # Check if post meets promotion criteria
+            if current_score >= 50:  # Base threshold
+                # Create a new event from the post
+                new_event = Event(
+                    title=post.title,
+                    content=post.content,
+                    event_date=post.event_date,
+                    url=post.url,
+                    url_title=post.url_title,
+                    url_description=post.url_description,
+                    url_image=post.url_image,
+                    timeline_id=timeline_id,
+                    created_by=post.created_by,
+                    created_at=datetime.now(timezone.utc),
+                    upvotes=post.upvotes
+                )
+                
+                # Mark post as promoted
+                post.promoted_to_event = True
+                promoted_posts.append(post.id)
+                
+                db.session.add(new_event)
+        
+        db.session.commit()
+        
+        return jsonify({
+            'success': True,
+            'promoted_posts': promoted_posts,
+            'message': f'Promoted {len(promoted_posts)} posts to timeline events'
+        }), 200
+
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+@app.route('/api/post/<int:post_id>/promote-vote', methods=['POST'])
+@jwt_required()
+def vote_for_promotion(post_id):
+    try:
+        post = Post.query.get_or_404(post_id)
+        post.promotion_votes += 1
+        post.update_promotion_score()
+        db.session.commit()
+        
+        return jsonify({
+            'success': True,
+            'new_score': post.promotion_score
+        }), 200
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+@app.route('/api/posts', methods=['GET'])
+def get_all_posts():
+    try:
+        # Get query parameters for pagination
+        page = request.args.get('page', 1, type=int)
+        per_page = request.args.get('per_page', 10, type=int)
+        sort_by = request.args.get('sort', 'newest')  # 'newest', 'popular', 'promoted'
+
+        # Base query with joins to get timeline and user information
+        query = db.session.query(Post, Timeline, User)\
+            .join(Timeline, Post.timeline_id == Timeline.id)\
+            .join(User, Post.created_by == User.id)
+
+        # Apply sorting
+        if sort_by == 'newest':
+            query = query.order_by(Post.created_at.desc())
+        elif sort_by == 'popular':
+            query = query.order_by(Post.upvotes.desc())
+        elif sort_by == 'promoted':
+            query = query.order_by(Post.promotion_score.desc())
+
+        # Execute paginated query
+        paginated_posts = query.paginate(page=page, per_page=per_page, error_out=False)
+        
+        # Format the response
+        posts = []
+        for post, timeline, user in paginated_posts.items:
+            posts.append({
+                'id': post.id,
+                'title': post.title,
+                'content': post.content,
+                'event_date': post.event_date.isoformat(),
+                'created_at': post.created_at.isoformat(),
+                'upvotes': post.upvotes,
+                'promotion_score': post.promotion_score,
+                'url': post.url,
+                'url_title': post.url_title,
+                'url_description': post.url_description,
+                'url_image': post.url_image,
+                'timeline': {
+                    'id': timeline.id,
+                    'name': timeline.name,
+                },
+                'author': {
+                    'id': user.id,
+                    'username': user.username,
+                    'avatar_url': user.avatar_url
+                },
+                'comment_count': len(post.comments)
+            })
+
+        return jsonify({
+            'posts': posts,
+            'total': paginated_posts.total,
+            'pages': paginated_posts.pages,
+            'current_page': page,
+            'has_next': paginated_posts.has_next,
+            'has_prev': paginated_posts.has_prev
+        }), 200
+
+    except Exception as e:
         return jsonify({'error': str(e)}), 500
 
 # Auth routes

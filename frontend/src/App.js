@@ -7,6 +7,7 @@ import TimelineList from './components/TimelineList';
 import TimelineView from './components/TimelineView';
 import CreateTimeline from './components/CreateTimeline';
 import CreateEvent from './components/CreateEvent';
+import PostsFeed from './components/PostsFeed';
 import Login from './components/Login';
 import Register from './components/Register';
 import UserProfile from './components/UserProfile';
@@ -51,27 +52,32 @@ function App() {
       <AuthProvider>
         <Router>
           <Navbar />
-          <Routes>
-            <Route path="/" element={<TimelineList />} />
-            <Route path="/login" element={<Login />} />
-            <Route path="/register" element={<Register />} />
-            <Route path="/profile" element={
-              <ProtectedRoute>
-                <UserProfile />
-              </ProtectedRoute>
-            } />
-            <Route path="/timeline/create" element={
-              <ProtectedRoute>
-                <CreateTimeline />
-              </ProtectedRoute>
-            } />
-            <Route path="/timeline/:id" element={<TimelineView />} />
-            <Route path="/timeline/:id/event/create" element={
-              <ProtectedRoute>
-                <CreateEvent />
-              </ProtectedRoute>
-            } />
-          </Routes>
+          <Box sx={{ display: 'flex', minHeight: '100vh' }}>
+            <Box sx={{ flex: 1, pt: 8 }}>
+              <Routes>
+                <Route path="/" element={<PostsFeed />} />
+                <Route path="/timeline/:id" element={<TimelineView />} />
+                <Route path="/timeline/create" element={
+                  <ProtectedRoute>
+                    <CreateTimeline />
+                  </ProtectedRoute>
+                } />
+                <Route path="/timeline/:id/event/create" element={
+                  <ProtectedRoute>
+                    <CreateEvent />
+                  </ProtectedRoute>
+                } />
+                <Route path="/login" element={<Login />} />
+                <Route path="/register" element={<Register />} />
+                <Route path="/profile" element={
+                  <ProtectedRoute>
+                    <UserProfile />
+                  </ProtectedRoute>
+                } />
+              </Routes>
+            </Box>
+            <TimelineList />
+          </Box>
         </Router>
       </AuthProvider>
     </ThemeProvider>

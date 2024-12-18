@@ -30,65 +30,95 @@ function TimelineList() {
   }, []);
 
   return (
-    <Container maxWidth="lg" sx={{ mt: 4, mb: 4 }}>
-      <Box display="flex" justifyContent="space-between" alignItems="center" mb={4}>
-        <Typography variant="h4" component="h1">
-          Timelines
-        </Typography>
-        {user ? (
-          <Button
-            component={Link}
-            to="/timeline/create"
-            variant="contained"
-            color="primary"
-          >
-            Create Timeline
-          </Button>
-        ) : (
-          <Button
-            component={Link}
-            to="/login"
-            variant="contained"
-            color="primary"
-          >
-            Login to Create Timeline
-          </Button>
-        )}
+    <Box
+      sx={{
+        position: 'fixed',
+        right: 0,
+        top: 64, // Height of the navbar
+        width: '300px',
+        height: 'calc(100vh - 64px)',
+        backgroundColor: 'background.paper',
+        borderLeft: 1,
+        borderColor: 'divider',
+        overflow: 'hidden',
+        display: 'flex',
+        flexDirection: 'column'
+      }}
+    >
+      <Box sx={{ p: 2, borderBottom: 1, borderColor: 'divider' }}>
+        <Box display="flex" justifyContent="space-between" alignItems="center">
+          <Typography variant="h6" component="h1">
+            Timelines
+          </Typography>
+          {user ? (
+            <Button
+              component={Link}
+              to="/timeline/create"
+              variant="contained"
+              color="primary"
+              size="small"
+            >
+              Create
+            </Button>
+          ) : (
+            <Button
+              component={Link}
+              to="/login"
+              variant="contained"
+              color="primary"
+              size="small"
+            >
+              Login to Create
+            </Button>
+          )}
+        </Box>
       </Box>
       
-      {timelines.length === 0 ? (
-        <Alert severity="info" sx={{ mt: 2 }}>
-          No timelines yet. Be the first to create one!
-        </Alert>
-      ) : (
-        <Grid container spacing={3}>
-          {timelines.map((timeline) => (
-            <Grid item xs={12} sm={6} md={4} key={timeline.id}>
-              <Card>
-                <CardContent>
-                  <Typography variant="h6" component="h2" gutterBottom>
-                    {timeline.name}
-                  </Typography>
-                  <Typography color="textSecondary" gutterBottom>
-                    {timeline.description}
-                  </Typography>
-                  <Button
-                    component={Link}
-                    to={`/timeline/${timeline.id}`}
-                    variant="outlined"
-                    color="primary"
-                    fullWidth
-                    sx={{ mt: 2 }}
-                  >
-                    View Timeline
-                  </Button>
-                </CardContent>
-              </Card>
-            </Grid>
-          ))}
-        </Grid>
-      )}
-    </Container>
+      <Box sx={{ 
+        overflow: 'auto',
+        flex: 1,
+        p: 2
+      }}>
+        {timelines.length === 0 ? (
+          <Alert severity="info" sx={{ mt: 2 }}>
+            No timelines yet. Be the first to create one!
+          </Alert>
+        ) : (
+          <Grid container spacing={2} direction="column">
+            {timelines.map((timeline) => (
+              <Grid item key={timeline.id}>
+                <Card>
+                  <CardContent>
+                    <Typography variant="h6" component="h2" gutterBottom>
+                      <Box component="span" sx={{ 
+                        fontWeight: 'bold',
+                        color: 'primary.main',
+                        mr: 0.5
+                      }}>
+                        #
+                      </Box>
+                      {timeline.name}
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary" gutterBottom>
+                      {timeline.description}
+                    </Typography>
+                    <Button
+                      component={Link}
+                      to={`/timeline/${timeline.id}`}
+                      variant="outlined"
+                      size="small"
+                      fullWidth
+                    >
+                      View Timeline
+                    </Button>
+                  </CardContent>
+                </Card>
+              </Grid>
+            ))}
+          </Grid>
+        )}
+      </Box>
+    </Box>
   );
 }
 
