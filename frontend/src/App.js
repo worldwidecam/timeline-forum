@@ -7,6 +7,7 @@ import TimelineList from './components/TimelineList';
 import TimelineView from './components/TimelineView';
 import CreateTimeline from './components/CreateTimeline';
 import CreateEvent from './components/CreateEvent';
+import CreatePost from './components/CreatePost';
 import PostsFeed from './components/PostsFeed';
 import Login from './components/Login';
 import Register from './components/Register';
@@ -55,7 +56,14 @@ function App() {
           <Box sx={{ display: 'flex', minHeight: '100vh' }}>
             <Box sx={{ flex: 1, pt: 8 }}>
               <Routes>
-                <Route path="/" element={<PostsFeed />} />
+                <Route path="/" element={
+                  <Box sx={{ display: 'flex' }}>
+                    <Box sx={{ flex: 1 }}>
+                      <PostsFeed />
+                    </Box>
+                    <TimelineList />
+                  </Box>
+                } />
                 <Route path="/timeline/:id" element={<TimelineView />} />
                 <Route path="/timeline/create" element={
                   <ProtectedRoute>
@@ -67,6 +75,11 @@ function App() {
                     <CreateEvent />
                   </ProtectedRoute>
                 } />
+                <Route path="/post/create" element={
+                  <ProtectedRoute>
+                    <CreatePost />
+                  </ProtectedRoute>
+                } />
                 <Route path="/login" element={<Login />} />
                 <Route path="/register" element={<Register />} />
                 <Route path="/profile" element={
@@ -76,7 +89,6 @@ function App() {
                 } />
               </Routes>
             </Box>
-            <TimelineList />
           </Box>
         </Router>
       </AuthProvider>

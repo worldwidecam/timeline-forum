@@ -8,6 +8,7 @@ from werkzeug.security import generate_password_hash, check_password_hash
 import requests
 from bs4 import BeautifulSoup
 from urllib.parse import urlparse
+from sqlalchemy import func
 
 def get_favicon_url(url, soup):
     try:
@@ -330,12 +331,16 @@ def get_timeline_events(timeline_id):
 
 @app.route('/api/timelines', methods=['GET'])
 def get_timelines():
-    timelines = Timeline.query.all()
+    search = request.args.get('search', '').lower()
+    if search:
+        timelines = Timeline.query.filter(func.lower(Timeline.name).contains(search)).all()
+    else:
+        timelines = Timeline.query.all()
     return jsonify([{
-        'id': timeline.id,
-        'name': timeline.name,
-        'description': timeline.description
-    } for timeline in timelines])
+        'id': t.id,
+        'name': t.name,
+        'description': t.description
+    } for t in timelines])
 
 @app.route('/api/event/<int:event_id>/comments', methods=['GET'])
 def get_event_comments(event_id):
@@ -350,9 +355,7 @@ def get_event_comments(event_id):
     } for comment in comments])
 
 @app.route('/api/event/<int:event_id>/comments', methods=['POST'])
-@jwt_required()
 def create_comment(event_id):
-    current_user_id = get_jwt_identity()
     data = request.get_json()
     
     if not data.get('content'):
@@ -361,7 +364,7 @@ def create_comment(event_id):
     new_comment = Comment(
         content=data['content'],
         event_id=event_id,
-        user_id=current_user_id
+        user_id=1  # Temporary default user ID
     )
     
     db.session.add(new_comment)
@@ -376,13 +379,8 @@ def create_comment(event_id):
     }), 201
 
 @app.route('/api/comments/<int:comment_id>', methods=['PUT', 'DELETE'])
-@jwt_required()
 def manage_comment(comment_id):
-    current_user_id = get_jwt_identity()
     comment = Comment.query.get_or_404(comment_id)
-    
-    if comment.user_id != current_user_id:
-        return jsonify({'error': 'Unauthorized'}), 403
     
     if request.method == 'DELETE':
         db.session.delete(comment)
@@ -405,10 +403,8 @@ def manage_comment(comment_id):
     })
 
 @app.route('/api/user/current', methods=['GET'])
-@jwt_required()
 def get_current_user():
-    current_user_id = get_jwt_identity()
-    user = User.query.get(current_user_id)
+    user = User.query.get(1)  # Temporary default user ID
     if not user:
         return jsonify({'error': 'User not found'}), 404
     
@@ -437,10 +433,8 @@ def get_timeline_posts(timeline_id):
     } for post in posts])
 
 @app.route('/api/timeline/<int:timeline_id>/posts', methods=['POST'])
-# @jwt_required()
 def create_post(timeline_id):
     try:
-        current_user_id = 1  # Temporary default user ID for testing
         data = request.get_json()
         print(f"Received post data: {data}")  # Debug log
         
@@ -453,7 +447,7 @@ def create_post(timeline_id):
             event_date=datetime.fromisoformat(data['event_date']),
             url=data.get('url', ''),
             timeline_id=timeline_id,
-            created_by=current_user_id
+            created_by=1  # Temporary default user ID
         )
         
         if new_post.url:
@@ -470,7 +464,7 @@ def create_post(timeline_id):
         db.session.add(new_post)
         db.session.commit()
         
-        user = User.query.get(current_user_id)
+        user = User.query.get(1)  # Temporary default user ID
         
         return jsonify({
             'id': new_post.id,
@@ -491,78 +485,90 @@ def create_post(timeline_id):
         db.session.rollback()
         return jsonify({'error': str(e)}), 500
 
-@app.route('/api/timeline/<int:timeline_id>/check-promotions', methods=['POST'])
-@jwt_required()
-def check_timeline_promotions(timeline_id):
+@app.route('/api/posts', methods=['POST'])
+def create_post_without_timeline():
     try:
-        # Get timeline's posts ordered by promotion score
-        top_posts = Post.query.filter_by(
-            timeline_id=timeline_id,
-            promoted_to_event=False
-        ).order_by(Post.promotion_score.desc()).limit(5).all()
+        data = request.get_json()
+        print(f"Received post data: {data}")  # Debug log
+        
+        if not all(key in data for key in ['title', 'content', 'date']):
+            return jsonify({'error': 'Missing required fields'}), 400
 
-        promoted_posts = []
-        for post in top_posts:
-            # Update the post's promotion score
-            current_score = post.update_promotion_score()
-            
-            # Check if post meets promotion criteria
-            if current_score >= 50:  # Base threshold
-                # Create a new event from the post
-                new_event = Event(
-                    title=post.title,
-                    content=post.content,
-                    event_date=post.event_date,
-                    url=post.url,
-                    url_title=post.url_title,
-                    url_description=post.url_description,
-                    url_image=post.url_image,
-                    timeline_id=timeline_id,
-                    created_by=post.created_by,
-                    created_at=datetime.now(timezone.utc),
-                    upvotes=post.upvotes
+        # Create timelines from tags if they don't exist
+        timelines = []
+        if 'tags' in data and data['tags']:
+            for tag in data['tags']:
+                # Convert tag to lowercase for case-insensitive comparison
+                normalized_tag = tag.lower()
+                # First try to find an existing timeline with case-insensitive search
+                timeline = Timeline.query.filter(func.lower(Timeline.name) == normalized_tag).first()
+                if not timeline:
+                    timeline = Timeline(
+                        name=normalized_tag,  # Store the tag in lowercase
+                        description=f"Timeline for {tag}",
+                        created_by=1  # Default user ID
+                    )
+                    db.session.add(timeline)
+                    db.session.commit()
+                timelines.append(timeline)
+        
+        # If no tags provided, use or create the default timeline
+        if not timelines:
+            timeline = Timeline.query.filter_by(name='general').first()  # Use lowercase for consistency
+            if not timeline:
+                timeline = Timeline(
+                    name='general',  # Use lowercase for consistency
+                    description='General timeline for uncategorized posts',
+                    created_by=1  # Default user ID
                 )
-                
-                # Mark post as promoted
-                post.promoted_to_event = True
-                promoted_posts.append(post.id)
-                
-                db.session.add(new_event)
+                db.session.add(timeline)
+                db.session.commit()
+            timelines.append(timeline)
+
+        # Create the post
+        new_post = Post(
+            title=data['title'],
+            content=data['content'],
+            event_date=datetime.fromisoformat(data['date']),
+            url=data.get('url', ''),
+            created_by=1,  # Default user ID
+            timeline_id=timelines[0].id
+        )
         
+        if new_post.url:
+            try:
+                link_preview = get_link_preview(new_post.url)
+                new_post.url_title = link_preview.get('url_title')
+                new_post.url_description = link_preview.get('url_description')
+                new_post.url_image = link_preview.get('url_image')
+            except Exception as preview_error:
+                print(f"Error fetching link preview: {str(preview_error)}")
+                pass
+        
+        db.session.add(new_post)
         db.session.commit()
         
         return jsonify({
-            'success': True,
-            'promoted_posts': promoted_posts,
-            'message': f'Promoted {len(promoted_posts)} posts to timeline events'
-        }), 200
-
+            'id': new_post.id,
+            'title': new_post.title,
+            'content': new_post.content,
+            'event_date': new_post.event_date.isoformat(),
+            'url': new_post.url,
+            'url_title': new_post.url_title,
+            'url_description': new_post.url_description,
+            'url_image': new_post.url_image,
+            'created_by': new_post.created_by,
+            'created_at': new_post.created_at.isoformat(),
+            'upvotes': new_post.upvotes,
+            'timeline': {
+                'id': timelines[0].id,
+                'name': timelines[0].name
+            }
+        }), 201
     except Exception as e:
+        print(f"Error creating post: {str(e)}")  # Debug log
         db.session.rollback()
-        return jsonify({
-            'success': False,
-            'error': str(e)
-        }), 500
-
-@app.route('/api/post/<int:post_id>/promote-vote', methods=['POST'])
-@jwt_required()
-def vote_for_promotion(post_id):
-    try:
-        post = Post.query.get_or_404(post_id)
-        post.promotion_votes += 1
-        post.update_promotion_score()
-        db.session.commit()
-        
-        return jsonify({
-            'success': True,
-            'new_score': post.promotion_score
-        }), 200
-    except Exception as e:
-        db.session.rollback()
-        return jsonify({
-            'success': False,
-            'error': str(e)
-        }), 500
+        return jsonify({'error': str(e)}), 500
 
 @app.route('/api/posts', methods=['GET'])
 def get_all_posts():
@@ -627,6 +633,77 @@ def get_all_posts():
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
+@app.route('/api/timeline/<int:timeline_id>/check-promotions', methods=['POST'])
+def check_timeline_promotions(timeline_id):
+    try:
+        # Get timeline's posts ordered by promotion score
+        top_posts = Post.query.filter_by(
+            timeline_id=timeline_id,
+            promoted_to_event=False
+        ).order_by(Post.promotion_score.desc()).limit(5).all()
+
+        promoted_posts = []
+        for post in top_posts:
+            # Update the post's promotion score
+            current_score = post.update_promotion_score()
+            
+            # Check if post meets promotion criteria
+            if current_score >= 50:  # Base threshold
+                # Create a new event from the post
+                new_event = Event(
+                    title=post.title,
+                    content=post.content,
+                    event_date=post.event_date,
+                    url=post.url,
+                    url_title=post.url_title,
+                    url_description=post.url_description,
+                    url_image=post.url_image,
+                    timeline_id=timeline_id,
+                    created_by=post.created_by,
+                    created_at=datetime.now(timezone.utc),
+                    upvotes=post.upvotes
+                )
+                
+                # Mark post as promoted
+                post.promoted_to_event = True
+                promoted_posts.append(post.id)
+                
+                db.session.add(new_event)
+        
+        db.session.commit()
+        
+        return jsonify({
+            'success': True,
+            'promoted_posts': promoted_posts,
+            'message': f'Promoted {len(promoted_posts)} posts to timeline events'
+        }), 200
+
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+@app.route('/api/post/<int:post_id>/promote-vote', methods=['POST'])
+def vote_for_promotion(post_id):
+    try:
+        post = Post.query.get_or_404(post_id)
+        post.promotion_votes += 1
+        post.update_promotion_score()
+        db.session.commit()
+        
+        return jsonify({
+            'success': True,
+            'new_score': post.promotion_score
+        }), 200
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
 # Auth routes
 @app.route('/api/auth/register', methods=['POST'])
 def register():
@@ -684,10 +761,8 @@ def login():
     })
 
 @app.route('/api/user/profile', methods=['GET', 'PUT'])
-@jwt_required()
 def user_profile():
-    current_user_id = get_jwt_identity()
-    user = User.query.get(current_user_id)
+    user = User.query.get(1)  # Temporary default user ID
     
     if not user:
         return jsonify({'error': 'User not found'}), 404
