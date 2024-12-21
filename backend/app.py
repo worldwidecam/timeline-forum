@@ -1,7 +1,7 @@
 from flask import Flask, request, jsonify
 from flask_sqlalchemy import SQLAlchemy
 from flask_jwt_extended import JWTManager, create_access_token, jwt_required, get_jwt_identity
-from flask_cors import CORS
+from flask_cors import CORS, cross_origin
 from datetime import datetime, timezone
 import os
 from werkzeug.security import generate_password_hash, check_password_hash
@@ -9,6 +9,10 @@ import requests
 from bs4 import BeautifulSoup
 from urllib.parse import urlparse
 from sqlalchemy import func
+from werkzeug.utils import secure_filename
+from PIL import Image
+import io
+import time
 
 def get_favicon_url(url, soup):
     try:
@@ -151,7 +155,14 @@ def get_link_preview(url):
             }
 
 app = Flask(__name__)
-CORS(app)
+CORS(app, resources={
+    r"/*": {
+        "origins": ["http://localhost:3000"],
+        "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+        "allow_headers": ["Content-Type", "Authorization"],
+        "supports_credentials": True
+    }
+})
 
 # Configuration
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///timeline_forum.db'
@@ -160,6 +171,10 @@ app.config['JWT_SECRET_KEY'] = 'your-secret-key'  # Change this in production
 
 db = SQLAlchemy(app)
 jwt = JWTManager(app)
+
+UPLOAD_FOLDER = 'static/avatars'
+if not os.path.exists(UPLOAD_FOLDER):
+    os.makedirs(UPLOAD_FOLDER)
 
 # Models
 class User(db.Model):
@@ -809,6 +824,69 @@ def user_profile():
         'avatar_url': user.avatar_url,
         'created_at': user.created_at.isoformat()
     })
+
+@app.route('/api/profile/update', methods=['POST'])
+@jwt_required()
+@cross_origin()
+def update_profile():
+    try:
+        current_user_id = get_jwt_identity()
+        user = User.query.get(current_user_id)
+        
+        if not user:
+            return jsonify({'error': 'User not found'}), 404
+
+        # Update text fields
+        if request.form.get('username'):
+            user.username = request.form.get('username')
+        if request.form.get('email'):
+            user.email = request.form.get('email')
+        if request.form.get('bio'):
+            user.bio = request.form.get('bio')
+
+        # Handle avatar upload
+        if 'avatar' in request.files:
+            file = request.files['avatar']
+            if file and file.filename:
+                try:
+                    # Process the image
+                    image = Image.open(file)
+                    
+                    # Convert to RGB if necessary
+                    if image.mode != 'RGB':
+                        image = image.convert('RGB')
+                    
+                    # Resize image to a standard size
+                    image = image.resize((200, 200))
+                    
+                    # Create avatars directory if it doesn't exist
+                    if not os.path.exists(UPLOAD_FOLDER):
+                        os.makedirs(UPLOAD_FOLDER)
+                    
+                    # Save the processed image
+                    filename = secure_filename(f"avatar_{current_user_id}_{int(time.time())}.jpg")
+                    filepath = os.path.join(UPLOAD_FOLDER, filename)
+                    image.save(filepath, 'JPEG', quality=85)
+                    
+                    # Update avatar URL in database
+                    user.avatar_url = f"/static/avatars/{filename}"
+                except Exception as e:
+                    return jsonify({'error': f'Image processing failed: {str(e)}'}), 400
+
+        db.session.commit()
+
+        return jsonify({
+            'id': user.id,
+            'username': user.username,
+            'email': user.email,
+            'bio': user.bio,
+            'avatar_url': user.avatar_url
+        })
+
+    except Exception as e:
+        db.session.rollback()
+        app.logger.error(f'Profile update error: {str(e)}')
+        return jsonify({'error': str(e)}), 500
 
 if __name__ == '__main__':
     with app.app_context():

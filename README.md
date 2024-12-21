@@ -125,7 +125,27 @@ When suggesting improvements, consider:
 - Will it scale with community growth?
 - Does it respect user privacy needs?
 
-## Timeline Component Glossary
+## UI Components and Terminology
+
+### Navigation Elements
+- **View Profile Button**: Direct access to user profile page, located in the top-right navbar
+- **Profile Hamburger Menu**: Expandable menu (≡) containing profile-related options and settings
+- **Profile Avatar**: User's profile picture, displayed in the top-right corner
+
+### Profile System
+- **Profile Page**: Main user profile view
+  - Personal information display
+  - Activity history
+  - Timeline overview
+- **Profile Settings**: Configuration page accessed via Profile Hamburger Menu
+  - Profile picture management
+  - Account information updates
+  - Personal details modification
+
+### Profile Navigation
+- Top navbar provides consistent access to profile features
+- Profile Hamburger Menu (≡) contains all profile-related settings and options
+- Clear separation between main profile view and settings management
 
 ### Visual Elements
 - **Fret**: The space between time markers on the timeline. These are designed to be equidistant to create a consistent visual rhythm.

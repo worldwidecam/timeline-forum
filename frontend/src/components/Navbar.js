@@ -1,5 +1,5 @@
 import React from 'react';
-import { Link as RouterLink, useNavigate } from 'react-router-dom';
+import { Link as RouterLink, useNavigate, useLocation } from 'react-router-dom';
 import {
   AppBar,
   Toolbar,
@@ -10,13 +10,25 @@ import {
   Menu,
   MenuItem,
   IconButton,
+  Drawer,
+  List,
+  ListItem,
+  ListItemIcon,
+  ListItemText,
+  Divider,
 } from '@mui/material';
 import { useAuth } from '../contexts/AuthContext';
+import MenuIcon from '@mui/icons-material/Menu';
+import SettingsIcon from '@mui/icons-material/Settings';
 
 function Navbar() {
   const navigate = useNavigate();
+  const location = useLocation();
   const { user, logout } = useAuth();
   const [anchorEl, setAnchorEl] = React.useState(null);
+  const [drawerOpen, setDrawerOpen] = React.useState(false);
+
+  const isProfilePage = location.pathname.startsWith('/profile');
 
   const handleMenu = (event) => {
     setAnchorEl(event.currentTarget);
@@ -31,6 +43,37 @@ function Navbar() {
     handleClose();
     navigate('/');
   };
+
+  const toggleDrawer = (open) => (event) => {
+    if (event.type === 'keydown' && (event.key === 'Tab' || event.key === 'Shift')) {
+      return;
+    }
+    setDrawerOpen(open);
+  };
+
+  const profileTabs = (
+    <Box
+      sx={{ width: 250 }}
+      role="presentation"
+      onClick={toggleDrawer(false)}
+      onKeyDown={toggleDrawer(false)}
+    >
+      <List>
+        <ListItem>
+          <Typography variant="h6" sx={{ p: 2 }}>
+            Profile Menu
+          </Typography>
+        </ListItem>
+        <Divider />
+        <ListItem button component={RouterLink} to="/profile/settings">
+          <ListItemIcon>
+            <SettingsIcon />
+          </ListItemIcon>
+          <ListItemText primary="Profile Settings" />
+        </ListItem>
+      </List>
+    </Box>
+  );
 
   return (
     <AppBar position="static">
@@ -47,14 +90,35 @@ function Navbar() {
         <Box sx={{ display: 'flex', alignItems: 'center' }}>
           {user ? (
             <>
-              <Button
-                color="inherit"
-                component={RouterLink}
-                to="/timeline/create"
-                sx={{ mr: 2 }}
-              >
-                Create Timeline
-              </Button>
+              {!isProfilePage && (
+                <Button
+                  color="inherit"
+                  component={RouterLink}
+                  to="/profile"
+                  sx={{ mr: 2 }}
+                >
+                  View Profile
+                </Button>
+              )}
+              {isProfilePage && (
+                <>
+                  <IconButton
+                    color="inherit"
+                    onClick={toggleDrawer(true)}
+                    sx={{ mr: 2 }}
+                    aria-label="profile menu"
+                  >
+                    <MenuIcon />
+                  </IconButton>
+                  <Drawer
+                    anchor="right"
+                    open={drawerOpen}
+                    onClose={toggleDrawer(false)}
+                  >
+                    {profileTabs}
+                  </Drawer>
+                </>
+              )}
               <IconButton onClick={handleMenu} sx={{ p: 0 }}>
                 <Avatar
                   alt={user.username}
@@ -69,32 +133,15 @@ function Navbar() {
                 open={Boolean(anchorEl)}
                 onClose={handleClose}
               >
-                <MenuItem
-                  component={RouterLink}
-                  to="/profile"
-                  onClick={handleClose}
-                >
-                  Profile
-                </MenuItem>
                 <MenuItem onClick={handleLogout}>Logout</MenuItem>
               </Menu>
             </>
           ) : (
             <>
-              <Button
-                color="inherit"
-                component={RouterLink}
-                to="/login"
-                sx={{ mr: 1 }}
-              >
+              <Button color="inherit" component={RouterLink} to="/login">
                 Login
               </Button>
-              <Button
-                color="inherit"
-                component={RouterLink}
-                to="/register"
-                variant="outlined"
-              >
+              <Button color="inherit" component={RouterLink} to="/register">
                 Register
               </Button>
             </>

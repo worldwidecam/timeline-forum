@@ -12,6 +12,7 @@ import PostsFeed from './components/PostsFeed';
 import Login from './components/Login';
 import Register from './components/Register';
 import UserProfile from './components/UserProfile';
+import ProfileSettings from './components/ProfileSettings'; // Added import statement
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { CircularProgress, Box } from '@mui/material';
 
@@ -86,7 +87,10 @@ function App() {
                   <ProtectedRoute>
                     <UserProfile />
                   </ProtectedRoute>
-                } />
+                }>
+                  <Route index element={<UserProfile />} />
+                  <Route path="settings" element={<ProfileSettings />} />
+                </Route>
               </Routes>
             </Box>
           </Box>

@@ -55,16 +55,16 @@ export const AuthProvider = ({ children }) => {
     setUser(null);
   };
 
-  const updateProfile = async (data) => {
-    const response = await axios.put(
-      'http://localhost:5000/api/user/profile',
-      data,
-      {
-        headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
-      }
-    );
-    setUser(response.data);
-    return response.data;
+  const updateProfile = (userData) => {
+    setUser(prevUser => ({
+      ...prevUser,
+      ...userData
+    }));
+    
+    // Update the stored user data
+    const storedData = JSON.parse(localStorage.getItem('userData') || '{}');
+    const updatedData = { ...storedData, ...userData };
+    localStorage.setItem('userData', JSON.stringify(updatedData));
   };
 
   const value = {
