@@ -13,6 +13,10 @@ from werkzeug.utils import secure_filename
 from PIL import Image
 import io
 import time
+import logging
+
+app = Flask(__name__)
+app.logger.setLevel(logging.INFO)
 
 def get_favicon_url(url, soup):
     try:
@@ -160,7 +164,8 @@ CORS(app, resources={
         "origins": ["http://localhost:3000"],
         "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
         "allow_headers": ["Content-Type", "Authorization"],
-        "supports_credentials": True
+        "supports_credentials": True,
+        "expose_headers": ["Content-Type", "Authorization"]
     }
 })
 
@@ -849,32 +854,43 @@ def update_profile():
             file = request.files['avatar']
             if file and file.filename:
                 try:
-                    # Process the image
-                    image = Image.open(file)
+                    # Ensure the upload folder exists
+                    os.makedirs(UPLOAD_FOLDER, exist_ok=True)
                     
-                    # Convert to RGB if necessary
-                    if image.mode != 'RGB':
-                        image = image.convert('RGB')
-                    
-                    # Resize image to a standard size
-                    image = image.resize((200, 200))
-                    
-                    # Create avatars directory if it doesn't exist
-                    if not os.path.exists(UPLOAD_FOLDER):
-                        os.makedirs(UPLOAD_FOLDER)
-                    
-                    # Save the processed image
+                    # Generate a secure filename
                     filename = secure_filename(f"avatar_{current_user_id}_{int(time.time())}.jpg")
                     filepath = os.path.join(UPLOAD_FOLDER, filename)
-                    image.save(filepath, 'JPEG', quality=85)
                     
-                    # Update avatar URL in database
-                    user.avatar_url = f"/static/avatars/{filename}"
+                    # Save the original file first
+                    file.save(filepath)
+                    
+                    try:
+                        # Process the image
+                        with Image.open(filepath) as image:
+                            # Convert to RGB if necessary
+                            if image.mode != 'RGB':
+                                image = image.convert('RGB')
+                            
+                            # Resize image
+                            image = image.resize((200, 200))
+                            
+                            # Save the processed image
+                            image.save(filepath, 'JPEG', quality=85)
+                            
+                            # Update avatar URL in database
+                            user.avatar_url = f"/static/avatars/{filename}"
+                            app.logger.info(f'Successfully saved avatar for user {current_user_id} at {filepath}')
+                    except Exception as img_error:
+                        # If image processing fails, remove the uploaded file
+                        os.remove(filepath)
+                        raise Exception(f'Image processing failed: {str(img_error)}')
+                        
                 except Exception as e:
-                    return jsonify({'error': f'Image processing failed: {str(e)}'}), 400
+                    app.logger.error(f'Avatar upload error: {str(e)}')
+                    return jsonify({'error': f'Avatar upload failed: {str(e)}'}), 400
 
         db.session.commit()
-
+        
         return jsonify({
             'id': user.id,
             'username': user.username,

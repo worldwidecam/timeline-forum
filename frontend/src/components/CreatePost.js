@@ -9,8 +9,10 @@ import {
   Container,
   Alert,
   Chip,
-  Stack
+  Stack,
+  IconButton
 } from '@mui/material';
+import CloseIcon from '@mui/icons-material/Close';
 import { DateTimePicker } from '@mui/x-date-pickers/DateTimePicker';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
@@ -68,7 +70,18 @@ function CreatePost() {
 
   return (
     <Container maxWidth="md">
-      <Paper elevation={3} sx={{ p: 4, mt: 4 }}>
+      <Paper elevation={3} sx={{ p: 4, mt: 4, position: 'relative' }}>
+        <IconButton
+          aria-label="close"
+          onClick={() => navigate('/')}
+          sx={{
+            position: 'absolute',
+            right: 8,
+            top: 8,
+          }}
+        >
+          <CloseIcon />
+        </IconButton>
         <Typography variant="h4" component="h1" gutterBottom>
           Create New Post
         </Typography>

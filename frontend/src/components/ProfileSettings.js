@@ -50,6 +50,11 @@ const ProfileSettings = () => {
     setSuccess('');
 
     try {
+      const token = localStorage.getItem('token');
+      if (!token) {
+        throw new Error('Not authenticated');
+      }
+
       // Create FormData for multipart form submission
       const submitData = new FormData();
       submitData.append('username', formData.username);
@@ -57,21 +62,23 @@ const ProfileSettings = () => {
       submitData.append('bio', formData.bio);
       
       if (selectedFile) {
+        // Validate file type
+        if (!selectedFile.type.startsWith('image/')) {
+          throw new Error('Please select a valid image file');
+        }
+        // Validate file size (max 5MB)
+        if (selectedFile.size > 5 * 1024 * 1024) {
+          throw new Error('Image size should be less than 5MB');
+        }
         submitData.append('avatar', selectedFile);
-      }
-
-      const token = localStorage.getItem('token');
-      if (!token) {
-        throw new Error('Not authenticated');
       }
 
       const response = await fetch('http://localhost:5000/api/profile/update', {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${token}`,
+          'Authorization': `Bearer ${token}`
         },
         body: submitData,
-        mode: 'cors',
         credentials: 'include'
       });
 
@@ -84,8 +91,10 @@ const ProfileSettings = () => {
       updateProfile(data);
       setSuccess('Profile updated successfully');
       
-      // Refresh the page to show updated profile
-      window.location.reload();
+      // Only reload if there were no errors
+      setTimeout(() => {
+        window.location.reload();
+      }, 1000);
     } catch (err) {
       console.error('Profile update error:', err);
       setError(err.message || 'Failed to update profile');
