@@ -20,10 +20,12 @@ import PhotoCamera from '@mui/icons-material/PhotoCamera';
 import LightModeIcon from '@mui/icons-material/LightMode';
 import DarkModeIcon from '@mui/icons-material/DarkMode';
 import { useAuth } from '../contexts/AuthContext';
+import { useTheme } from '../contexts/ThemeContext';
 import MusicPlayer from './MusicPlayer';
 
 const ProfileSettings = () => {
   const { user, updateProfile } = useAuth();
+  const { isDarkMode, toggleTheme } = useTheme();
   const [formData, setFormData] = useState({
     email: user?.email || '',
     username: user?.username || '',
@@ -37,7 +39,6 @@ const ProfileSettings = () => {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const [darkMode, setDarkMode] = useState(localStorage.getItem('theme') === 'dark');
   const [musicData, setMusicData] = useState({
     music_url: '',
     music_platform: 'youtube'
@@ -65,11 +66,7 @@ const ProfileSettings = () => {
   }, [user]);
 
   const handleThemeChange = (event) => {
-    const isDark = event.target.checked;
-    setDarkMode(isDark);
-    localStorage.setItem('theme', isDark ? 'dark' : 'light');
-    // Assuming you have a theme context or provider
-    // updateTheme(isDark ? 'dark' : 'light');
+    toggleTheme();
   };
 
   const handleInputChange = (e) => {
@@ -203,7 +200,7 @@ const ProfileSettings = () => {
   return (
     <Container maxWidth="md">
       <Paper sx={{ p: 4, mt: 4 }}>
-        <Typography variant="h5" gutterBottom>
+        <Typography variant="h4" gutterBottom>
           Profile Settings
         </Typography>
         
@@ -213,31 +210,24 @@ const ProfileSettings = () => {
           </Alert>
         )}
         
+        <Box sx={{ mb: 3 }}>
+          <FormControlLabel
+            control={
+              <Switch
+                checked={isDarkMode}
+                onChange={handleThemeChange}
+                icon={<LightModeIcon />}
+                checkedIcon={<DarkModeIcon />}
+              />
+            }
+            label={isDarkMode ? "Dark Mode" : "Light Mode"}
+          />
+        </Box>
+        
+        <Divider sx={{ my: 3 }} />
+        
         <Box component="form" onSubmit={handleSubmit} sx={{ mt: 3 }}>
           <Grid container spacing={3}>
-            {/* Theme Preference Section */}
-            <Grid item xs={12}>
-              <Typography variant="h6" gutterBottom>
-                Theme Preference
-              </Typography>
-              <FormControlLabel
-                control={
-                  <Switch
-                    checked={darkMode}
-                    onChange={handleThemeChange}
-                    icon={<LightModeIcon />}
-                    checkedIcon={<DarkModeIcon />}
-                  />
-                }
-                label={darkMode ? "Dark Mode" : "Light Mode"}
-              />
-            </Grid>
-
-            <Grid item xs={12}>
-              <Divider sx={{ my: 2 }} />
-            </Grid>
-
-            {/* Profile Picture Section */}
             <Grid item xs={12} sm={4} md={3}>
               <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
                 <Avatar
@@ -267,7 +257,6 @@ const ProfileSettings = () => {
 
             <Grid item xs={12} sm={8} md={9}>
               <Grid container spacing={3}>
-                {/* Profile Information Section */}
                 <Grid item xs={12}>
                   <Typography variant="h6" gutterBottom>
                     Profile Information
@@ -311,7 +300,6 @@ const ProfileSettings = () => {
                   <Divider sx={{ my: 2 }} />
                 </Grid>
 
-                {/* Password Change Section */}
                 <Grid item xs={12}>
                   <Typography variant="h6" gutterBottom>
                     Change Password
@@ -369,7 +357,6 @@ const ProfileSettings = () => {
               <Divider sx={{ my: 2 }} />
             </Grid>
 
-            {/* Music Settings Section */}
             <Grid item xs={12}>
               <Typography variant="h6" gutterBottom>
                 Profile Music
@@ -396,7 +383,6 @@ const ProfileSettings = () => {
               )}
             </Grid>
 
-            {/* Preview the music player */}
             <Grid item xs={12}>
               {(musicPreview || musicData?.music_url) && (
                 <MusicPlayer url={musicPreview || musicData?.music_url} />

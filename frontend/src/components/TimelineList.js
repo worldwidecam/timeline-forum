@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import {
   Container,
   Grid,
@@ -16,6 +16,7 @@ import { useAuth } from '../contexts/AuthContext';
 function TimelineList() {
   const [timelines, setTimelines] = useState([]);
   const { user } = useAuth();
+  const navigate = useNavigate();
 
   useEffect(() => {
     const fetchTimelines = async () => {
@@ -28,6 +29,10 @@ function TimelineList() {
     };
     fetchTimelines();
   }, []);
+
+  const handleCreateTimeline = () => {
+    navigate('/timeline/create');
+  };
 
   return (
     <Box
@@ -52,11 +57,10 @@ function TimelineList() {
           </Typography>
           {user ? (
             <Button
-              component={Link}
-              to="/timeline/create"
               variant="contained"
               color="primary"
               size="small"
+              onClick={handleCreateTimeline}
             >
               Create
             </Button>
@@ -73,12 +77,8 @@ function TimelineList() {
           )}
         </Box>
       </Box>
-      
-      <Box sx={{ 
-        overflow: 'auto',
-        flex: 1,
-        p: 2
-      }}>
+
+      <Box sx={{ flex: 1, overflow: 'auto', p: 2 }}>
         {timelines.length === 0 ? (
           <Alert severity="info" sx={{ mt: 2 }}>
             No timelines yet. Be the first to create one!
@@ -97,7 +97,12 @@ function TimelineList() {
                       }}>
                         #
                       </Box>
-                      {timeline.name}
+                      <Link
+                        to={`/timeline/${timeline.id}`}
+                        style={{ textDecoration: 'none', color: 'inherit' }}
+                      >
+                        {timeline.name}
+                      </Link>
                     </Typography>
                     <Typography variant="body2" color="text.secondary" gutterBottom>
                       {timeline.description}

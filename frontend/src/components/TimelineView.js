@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, Link, useNavigate } from 'react-router-dom';
 import {
   Container,
   Paper,
@@ -18,6 +18,7 @@ import { useAuth } from '../contexts/AuthContext';
 function TimelineView() {
   const { id } = useParams();
   const { user } = useAuth();
+  const navigate = useNavigate();
   const [events, setEvents] = useState([]);
   const [timelineInfo, setTimelineInfo] = useState(null);
   const [selectedEvent, setSelectedEvent] = useState(null);
@@ -221,7 +222,7 @@ function TimelineView() {
 
   const handleEditEvent = (event) => {
     // Navigate to edit page
-    window.location.href = `/timeline/${id}/event/${event.id}/edit`;
+    navigate(`/timeline/${id}/event/${event.id}/edit`);
   };
 
   const handleDeleteEvent = async (eventId) => {
@@ -278,9 +279,7 @@ function TimelineView() {
                 <Button
                   variant="contained"
                   color="primary"
-                  component={Link}
-                  to={`/timeline/${id}/event/create`}
-                  sx={{ color: '#fff' }}
+                  onClick={() => navigate(`/timeline/${id}/event/create`)}
                 >
                   Create Event
                 </Button>

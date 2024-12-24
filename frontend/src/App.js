@@ -1,6 +1,5 @@
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
-import { ThemeProvider, createTheme } from '@mui/material/styles';
 import CssBaseline from '@mui/material/CssBaseline';
 import Navbar from './components/Navbar';
 import TimelineList from './components/TimelineList';
@@ -14,19 +13,8 @@ import Register from './components/Register';
 import Profile from './components/Profile';
 import ProfileSettings from './components/ProfileSettings';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
+import { CustomThemeProvider } from './contexts/ThemeContext';
 import { CircularProgress, Box } from '@mui/material';
-
-const theme = createTheme({
-  palette: {
-    mode: 'dark',
-    primary: {
-      main: '#90caf9',
-    },
-    secondary: {
-      main: '#f48fb1',
-    },
-  },
-});
 
 // Protected Route component
 const ProtectedRoute = ({ children }) => {
@@ -49,23 +37,36 @@ const ProtectedRoute = ({ children }) => {
 
 function App() {
   return (
-    <ThemeProvider theme={theme}>
-      <CssBaseline />
+    <CustomThemeProvider>
       <AuthProvider>
+        <CssBaseline />
         <Router>
           <Navbar />
           <Box sx={{ display: 'flex', minHeight: '100vh' }}>
             <Box sx={{ flex: 1, pt: 8 }}>
               <Routes>
+                <Route path="/login" element={<Login />} />
+                <Route path="/register" element={<Register />} />
                 <Route path="/" element={
                   <Box sx={{ display: 'flex' }}>
                     <Box sx={{ flex: 1 }}>
                       <PostsFeed />
                     </Box>
-                    <TimelineList />
+                    <Box sx={{ width: 300, p: 2 }}>
+                      <TimelineList />
+                    </Box>
                   </Box>
                 } />
-                <Route path="/timeline/:id" element={<TimelineView />} />
+                <Route path="/timelines" element={
+                  <ProtectedRoute>
+                    <TimelineList />
+                  </ProtectedRoute>
+                } />
+                <Route path="/timeline/:id" element={
+                  <ProtectedRoute>
+                    <TimelineView />
+                  </ProtectedRoute>
+                } />
                 <Route path="/timeline/create" element={
                   <ProtectedRoute>
                     <CreateTimeline />
@@ -76,13 +77,11 @@ function App() {
                     <CreateEvent />
                   </ProtectedRoute>
                 } />
-                <Route path="/post/create" element={
+                <Route path="/create-post" element={
                   <ProtectedRoute>
                     <CreatePost />
                   </ProtectedRoute>
                 } />
-                <Route path="/login" element={<Login />} />
-                <Route path="/register" element={<Register />} />
                 <Route path="/profile" element={
                   <ProtectedRoute>
                     <Profile />
@@ -98,7 +97,7 @@ function App() {
           </Box>
         </Router>
       </AuthProvider>
-    </ThemeProvider>
+    </CustomThemeProvider>
   );
 }
 
