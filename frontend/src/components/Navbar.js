@@ -20,6 +20,7 @@ import {
 import { useAuth } from '../contexts/AuthContext';
 import MenuIcon from '@mui/icons-material/Menu';
 import SettingsIcon from '@mui/icons-material/Settings';
+import PersonIcon from '@mui/icons-material/Person';
 
 function Navbar() {
   const navigate = useNavigate();
@@ -65,6 +66,12 @@ function Navbar() {
           </Typography>
         </ListItem>
         <Divider />
+        <ListItem button component={RouterLink} to="/profile">
+          <ListItemIcon>
+            <PersonIcon />
+          </ListItemIcon>
+          <ListItemText primary="Profile" />
+        </ListItem>
         <ListItem button component={RouterLink} to="/profile/settings">
           <ListItemIcon>
             <SettingsIcon />
@@ -133,6 +140,12 @@ function Navbar() {
                 open={Boolean(anchorEl)}
                 onClose={handleClose}
               >
+                <MenuItem component={RouterLink} to="/profile" onClick={handleClose}>
+                  Profile
+                </MenuItem>
+                <MenuItem component={RouterLink} to="/profile/settings" onClick={handleClose}>
+                  Settings
+                </MenuItem>
                 <MenuItem onClick={handleLogout}>Logout</MenuItem>
               </Menu>
             </>

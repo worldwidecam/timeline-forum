@@ -1,4 +1,4 @@
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, send_from_directory
 from flask_sqlalchemy import SQLAlchemy
 from flask_jwt_extended import JWTManager, create_access_token, jwt_required, get_jwt_identity
 from flask_cors import CORS, cross_origin
@@ -17,6 +17,48 @@ import logging
 
 app = Flask(__name__)
 app.logger.setLevel(logging.INFO)
+
+# Configuration
+app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///timeline_forum.db'
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+app.config['JWT_SECRET_KEY'] = 'your-secret-key'  # Change this in production
+app.config['JWT_ACCESS_TOKEN_EXPIRES'] = False  # Tokens don't expire
+
+# Initialize extensions
+db = SQLAlchemy(app)
+jwt = JWTManager(app)
+CORS(app, resources={
+    r"/*": {
+        "origins": ["http://localhost:3000"],
+        "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+        "allow_headers": ["Content-Type", "Authorization"],
+        "supports_credentials": True,
+        "expose_headers": ["Content-Type", "Authorization"]
+    }
+})
+
+# File upload configuration
+UPLOAD_FOLDER = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'uploads')
+ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif'}
+app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
+app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB max file size
+
+# Create uploads directory if it doesn't exist
+if not os.path.exists(UPLOAD_FOLDER):
+    os.makedirs(UPLOAD_FOLDER)
+
+# Serve static files
+@app.route('/uploads/<path:filename>')
+def serve_file(filename):
+    return send_from_directory(app.config['UPLOAD_FOLDER'], filename)
+
+def allowed_file(filename):
+    return '.' in filename and \
+           filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
+
+def allowed_audio_file(filename):
+    return '.' in filename and \
+           filename.rsplit('.', 1)[1].lower() in {'mp3', 'wav', 'ogg'}
 
 def get_favicon_url(url, soup):
     try:
@@ -158,30 +200,15 @@ def get_link_preview(url):
                 'url_image': ''
             }
 
-app = Flask(__name__)
-CORS(app, resources={
-    r"/*": {
-        "origins": ["http://localhost:3000"],
-        "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-        "allow_headers": ["Content-Type", "Authorization"],
-        "supports_credentials": True,
-        "expose_headers": ["Content-Type", "Authorization"]
-    }
-})
-
-# Configuration
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///timeline_forum.db'
-app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-app.config['JWT_SECRET_KEY'] = 'your-secret-key'  # Change this in production
-
-db = SQLAlchemy(app)
-jwt = JWTManager(app)
-
-UPLOAD_FOLDER = 'static/avatars'
-if not os.path.exists(UPLOAD_FOLDER):
-    os.makedirs(UPLOAD_FOLDER)
-
 # Models
+class UserMusic(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), unique=True)
+    music_url = db.Column(db.String(500), nullable=True)
+    music_platform = db.Column(db.String(20), nullable=True)  # 'youtube', 'soundcloud', or 'spotify'
+    created_at = db.Column(db.DateTime, default=datetime.now(timezone.utc))
+    updated_at = db.Column(db.DateTime, default=datetime.now(timezone.utc), onupdate=datetime.now(timezone.utc))
+
 class User(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     username = db.Column(db.String(80), unique=True, nullable=False)
@@ -190,12 +217,7 @@ class User(db.Model):
     created_at = db.Column(db.DateTime, default=datetime.now(timezone.utc))
     bio = db.Column(db.Text, nullable=True)
     avatar_url = db.Column(db.String(200), nullable=True)
-    
-    def set_password(self, password):
-        self.password_hash = generate_password_hash(password)
-        
-    def check_password(self, password):
-        return check_password_hash(self.password_hash, password)
+    music = db.relationship('UserMusic', backref='user', uselist=False)
 
 class Timeline(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -423,15 +445,22 @@ def manage_comment(comment_id):
     })
 
 @app.route('/api/user/current', methods=['GET'])
+@jwt_required()
 def get_current_user():
-    user = User.query.get(1)  # Temporary default user ID
+    # Convert JWT identity to integer for database query
+    current_user_id = int(get_jwt_identity())
+    user = User.query.get(current_user_id)
+    
     if not user:
         return jsonify({'error': 'User not found'}), 404
-    
+        
     return jsonify({
         'id': user.id,
         'username': user.username,
-        'email': user.email
+        'email': user.email,
+        'bio': user.bio,
+        'avatar_url': user.avatar_url,
+        'created_at': user.created_at.isoformat()
     })
 
 @app.route('/api/timeline/<int:timeline_id>/posts', methods=['GET'])
@@ -724,6 +753,86 @@ def vote_for_promotion(post_id):
             'error': str(e)
         }), 500
 
+@app.route('/api/profile/music', methods=['POST'])
+@jwt_required()
+def update_music_preferences():
+    try:
+        current_user_id = int(get_jwt_identity())
+        app.logger.info(f'Updating music preferences for user {current_user_id}')
+        
+        user = User.query.get(current_user_id)
+        if not user:
+            app.logger.error(f'User {current_user_id} not found')
+            return jsonify({'error': 'User not found'}), 404
+
+        if 'music' not in request.files:
+            return jsonify({'error': 'No music file provided'}), 400
+            
+        file = request.files['music']
+        if file.filename == '':
+            return jsonify({'error': 'No selected file'}), 400
+            
+        if file and allowed_audio_file(file.filename):
+            # Delete old music file if it exists
+            if user.music and user.music.music_url:
+                old_file = user.music.music_url.split('/')[-1]
+                old_file_path = os.path.join(app.config['UPLOAD_FOLDER'], old_file)
+                if os.path.exists(old_file_path):
+                    os.remove(old_file_path)
+            
+            # Save new music file
+            filename = secure_filename(f'music_{current_user_id}_{int(time.time())}.{file.filename.rsplit(".", 1)[1].lower()}')
+            file_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+            file.save(file_path)
+            
+            # Update or create music preferences
+            music_prefs = user.music
+            if not music_prefs:
+                music_prefs = UserMusic(user_id=user.id)
+                db.session.add(music_prefs)
+            
+            music_prefs.music_url = f'http://localhost:5000/uploads/{filename}'
+            
+            db.session.commit()
+            app.logger.info('Music preferences updated successfully')
+            
+            return jsonify({
+                'music_url': music_prefs.music_url
+            })
+        else:
+            return jsonify({'error': 'Invalid file type. Please upload an MP3, WAV, or OGG file'}), 400
+            
+    except Exception as e:
+        app.logger.error(f'Error updating music preferences: {str(e)}')
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/profile/music', methods=['GET'])
+@jwt_required()
+def get_music_preferences():
+    try:
+        current_user_id = int(get_jwt_identity())
+        user = User.query.get(current_user_id)
+        
+        if not user:
+            return jsonify({'error': 'User not found'}), 404
+            
+        music_prefs = user.music
+        if not music_prefs:
+            return jsonify({
+                'music_url': None,
+                'music_platform': None
+            })
+            
+        return jsonify({
+            'music_url': music_prefs.music_url,
+            'music_platform': music_prefs.music_platform
+        })
+        
+    except Exception as e:
+        app.logger.error(f'Error getting music preferences: {str(e)}')
+        return jsonify({'error': str(e)}), 500
+
 # Auth routes
 @app.route('/api/auth/register', methods=['POST'])
 def register():
@@ -749,8 +858,8 @@ def register():
     db.session.add(user)
     db.session.commit()
     
-    # Create access token
-    access_token = create_access_token(identity=user.id)
+    # Create access token with string identity
+    access_token = create_access_token(identity=str(user.id))
     
     return jsonify({
         'id': user.id,
@@ -771,7 +880,8 @@ def login():
     if not user or not user.check_password(data['password']):
         return jsonify({'error': 'Invalid email or password'}), 401
     
-    access_token = create_access_token(identity=user.id)
+    # Create access token with string identity
+    access_token = create_access_token(identity=str(user.id))
     
     return jsonify({
         'id': user.id,
@@ -780,14 +890,51 @@ def login():
         'token': access_token
     })
 
-@app.route('/api/user/profile', methods=['GET', 'PUT'])
-def user_profile():
-    user = User.query.get(1)  # Temporary default user ID
-    
-    if not user:
-        return jsonify({'error': 'User not found'}), 404
-    
-    if request.method == 'GET':
+@app.route('/api/profile/update', methods=['POST'])
+@jwt_required()
+def update_profile():
+    try:
+        # Convert JWT identity to integer for database query
+        current_user_id = int(get_jwt_identity())
+        app.logger.info(f'Updating profile for user {current_user_id}')
+        
+        user = User.query.get(current_user_id)
+        if not user:
+            app.logger.error(f'User {current_user_id} not found')
+            return jsonify({'error': 'User not found'}), 404
+
+        form_data = request.form
+        app.logger.info(f'Received form data: {form_data}')
+        
+        # Update user fields
+        if 'username' in form_data:
+            existing_user = User.query.filter_by(username=form_data['username']).first()
+            if existing_user and existing_user.id != current_user_id:
+                return jsonify({'error': 'Username already taken'}), 400
+            user.username = form_data['username']
+            
+        if 'email' in form_data:
+            existing_user = User.query.filter_by(email=form_data['email']).first()
+            if existing_user and existing_user.id != current_user_id:
+                return jsonify({'error': 'Email already registered'}), 400
+            user.email = form_data['email']
+            
+        if 'bio' in form_data:
+            user.bio = form_data['bio']
+            app.logger.info(f'Updated bio to: {user.bio}')
+            
+        if 'avatar' in request.files:
+            file = request.files['avatar']
+            if file and allowed_file(file.filename):
+                filename = secure_filename(f'avatar_{current_user_id}_{int(time.time())}.{file.filename.rsplit(".", 1)[1].lower()}')
+                file_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+                file.save(file_path)
+                user.avatar_url = f'http://localhost:5000/uploads/{filename}'
+                app.logger.info(f'Updated avatar URL to: {user.avatar_url}')
+                
+        db.session.commit()
+        app.logger.info('Profile updated successfully')
+        
         return jsonify({
             'id': user.id,
             'username': user.username,
@@ -796,113 +943,32 @@ def user_profile():
             'avatar_url': user.avatar_url,
             'created_at': user.created_at.isoformat()
         })
-    
-    # Handle PUT request to update profile
-    data = request.get_json()
-    
-    if 'username' in data and data['username'] != user.username:
-        if User.query.filter_by(username=data['username']).first():
-            return jsonify({'error': 'Username already taken'}), 400
-        user.username = data['username']
         
-    if 'email' in data and data['email'] != user.email:
-        if User.query.filter_by(email=data['email']).first():
-            return jsonify({'error': 'Email already registered'}), 400
-        user.email = data['email']
-        
-    if 'bio' in data:
-        user.bio = data['bio']
-        
-    if 'avatar_url' in data:
-        user.avatar_url = data['avatar_url']
-        
-    if 'password' in data:
-        user.set_password(data['password'])
-    
-    db.session.commit()
-    
-    return jsonify({
-        'id': user.id,
-        'username': user.username,
-        'email': user.email,
-        'bio': user.bio,
-        'avatar_url': user.avatar_url,
-        'created_at': user.created_at.isoformat()
-    })
-
-@app.route('/api/profile/update', methods=['POST'])
-@jwt_required()
-@cross_origin()
-def update_profile():
-    try:
-        current_user_id = get_jwt_identity()
-        user = User.query.get(current_user_id)
-        
-        if not user:
-            return jsonify({'error': 'User not found'}), 404
-
-        # Update text fields
-        if request.form.get('username'):
-            user.username = request.form.get('username')
-        if request.form.get('email'):
-            user.email = request.form.get('email')
-        if request.form.get('bio'):
-            user.bio = request.form.get('bio')
-
-        # Handle avatar upload
-        if 'avatar' in request.files:
-            file = request.files['avatar']
-            if file and file.filename:
-                try:
-                    # Ensure the upload folder exists
-                    os.makedirs(UPLOAD_FOLDER, exist_ok=True)
-                    
-                    # Generate a secure filename
-                    filename = secure_filename(f"avatar_{current_user_id}_{int(time.time())}.jpg")
-                    filepath = os.path.join(UPLOAD_FOLDER, filename)
-                    
-                    # Save the original file first
-                    file.save(filepath)
-                    
-                    try:
-                        # Process the image
-                        with Image.open(filepath) as image:
-                            # Convert to RGB if necessary
-                            if image.mode != 'RGB':
-                                image = image.convert('RGB')
-                            
-                            # Resize image
-                            image = image.resize((200, 200))
-                            
-                            # Save the processed image
-                            image.save(filepath, 'JPEG', quality=85)
-                            
-                            # Update avatar URL in database
-                            user.avatar_url = f"/static/avatars/{filename}"
-                            app.logger.info(f'Successfully saved avatar for user {current_user_id} at {filepath}')
-                    except Exception as img_error:
-                        # If image processing fails, remove the uploaded file
-                        os.remove(filepath)
-                        raise Exception(f'Image processing failed: {str(img_error)}')
-                        
-                except Exception as e:
-                    app.logger.error(f'Avatar upload error: {str(e)}')
-                    return jsonify({'error': f'Avatar upload failed: {str(e)}'}), 400
-
-        db.session.commit()
-        
-        return jsonify({
-            'id': user.id,
-            'username': user.username,
-            'email': user.email,
-            'bio': user.bio,
-            'avatar_url': user.avatar_url
-        })
-
     except Exception as e:
+        app.logger.error(f'Error updating profile: {str(e)}')
         db.session.rollback()
-        app.logger.error(f'Profile update error: {str(e)}')
         return jsonify({'error': str(e)}), 500
+
+@jwt.invalid_token_loader
+def invalid_token_callback(error_string):
+    return jsonify({
+        'error': 'Invalid token',
+        'message': error_string
+    }), 401
+
+@jwt.unauthorized_loader
+def unauthorized_callback(error_string):
+    return jsonify({
+        'error': 'No token provided',
+        'message': error_string
+    }), 401
+
+@jwt.expired_token_loader
+def expired_token_callback(jwt_header, jwt_data):
+    return jsonify({
+        'error': 'Token has expired',
+        'message': 'Please log in again'
+    }), 401
 
 if __name__ == '__main__':
     with app.app_context():

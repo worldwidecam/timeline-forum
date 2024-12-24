@@ -11,8 +11,8 @@ import CreatePost from './components/CreatePost';
 import PostsFeed from './components/PostsFeed';
 import Login from './components/Login';
 import Register from './components/Register';
-import UserProfile from './components/UserProfile';
-import ProfileSettings from './components/ProfileSettings'; // Added import statement
+import Profile from './components/Profile';
+import ProfileSettings from './components/ProfileSettings';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { CircularProgress, Box } from '@mui/material';
 
@@ -85,12 +85,14 @@ function App() {
                 <Route path="/register" element={<Register />} />
                 <Route path="/profile" element={
                   <ProtectedRoute>
-                    <UserProfile />
+                    <Profile />
                   </ProtectedRoute>
-                }>
-                  <Route index element={<UserProfile />} />
-                  <Route path="settings" element={<ProfileSettings />} />
-                </Route>
+                } />
+                <Route path="/profile/settings" element={
+                  <ProtectedRoute>
+                    <ProfileSettings />
+                  </ProtectedRoute>
+                } />
               </Routes>
             </Box>
           </Box>

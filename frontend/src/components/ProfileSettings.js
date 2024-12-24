@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import axios from 'axios';
 import {
   Box,
   Container,
@@ -12,9 +13,14 @@ import {
   Divider,
   Alert,
   Snackbar,
+  Switch,
+  FormControlLabel,
 } from '@mui/material';
 import PhotoCamera from '@mui/icons-material/PhotoCamera';
+import LightModeIcon from '@mui/icons-material/LightMode';
+import DarkModeIcon from '@mui/icons-material/DarkMode';
 import { useAuth } from '../contexts/AuthContext';
+import MusicPlayer from './MusicPlayer';
 
 const ProfileSettings = () => {
   const { user, updateProfile } = useAuth();
@@ -22,11 +28,49 @@ const ProfileSettings = () => {
     email: user?.email || '',
     username: user?.username || '',
     bio: user?.bio || '',
+    currentPassword: '',
+    newPassword: '',
+    confirmPassword: '',
   });
   const [selectedFile, setSelectedFile] = useState(null);
   const [previewUrl, setPreviewUrl] = useState(user?.avatar_url || '');
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+  const [darkMode, setDarkMode] = useState(localStorage.getItem('theme') === 'dark');
+  const [musicData, setMusicData] = useState({
+    music_url: '',
+    music_platform: 'youtube'
+  });
+  const [musicFile, setMusicFile] = useState(null);
+  const [musicPreview, setMusicPreview] = useState(null);
+
+  useEffect(() => {
+    const fetchMusicPreferences = async () => {
+      try {
+        const response = await axios.get('http://localhost:5000/api/profile/music', {
+          headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
+        });
+        if (response.data.music_url) {
+          setMusicData(response.data);
+        }
+      } catch (error) {
+        console.error('Error fetching music preferences:', error);
+      }
+    };
+
+    if (user) {
+      fetchMusicPreferences();
+    }
+  }, [user]);
+
+  const handleThemeChange = (event) => {
+    const isDark = event.target.checked;
+    setDarkMode(isDark);
+    localStorage.setItem('theme', isDark ? 'dark' : 'light');
+    // Assuming you have a theme context or provider
+    // updateTheme(isDark ? 'dark' : 'light');
+  };
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
@@ -36,11 +80,26 @@ const ProfileSettings = () => {
     }));
   };
 
-  const handleFileSelect = (event) => {
-    if (event.target.files && event.target.files[0]) {
-      const file = event.target.files[0];
+  const handleFileChange = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      // Validate file type
+      if (!file.type.startsWith('image/')) {
+        setError('Please select a valid image file');
+        return;
+      }
+      // Validate file size (max 5MB)
+      if (file.size > 5 * 1024 * 1024) {
+        setError('Image size should be less than 5MB');
+        return;
+      }
       setSelectedFile(file);
-      setPreviewUrl(URL.createObjectURL(file));
+      // Create a preview URL
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setPreviewUrl(reader.result);
+      };
+      reader.readAsDataURL(file);
     }
   };
 
@@ -48,6 +107,7 @@ const ProfileSettings = () => {
     e.preventDefault();
     setError('');
     setSuccess('');
+    setIsLoading(true);
 
     try {
       const token = localStorage.getItem('token');
@@ -62,33 +122,28 @@ const ProfileSettings = () => {
       submitData.append('bio', formData.bio);
       
       if (selectedFile) {
-        // Validate file type
-        if (!selectedFile.type.startsWith('image/')) {
-          throw new Error('Please select a valid image file');
-        }
-        // Validate file size (max 5MB)
-        if (selectedFile.size > 5 * 1024 * 1024) {
-          throw new Error('Image size should be less than 5MB');
-        }
         submitData.append('avatar', selectedFile);
       }
 
-      const response = await fetch('http://localhost:5000/api/profile/update', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`
-        },
-        body: submitData,
-        credentials: 'include'
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to update profile');
+      // Add password change to form data if provided
+      if (formData.currentPassword && formData.newPassword) {
+        submitData.append('current_password', formData.currentPassword);
+        submitData.append('new_password', formData.newPassword);
       }
 
-      const data = await response.json();
-      updateProfile(data);
+      const response = await axios.post('http://localhost:5000/api/profile/update', 
+        submitData,
+        {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'multipart/form-data'
+          }
+        }
+      );
+
+      if (updateProfile) {
+        updateProfile(response.data);
+      }
       setSuccess('Profile updated successfully');
       
       // Only reload if there were no errors
@@ -96,8 +151,52 @@ const ProfileSettings = () => {
         window.location.reload();
       }, 1000);
     } catch (err) {
-      console.error('Profile update error:', err);
-      setError(err.message || 'Failed to update profile');
+      console.error('Profile update error:', err.response?.data || err.message);
+      setError(err.response?.data?.error || err.message || 'Failed to update profile');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleMusicChange = (e) => {
+    const { name, value } = e.target;
+    setMusicData(prev => ({
+      ...prev,
+      [name]: value
+    }));
+  };
+
+  const handleMusicFileChange = (event) => {
+    const file = event.target.files[0];
+    if (file) {
+      if (file.type.startsWith('audio/')) {
+        setMusicFile(file);
+        setMusicPreview(URL.createObjectURL(file));
+      } else {
+        setError('Please select an audio file (MP3, WAV, or OGG)');
+      }
+    }
+  };
+
+  const handleMusicSubmit = async () => {
+    try {
+      const formData = new FormData();
+      formData.append('music', musicFile);
+
+      const response = await axios.post(
+        'http://localhost:5000/api/profile/music',
+        formData,
+        {
+          headers: {
+            'Authorization': `Bearer ${localStorage.getItem('token')}`,
+            'Content-Type': 'multipart/form-data'
+          }
+        }
+      );
+      setSuccess('Music updated successfully');
+      setMusicData(response.data);
+    } catch (error) {
+      setError(error.response?.data?.error || 'Failed to update music');
     }
   };
 
@@ -116,28 +215,49 @@ const ProfileSettings = () => {
         
         <Box component="form" onSubmit={handleSubmit} sx={{ mt: 3 }}>
           <Grid container spacing={3}>
-            {/* Profile Picture Section */}
+            {/* Theme Preference Section */}
             <Grid item xs={12}>
               <Typography variant="h6" gutterBottom>
-                Profile Picture
+                Theme Preference
               </Typography>
-              <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
-                <Avatar
-                  src={previewUrl}
-                  sx={{ width: 100, height: 100, mr: 2 }}
-                />
-                <label htmlFor="icon-button-file">
-                  <input
-                    accept="image/*"
-                    id="icon-button-file"
-                    type="file"
-                    style={{ display: 'none' }}
-                    onChange={handleFileSelect}
+              <FormControlLabel
+                control={
+                  <Switch
+                    checked={darkMode}
+                    onChange={handleThemeChange}
+                    icon={<LightModeIcon />}
+                    checkedIcon={<DarkModeIcon />}
                   />
+                }
+                label={darkMode ? "Dark Mode" : "Light Mode"}
+              />
+            </Grid>
+
+            <Grid item xs={12}>
+              <Divider sx={{ my: 2 }} />
+            </Grid>
+
+            {/* Profile Picture Section */}
+            <Grid item xs={12} sm={4} md={3}>
+              <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
+                <Avatar
+                  src={previewUrl || user?.avatar_url || ''}
+                  sx={{ width: 100, height: 100 }}
+                  alt={formData.username}
+                />
+                <input
+                  accept="image/*"
+                  style={{ display: 'none' }}
+                  id="avatar-upload"
+                  type="file"
+                  onChange={handleFileChange}
+                />
+                <label htmlFor="avatar-upload">
                   <IconButton
                     color="primary"
                     aria-label="upload picture"
                     component="span"
+                    sx={{ mt: 1 }}
                   >
                     <PhotoCamera />
                   </IconButton>
@@ -145,59 +265,157 @@ const ProfileSettings = () => {
               </Box>
             </Grid>
 
+            <Grid item xs={12} sm={8} md={9}>
+              <Grid container spacing={3}>
+                {/* Profile Information Section */}
+                <Grid item xs={12}>
+                  <Typography variant="h6" gutterBottom>
+                    Profile Information
+                  </Typography>
+                </Grid>
+                
+                <Grid item xs={12} sm={6}>
+                  <TextField
+                    fullWidth
+                    label="Username"
+                    name="username"
+                    value={formData.username}
+                    onChange={handleInputChange}
+                  />
+                </Grid>
+                
+                <Grid item xs={12} sm={6}>
+                  <TextField
+                    fullWidth
+                    label="Email"
+                    name="email"
+                    type="email"
+                    value={formData.email}
+                    onChange={handleInputChange}
+                  />
+                </Grid>
+                
+                <Grid item xs={12}>
+                  <TextField
+                    fullWidth
+                    label="Bio"
+                    name="bio"
+                    multiline
+                    rows={4}
+                    value={formData.bio}
+                    onChange={handleInputChange}
+                  />
+                </Grid>
+
+                <Grid item xs={12}>
+                  <Divider sx={{ my: 2 }} />
+                </Grid>
+
+                {/* Password Change Section */}
+                <Grid item xs={12}>
+                  <Typography variant="h6" gutterBottom>
+                    Change Password
+                  </Typography>
+                </Grid>
+                
+                <Grid item xs={12}>
+                  <TextField
+                    fullWidth
+                    label="Current Password"
+                    name="currentPassword"
+                    type="password"
+                    value={formData.currentPassword}
+                    onChange={handleInputChange}
+                  />
+                </Grid>
+                
+                <Grid item xs={12} sm={6}>
+                  <TextField
+                    fullWidth
+                    label="New Password"
+                    name="newPassword"
+                    type="password"
+                    value={formData.newPassword}
+                    onChange={handleInputChange}
+                  />
+                </Grid>
+                
+                <Grid item xs={12} sm={6}>
+                  <TextField
+                    fullWidth
+                    label="Confirm New Password"
+                    name="confirmPassword"
+                    type="password"
+                    value={formData.confirmPassword}
+                    onChange={handleInputChange}
+                  />
+                </Grid>
+
+                <Grid item xs={12}>
+                  <Button
+                    type="submit"
+                    variant="contained"
+                    color="primary"
+                    sx={{ mt: 2 }}
+                    disabled={isLoading}
+                  >
+                    {isLoading ? 'Saving...' : 'Save Changes'}
+                  </Button>
+                </Grid>
+              </Grid>
+            </Grid>
+
             <Grid item xs={12}>
               <Divider sx={{ my: 2 }} />
             </Grid>
 
-            {/* Profile Information Section */}
+            {/* Music Settings Section */}
             <Grid item xs={12}>
               <Typography variant="h6" gutterBottom>
-                Profile Information
+                Profile Music
               </Typography>
             </Grid>
-            
-            <Grid item xs={12} sm={6}>
-              <TextField
-                fullWidth
-                label="Username"
-                name="username"
-                value={formData.username}
-                onChange={handleInputChange}
-              />
-            </Grid>
-            
-            <Grid item xs={12} sm={6}>
-              <TextField
-                fullWidth
-                label="Email"
-                name="email"
-                type="email"
-                value={formData.email}
-                onChange={handleInputChange}
-              />
-            </Grid>
-            
+
             <Grid item xs={12}>
-              <TextField
-                fullWidth
-                label="Bio"
-                name="bio"
-                multiline
-                rows={4}
-                value={formData.bio}
-                onChange={handleInputChange}
+              <input
+                accept="audio/*"
+                style={{ display: 'none' }}
+                id="music-file"
+                type="file"
+                onChange={handleMusicFileChange}
               />
+              <label htmlFor="music-file">
+                <Button variant="outlined" component="span">
+                  Choose Audio File
+                </Button>
+              </label>
+              {musicFile && (
+                <Typography variant="body2" sx={{ mt: 1 }}>
+                  Selected: {musicFile.name}
+                </Typography>
+              )}
+            </Grid>
+
+            {/* Preview the music player */}
+            <Grid item xs={12}>
+              {(musicPreview || musicData?.music_url) && (
+                <MusicPlayer url={musicPreview || musicData?.music_url} />
+              )}
             </Grid>
 
             <Grid item xs={12}>
               <Button
-                type="submit"
                 variant="contained"
                 color="primary"
-                sx={{ mt: 2 }}
+                onClick={handleMusicSubmit}
+                disabled={!musicFile}
               >
-                Save Changes
+                Update Music
               </Button>
+            </Grid>
+
+            <Grid item xs={12}>
+              <Divider sx={{ my: 2 }} />
             </Grid>
           </Grid>
         </Box>

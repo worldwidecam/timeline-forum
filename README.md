@@ -4,17 +4,27 @@ An interactive web application for creating and visualizing timelines with event
 
 ## Features
 
-- Create multiple timelines
-- Add events to timelines with titles, dates, and descriptions
-- Visual timeline display with:
-  - Year markers
-  - Interactive event cards
-  - Hover effects
-  - Diagonal connecting lines
-- Chronological event ordering
-- Expandable event details
-- Basic user authentication (early phase)
-- Post-to-Event promotion system (in development)
+### User Features
+- User authentication (login/register)
+- Customizable user profiles
+  - Profile picture upload
+  - Bio
+  - Profile music player (MP3, WAV, OGG support)
+- Dark/Light mode toggle
+
+### Timeline Features
+- Create and view timelines
+- Add events to timelines
+- Rich text formatting
+- Image uploads for events
+- Timeline sharing
+
+### Social Features
+- Create posts
+- Comment on posts
+- Like posts and comments
+- View user profiles
+- Listen to profile music while browsing
 
 ## Post and Event System
 
@@ -177,6 +187,113 @@ When suggesting improvements, consider:
 - **Multi-year**: Shows month and year (e.g., "Dec 2023")
   - Reference: `TimelineView.js:149-166` (time format logic)
 
+## Technical Implementation
+
+### Frontend Stack
+- **Framework**: React.js
+- **UI Library**: Material-UI (MUI)
+- **State Management**: React Context API
+- **HTTP Client**: Axios
+- **Key Dependencies**:
+  - `@mui/material`: UI components
+  - `@mui/icons-material`: Material icons
+  - `axios`: HTTP requests
+  - `react-router-dom`: Client-side routing
+
+### Backend Stack
+- **Framework**: Flask (Python)
+- **Database**: SQLAlchemy with SQLite
+- **Authentication**: Flask-JWT-Extended
+- **File Uploads**: Flask's built-in file handling
+- **Key Dependencies**:
+  - `flask`: Web framework
+  - `flask-sqlalchemy`: Database ORM
+  - `flask-jwt-extended`: JWT authentication
+  - `flask-cors`: CORS handling
+  - `werkzeug`: File upload security
+
+### Authentication System
+- JWT-based authentication
+- Token stored in localStorage
+- Protected routes using `@jwt_required()` decorator
+- Token format: Bearer authentication
+
+### API Endpoints
+- **Authentication**:
+  - `POST /api/auth/register`: User registration
+  - `POST /api/auth/login`: User login
+  
+- **User Profile**:
+  - `GET /api/user/current`: Get current user data
+  - `POST /api/profile/update`: Update user profile (multipart/form-data)
+  
+- **Timeline Management**:
+  - `POST /api/timeline`: Create new timeline
+  - `GET /api/timeline/<id>`: Get timeline details
+  - `GET /api/timelines`: List all timelines
+  
+- **Posts and Events**:
+  - `POST /api/timeline/<id>/posts`: Create post
+  - `GET /api/timeline/<id>/posts`: Get timeline posts
+  - `POST /api/timeline/<id>/events`: Create event
+  - `GET /api/timeline/<id>/events`: Get timeline events
+
+### File Structure
+```
+timeline-forum/
+├── frontend/
+│   ├── src/
+│   │   ├── components/
+│   │   ├── contexts/
+│   │   ├── pages/
+│   │   └── App.js
+│   ├── package.json
+│   └── README.md
+├── backend/
+│   ├── app.py
+│   ├── requirements.txt
+│   └── uploads/
+└── README.md
+```
+
+### Development Setup
+1. **Backend Setup**:
+   ```bash
+   cd backend
+   pip install -r requirements.txt
+   python app.py
+   ```
+
+2. **Frontend Setup**:
+   ```bash
+   cd frontend
+   npm install
+   npm start
+   ```
+
+3. **Environment Variables**:
+   - Backend:
+     - `JWT_SECRET_KEY`: Secret key for JWT tokens
+     - `UPLOAD_FOLDER`: Path for file uploads
+   - Frontend:
+     - `REACT_APP_API_URL`: Backend API URL (default: http://localhost:5000)
+
+### Common Issues and Solutions
+1. **JWT Token Issues**:
+   - Ensure token is properly stored in localStorage
+   - Check token format (Bearer + token)
+   - Verify token expiration
+
+2. **File Upload Issues**:
+   - Use multipart/form-data for file uploads
+   - Don't set Content-Type header manually
+   - Check file size limits
+
+3. **CORS Issues**:
+   - Verify CORS configuration in backend
+   - Check allowed origins and methods
+   - Ensure credentials handling is consistent
+
 ## Getting Started
 
 ### Prerequisites
@@ -314,3 +431,12 @@ The authentication system is in its early phases:
   - Refined user permissions
   - Enhanced profile system for social sharing
   - Clear differentiation between anonymous and authenticated user capabilities
+
+## Recent Updates
+- Added profile music player feature
+  - Upload and play audio files on profiles
+  - Simple play/pause controls
+  - Volume adjustment with mute option
+  - Automatic cleanup of old audio files
+- Improved profile picture handling
+- Enhanced error handling for file uploads
