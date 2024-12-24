@@ -7,6 +7,7 @@ import VolumeOffIcon from '@mui/icons-material/VolumeOff';
 
 const MusicPlayer = ({ url, platform }) => {
   const audioRef = useRef(null);
+  const fadeInterval = useRef(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [isMuted, setIsMuted] = useState(false);
   const [volume, setVolume] = useState(0.5);
@@ -21,18 +22,65 @@ const MusicPlayer = ({ url, platform }) => {
       audioRef.current.pause();
       audioRef.current.currentTime = 0;
     }
+
+    return () => {
+      if (fadeInterval.current) {
+        clearInterval(fadeInterval.current);
+      }
+    };
   }, [url]);
+
+  const fadeInVolume = async () => {
+    if (!audioRef.current) return;
+    
+    // Start with volume at 0
+    audioRef.current.volume = 0;
+    
+    // Start playing
+    try {
+      await audioRef.current.play();
+      setIsPlaying(true);
+      
+      let currentVol = 0;
+      const targetVol = isMuted ? 0 : volume;
+      const steps = 20; // Number of steps in fade
+      const increment = targetVol / steps;
+      const intervalTime = 50; // Time between steps in ms
+      
+      // Clear any existing fade interval
+      if (fadeInterval.current) {
+        clearInterval(fadeInterval.current);
+      }
+      
+      // Create new fade interval
+      fadeInterval.current = setInterval(() => {
+        currentVol = Math.min(targetVol, currentVol + increment);
+        if (audioRef.current) {
+          audioRef.current.volume = currentVol;
+        }
+        
+        if (currentVol >= targetVol) {
+          clearInterval(fadeInterval.current);
+        }
+      }, intervalTime);
+    } catch (err) {
+      setError('Unable to play audio. Please check the URL.');
+      setIsPlaying(false);
+    }
+  };
 
   const handlePlayPause = () => {
     if (audioRef.current) {
       if (isPlaying) {
         audioRef.current.pause();
+        setIsPlaying(false);
+        // Clear any ongoing fade
+        if (fadeInterval.current) {
+          clearInterval(fadeInterval.current);
+        }
       } else {
-        audioRef.current.play().catch(err => {
-          setError('Unable to play audio. Please check the URL.');
-        });
+        fadeInVolume();
       }
-      setIsPlaying(!isPlaying);
     }
   };
 
@@ -40,13 +88,16 @@ const MusicPlayer = ({ url, platform }) => {
     if (audioRef.current) {
       audioRef.current.muted = !isMuted;
       setIsMuted(!isMuted);
+      if (audioRef.current.volume > 0) {
+        audioRef.current.volume = isMuted ? volume : 0;
+      }
     }
   };
 
   const handleVolumeChange = (event, newValue) => {
     const volumeValue = newValue / 100;
     setVolume(volumeValue);
-    if (audioRef.current) {
+    if (audioRef.current && isPlaying) {
       audioRef.current.volume = volumeValue;
     }
   };

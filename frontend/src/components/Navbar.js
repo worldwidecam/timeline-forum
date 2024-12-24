@@ -21,6 +21,7 @@ import { useAuth } from '../contexts/AuthContext';
 import MenuIcon from '@mui/icons-material/Menu';
 import SettingsIcon from '@mui/icons-material/Settings';
 import PersonIcon from '@mui/icons-material/Person';
+import ToolbarSpacer from './ToolbarSpacer';
 
 function Navbar() {
   const navigate = useNavigate();
@@ -83,85 +84,88 @@ function Navbar() {
   );
 
   return (
-    <AppBar position="static">
-      <Toolbar>
-        <Typography
-          variant="h6"
-          component={RouterLink}
-          to="/"
-          sx={{ flexGrow: 1, textDecoration: 'none', color: 'inherit' }}
-        >
-          Timeline Forum
-        </Typography>
+    <>
+      <AppBar position="fixed" sx={{ zIndex: (theme) => theme.zIndex.drawer + 1 }}>
+        <Toolbar>
+          <Typography
+            variant="h6"
+            component={RouterLink}
+            to="/"
+            sx={{ flexGrow: 1, textDecoration: 'none', color: 'inherit' }}
+          >
+            Timeline Forum
+          </Typography>
 
-        <Box sx={{ display: 'flex', alignItems: 'center' }}>
-          {user ? (
-            <>
-              {!isProfilePage && (
-                <Button
-                  color="inherit"
-                  component={RouterLink}
-                  to="/profile"
-                  sx={{ mr: 2 }}
-                >
-                  View Profile
-                </Button>
-              )}
-              {isProfilePage && (
-                <>
-                  <IconButton
+          <Box sx={{ display: 'flex', alignItems: 'center' }}>
+            {user ? (
+              <>
+                {!isProfilePage && (
+                  <Button
                     color="inherit"
-                    onClick={toggleDrawer(true)}
+                    component={RouterLink}
+                    to="/profile"
                     sx={{ mr: 2 }}
-                    aria-label="profile menu"
                   >
-                    <MenuIcon />
-                  </IconButton>
-                  <Drawer
-                    anchor="right"
-                    open={drawerOpen}
-                    onClose={toggleDrawer(false)}
+                    View Profile
+                  </Button>
+                )}
+                {isProfilePage && (
+                  <>
+                    <IconButton
+                      color="inherit"
+                      onClick={toggleDrawer(true)}
+                      sx={{ mr: 2 }}
+                      aria-label="profile menu"
+                    >
+                      <MenuIcon />
+                    </IconButton>
+                    <Drawer
+                      anchor="right"
+                      open={drawerOpen}
+                      onClose={toggleDrawer(false)}
+                    >
+                      {profileTabs}
+                    </Drawer>
+                  </>
+                )}
+                <IconButton onClick={handleMenu} sx={{ p: 0 }}>
+                  <Avatar
+                    alt={user.username}
+                    src={user.avatar_url}
+                    sx={{ bgcolor: 'secondary.main' }}
                   >
-                    {profileTabs}
-                  </Drawer>
-                </>
-              )}
-              <IconButton onClick={handleMenu} sx={{ p: 0 }}>
-                <Avatar
-                  alt={user.username}
-                  src={user.avatar_url}
-                  sx={{ bgcolor: 'secondary.main' }}
+                    {user.username[0].toUpperCase()}
+                  </Avatar>
+                </IconButton>
+                <Menu
+                  anchorEl={anchorEl}
+                  open={Boolean(anchorEl)}
+                  onClose={handleClose}
                 >
-                  {user.username[0].toUpperCase()}
-                </Avatar>
-              </IconButton>
-              <Menu
-                anchorEl={anchorEl}
-                open={Boolean(anchorEl)}
-                onClose={handleClose}
-              >
-                <MenuItem component={RouterLink} to="/profile" onClick={handleClose}>
-                  Profile
-                </MenuItem>
-                <MenuItem component={RouterLink} to="/profile/settings" onClick={handleClose}>
-                  Settings
-                </MenuItem>
-                <MenuItem onClick={handleLogout}>Logout</MenuItem>
-              </Menu>
-            </>
-          ) : (
-            <>
-              <Button color="inherit" component={RouterLink} to="/login">
-                Login
-              </Button>
-              <Button color="inherit" component={RouterLink} to="/register">
-                Register
-              </Button>
-            </>
-          )}
-        </Box>
-      </Toolbar>
-    </AppBar>
+                  <MenuItem component={RouterLink} to="/profile" onClick={handleClose}>
+                    Profile
+                  </MenuItem>
+                  <MenuItem component={RouterLink} to="/profile/settings" onClick={handleClose}>
+                    Settings
+                  </MenuItem>
+                  <MenuItem onClick={handleLogout}>Logout</MenuItem>
+                </Menu>
+              </>
+            ) : (
+              <>
+                <Button color="inherit" component={RouterLink} to="/login">
+                  Login
+                </Button>
+                <Button color="inherit" component={RouterLink} to="/register">
+                  Register
+                </Button>
+              </>
+            )}
+          </Box>
+        </Toolbar>
+      </AppBar>
+      <ToolbarSpacer />
+    </>
   );
 }
 
