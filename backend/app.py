@@ -306,8 +306,10 @@ def get_timeline(timeline_id):
     })
 
 @app.route('/api/timeline/<int:timeline_id>/event', methods=['POST'])
+@jwt_required()
 def create_event(timeline_id):
     try:
+        current_user_id = get_jwt_identity()
         data = request.get_json()
         print(f"Received event data: {data}")  # Debug log
         
@@ -320,7 +322,7 @@ def create_event(timeline_id):
             event_date=datetime.fromisoformat(data['event_date']),
             url=data.get('url', ''),
             timeline_id=timeline_id,
-            created_by=1  # Temporary default user ID
+            created_by=current_user_id
         )
         
         if new_event.url:

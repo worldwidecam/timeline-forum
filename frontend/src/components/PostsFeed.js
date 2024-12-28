@@ -95,7 +95,7 @@ function PostsFeed() {
           {user && (
             <Button
               component={Link}
-              to="/post/create"
+              to="/create-post"
               variant="contained"
               color="primary"
             >

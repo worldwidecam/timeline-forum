@@ -18,6 +18,8 @@ An interactive web application for creating and visualizing timelines with event
 - Rich text formatting
 - Image uploads for events
 - Timeline sharing
+- Fixed-width timeline (1200px) for consistent visualization
+- Multi-scale zoom levels (day, week, month, year)
 
 ### Social Features
 - Create posts
@@ -64,12 +66,23 @@ The timeline component is the core feature of this application, requiring carefu
   - Diagonal connecting lines
 - Chronological event ordering
 - Expandable event details
+- Fixed timeline width for consistent visualization
+- Zoom controls with four distinct scales:
+  - Day view (markers show hours)
+  - Week view (markers show days and hours)
+  - Month view (markers show dates)
+  - Year view (markers show years)
 
 ### Future Vision
 - Tag-Based Timeline Generation
   - Main timelines will be automatically created from post tags
   - Self-moderating through user engagement
   - Popular posts automatically promote to timeline events
+- Enhanced Timeline-Centric Design
+  - Prioritize timeline visualization over event display
+  - Improve timeline navigation and interaction
+  - Add visual guides and period indicators
+  - Implement timeline overview features
 
 ### Timeline Privacy and Sharing
 - Public Timelines
@@ -123,7 +136,7 @@ The timeline component is fundamental to the project's functionality. Any modifi
    - Maintain focus on timeline visualization and interaction
 
 ### Development Priorities
-1. Timeline visualization and interaction
+1. Timeline-centric visualization and interaction
 2. Post-to-event promotion system
 3. User authentication and profiles
 4. Privacy controls and sharing features
@@ -132,6 +145,7 @@ The timeline component is fundamental to the project's functionality. Any modifi
 When suggesting improvements, consider:
 - How does it enhance the timeline experience?
 - Does it maintain the natural flow from posts to events?
+- Does it prioritize the timeline over individual events?
 - Will it scale with community growth?
 - Does it respect user privacy needs?
 

@@ -26,13 +26,17 @@ function TimelineView() {
   const [isDragging, setIsDragging] = useState(false);
   const [startX, setStartX] = useState(0);
   const [scrollLeft, setScrollLeft] = useState(0);
+  const [zoomLevel, setZoomLevel] = useState('month'); // 'day', 'week', 'month', 'year'
   const timelineRef = useRef(null);
 
   const handleMouseDown = (e) => {
-    setIsDragging(true);
-    if (timelineRef.current) {
-      setStartX(e.pageX - timelineRef.current.offsetLeft);
-      setScrollLeft(timelineRef.current.scrollLeft);
+    // Only initiate drag if clicking on the timeline line or its hit area
+    if (e.target.closest('.timeline-line')) {
+      setIsDragging(true);
+      if (timelineRef.current) {
+        setStartX(e.pageX - timelineRef.current.offsetLeft);
+        setScrollLeft(timelineRef.current.scrollLeft);
+      }
     }
   };
 
@@ -123,29 +127,37 @@ function TimelineView() {
     const dates = events.map(event => new Date(event.event_date));
     const start = new Date(Math.min(...dates));
     const end = new Date(Math.max(...dates));
-    const timeSpan = end - start;
     
-    // Add padding before the start date based on the timeline's span
-    if (timeSpan < 24 * 60 * 60 * 1000) {
-      // For same-day timeline, start at beginning of the hour before first event
-      start.setMinutes(0, 0, 0);
-      start.setHours(start.getHours() - 1);
-      end.setMinutes(59, 59, 999);
-    } else if (timeSpan < 7 * 24 * 60 * 60 * 1000) {
-      // For week timeline, start at beginning of the day
-      start.setHours(0, 0, 0, 0);
-      end.setHours(23, 59, 59, 999);
-    } else if (timeSpan < 365 * 24 * 60 * 60 * 1000) {
-      // For year timeline, start at beginning of the month
-      start.setDate(1);
-      start.setHours(0, 0, 0, 0);
-      end.setHours(23, 59, 59, 999);
-    } else {
-      // For multi-year timeline, start at beginning of the year
-      start.setMonth(0, 1);
-      start.setHours(0, 0, 0, 0);
-      end.setMonth(11, 31);
-      end.setHours(23, 59, 59, 999);
+    // Adjust boundaries based on zoom level
+    switch (zoomLevel) {
+      case 'day':
+        // For day view, start at beginning of the current hour
+        start.setMinutes(0, 0, 0);
+        start.setHours(start.getHours() - 1);
+        end.setMinutes(59, 59, 999);
+        end.setHours(end.getHours() + 1);
+        break;
+      case 'week':
+        // For week view, start at beginning of the day
+        start.setHours(0, 0, 0, 0);
+        start.setDate(start.getDate() - 1);
+        end.setHours(23, 59, 59, 999);
+        end.setDate(end.getDate() + 1);
+        break;
+      case 'month':
+        // For month view, start at beginning of the month
+        start.setDate(1);
+        start.setHours(0, 0, 0, 0);
+        end.setDate(new Date(end.getFullYear(), end.getMonth() + 1, 0).getDate());
+        end.setHours(23, 59, 59, 999);
+        break;
+      case 'year':
+        // For year view, start at beginning of the year
+        start.setMonth(0, 1);
+        start.setHours(0, 0, 0, 0);
+        end.setMonth(11, 31);
+        end.setHours(23, 59, 59, 999);
+        break;
     }
     
     return { start, end };
@@ -161,32 +173,31 @@ function TimelineView() {
 
   const generateTimeMarkers = () => {
     const { start, end } = getTimelineBoundaries();
-    const timeSpan = end - start;
     const markers = [];
     const numDividers = 8;
     const availableSpace = 94; // 94% of space for content
     const spacing = availableSpace / (numDividers + 1); // Equal divisions including end point
 
-    // Different formatting based on time span
-    const isWithinDay = timeSpan <= 24 * 60 * 60 * 1000;
-    const isWithinWeek = timeSpan <= 7 * 24 * 60 * 60 * 1000;
-    const isWithinYear = timeSpan <= 365 * 24 * 60 * 60 * 1000;
-
     for (let i = 1; i <= numDividers; i++) {
       const position = 3 + (spacing * i); // Start at 3% and space equally
-      const timestamp = new Date(start.getTime() + (timeSpan * (i / (numDividers + 1))));
+      const timestamp = new Date(start.getTime() + ((end - start) * (i / (numDividers + 1))));
       
       let label;
-      if (isWithinDay) {
-        const roundedTime = new Date(timestamp);
-        roundedTime.setMinutes(0, 0, 0);
-        label = format(roundedTime, 'ha');
-      } else if (isWithinWeek) {
-        label = format(timestamp, 'EEE ha');
-      } else if (isWithinYear) {
-        label = format(timestamp, 'MMM d');
-      } else {
-        label = format(timestamp, 'MMM yyyy');
+      switch (zoomLevel) {
+        case 'day':
+          label = format(timestamp, 'ha'); // e.g., "2PM"
+          break;
+        case 'week':
+          label = format(timestamp, 'EEE ha'); // e.g., "Mon 2PM"
+          break;
+        case 'month':
+          label = format(timestamp, 'MMM d'); // e.g., "Dec 7"
+          break;
+        case 'year':
+          label = format(timestamp, 'yyyy'); // e.g., "1997"
+          break;
+        default:
+          label = format(timestamp, 'MMM d');
       }
 
       markers.push({ position, label });
@@ -275,25 +286,54 @@ function TimelineView() {
                   Timeline View
                 </Typography>
               </Box>
-              {user ? (
-                <Button
-                  variant="contained"
-                  color="primary"
-                  onClick={() => navigate(`/timeline/${id}/event/create`)}
-                >
-                  Create Event
-                </Button>
-              ) : (
-                <Button
-                  variant="contained"
-                  color="primary"
-                  component={Link}
-                  to="/login"
-                  sx={{ color: '#fff' }}
-                >
-                  Login to Create Event
-                </Button>
-              )}
+              <Box sx={{ display: 'flex', gap: 2, alignItems: 'center' }}>
+                <Box sx={{ 
+                  display: 'flex', 
+                  backgroundColor: '#2c1b47',
+                  borderRadius: '20px',
+                  padding: '4px',
+                  border: '1px solid #ce93d8'
+                }}>
+                  {['day', 'week', 'month', 'year'].map((level) => (
+                    <Button
+                      key={level}
+                      size="small"
+                      onClick={() => setZoomLevel(level)}
+                      sx={{
+                        minWidth: '60px',
+                        color: zoomLevel === level ? '#fff' : '#ce93d8',
+                        backgroundColor: zoomLevel === level ? '#9c27b0' : 'transparent',
+                        borderRadius: '16px',
+                        textTransform: 'capitalize',
+                        '&:hover': {
+                          backgroundColor: zoomLevel === level ? '#9c27b0' : 'rgba(156, 39, 176, 0.1)'
+                        }
+                      }}
+                    >
+                      {level}
+                    </Button>
+                  ))}
+                </Box>
+                {user ? (
+                  <Button
+                    variant="contained"
+                    color="primary"
+                    onClick={() => navigate(`/timeline/${id}/event/create`)}
+                  >
+                    Create Event
+                  </Button>
+                ) : (
+                  <Button
+                    variant="contained"
+                    color="primary"
+                    component={Link}
+                    to="/login"
+                    sx={{ color: '#fff' }}
+                  >
+                    Login to Create Event
+                  </Button>
+                )}
+              </Box>
             </Box>
 
             {/* Timeline Container */}
@@ -331,7 +371,7 @@ function TimelineView() {
               {/* Timeline Content */}
               <Box sx={{
                 position: 'relative',
-                minWidth: events.length > 0 ? `max(1200px, 100%)` : '100%', 
+                minWidth: '1200px', // Fixed width instead of dynamic
                 padding: '40px 200px',
                 minHeight: '200px',
                 height: 'auto',
@@ -372,15 +412,27 @@ function TimelineView() {
                     Latest Event
                   </Typography>
                   {/* Main Timeline Line */}
-                  <Box sx={{
-                    position: 'absolute',
-                    top: '40px',
-                    width: '100%',
-                    height: '4px',
-                    background: 'linear-gradient(90deg, #9c27b0 0%, #ce93d8 100%)',
-                    borderRadius: '2px',
-                    boxShadow: '0 1px 3px rgba(0,0,0,0.3)'
-                  }}>
+                  <Box 
+                    className="timeline-line"
+                    sx={{
+                      position: 'absolute',
+                      top: '40px',
+                      width: '100%',
+                      height: '4px',
+                      background: 'linear-gradient(90deg, #9c27b0 0%, #ce93d8 100%)',
+                      borderRadius: '2px',
+                      boxShadow: '0 1px 3px rgba(0,0,0,0.3)',
+                      cursor: isDragging ? 'grabbing' : 'grab',
+                      '&::after': {
+                        content: '""',
+                        position: 'absolute',
+                        top: '-10px',
+                        bottom: '-10px',
+                        left: 0,
+                        right: 0,
+                      }
+                    }}
+                  >
                     {/* Left endpoint circle */}
                     <Box sx={{
                       position: 'absolute',
