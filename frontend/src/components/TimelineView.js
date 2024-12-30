@@ -8,6 +8,7 @@ import {
   Box,
   Dialog,
   DialogContent,
+  useTheme
 } from '@mui/material';
 import { format } from 'date-fns';
 import axios from 'axios';
@@ -19,6 +20,7 @@ function TimelineView() {
   const { id } = useParams();
   const { user } = useAuth();
   const navigate = useNavigate();
+  const theme = useTheme();
   const [events, setEvents] = useState([]);
   const [timelineInfo, setTimelineInfo] = useState(null);
   const [selectedEvent, setSelectedEvent] = useState(null);
@@ -253,13 +255,13 @@ function TimelineView() {
       display: 'flex',
       flexDirection: 'column',
       minHeight: '100vh', 
-      backgroundColor: '#000' 
+      bgcolor: theme.palette.mode === 'light' ? 'background.default' : '#000'
     }}>
       <Box sx={{ 
         width: '100%',
         position: 'relative',
-        backgroundColor: '#2c1b47',
-        color: '#fff',
+        bgcolor: theme.palette.mode === 'light' ? 'background.paper' : '#2c1b47',
+        color: theme.palette.mode === 'light' ? 'text.primary' : '#fff',
         minHeight: 'fit-content',
         paddingBottom: '20px', 
         overflowX: 'hidden' 
@@ -275,24 +277,26 @@ function TimelineView() {
                 <Typography variant="h4" component="h1" gutterBottom>
                   <Box component="span" sx={{ 
                     fontWeight: 'bold',
-                    color: '#ce93d8',
+                    color: theme.palette.mode === 'light' ? 'primary.main' : '#ce93d8',
                     mr: 1
                   }}>
                     #
                   </Box>
                   {timelineInfo?.name || 'Loading...'}
                 </Typography>
-                <Typography variant="subtitle1" color="text.secondary">
+                <Typography variant="subtitle1" color="textSecondary">
                   Timeline View
                 </Typography>
               </Box>
               <Box sx={{ display: 'flex', gap: 2, alignItems: 'center' }}>
                 <Box sx={{ 
                   display: 'flex', 
-                  backgroundColor: '#2c1b47',
+                  bgcolor: theme.palette.mode === 'light' ? 'background.paper' : '#2c1b47',
                   borderRadius: '20px',
                   padding: '4px',
-                  border: '1px solid #ce93d8'
+                  border: theme.palette.mode === 'light' 
+                    ? `1px solid ${theme.palette.primary.main}` 
+                    : `1px solid #ce93d8`
                 }}>
                   {['day', 'week', 'month', 'year'].map((level) => (
                     <Button
@@ -301,12 +305,12 @@ function TimelineView() {
                       onClick={() => setZoomLevel(level)}
                       sx={{
                         minWidth: '60px',
-                        color: zoomLevel === level ? '#fff' : '#ce93d8',
-                        backgroundColor: zoomLevel === level ? '#9c27b0' : 'transparent',
+                        color: zoomLevel === level ? '#fff' : theme.palette.mode === 'light' ? 'primary.main' : '#ce93d8',
+                        backgroundColor: zoomLevel === level ? theme.palette.mode === 'light' ? 'primary.main' : '#9c27b0' : 'transparent',
                         borderRadius: '16px',
                         textTransform: 'capitalize',
                         '&:hover': {
-                          backgroundColor: zoomLevel === level ? '#9c27b0' : 'rgba(156, 39, 176, 0.1)'
+                          backgroundColor: zoomLevel === level ? theme.palette.mode === 'light' ? 'primary.main' : '#9c27b0' : 'rgba(156, 39, 176, 0.1)'
                         }
                       }}
                     >
@@ -360,10 +364,10 @@ function TimelineView() {
                   background: 'rgba(0,0,0,0.1)',
                 },
                 '&::-webkit-scrollbar-thumb': {
-                  background: 'rgba(156, 39, 176, 0.5)',
+                  background: theme.palette.mode === 'light' ? 'rgba(156, 39, 176, 0.5)' : 'rgba(156, 39, 176, 0.5)',
                   borderRadius: '4px',
                   '&:hover': {
-                    background: 'rgba(156, 39, 176, 0.7)',
+                    background: theme.palette.mode === 'light' ? 'rgba(156, 39, 176, 0.7)' : 'rgba(156, 39, 176, 0.7)',
                   }
                 }
               }}
@@ -392,7 +396,7 @@ function TimelineView() {
                       left: '0px',
                       top: '5px',
                       fontStyle: 'italic',
-                      color: '#ce93d8',
+                      color: theme.palette.mode === 'light' ? 'text.secondary' : '#ce93d8',
                       fontSize: '0.8rem'
                     }}
                   >
@@ -405,7 +409,7 @@ function TimelineView() {
                       right: '0px',
                       top: '5px',
                       fontStyle: 'italic',
-                      color: '#ce93d8',
+                      color: theme.palette.mode === 'light' ? 'text.secondary' : '#ce93d8',
                       fontSize: '0.8rem'
                     }}
                   >
@@ -419,7 +423,9 @@ function TimelineView() {
                       top: '40px',
                       width: '100%',
                       height: '4px',
-                      background: 'linear-gradient(90deg, #9c27b0 0%, #ce93d8 100%)',
+                      background: theme.palette.mode === 'light' 
+                        ? `linear-gradient(90deg, ${theme.palette.primary.main} 0%, ${theme.palette.primary.light} 100%)`
+                        : 'linear-gradient(90deg, #9c27b0 0%, #ce93d8 100%)',
                       borderRadius: '2px',
                       boxShadow: '0 1px 3px rgba(0,0,0,0.3)',
                       cursor: isDragging ? 'grabbing' : 'grab',
@@ -441,8 +447,10 @@ function TimelineView() {
                       width: '12px',
                       height: '12px',
                       borderRadius: '50%',
-                      background: '#9c27b0',
-                      boxShadow: '0 0 0 2px #2c1b47, 0 0 0 4px #9c27b0',
+                      bgcolor: theme.palette.mode === 'light' ? theme.palette.primary.main : '#9c27b0',
+                      boxShadow: theme.palette.mode === 'light'
+                        ? `0 0 0 2px ${theme.palette.background.paper}, 0 0 0 4px ${theme.palette.primary.main}`
+                        : '0 0 0 2px #2c1b47, 0 0 0 4px #9c27b0',
                     }} />
                     {/* Right endpoint arrow */}
                     <Box sx={{
@@ -453,7 +461,7 @@ function TimelineView() {
                       height: '0',
                       borderTop: '8px solid transparent',
                       borderBottom: '8px solid transparent',
-                      borderLeft: '12px solid #ce93d8',
+                      borderLeft: theme.palette.mode === 'light' ? `12px solid ${theme.palette.primary.main}` : '12px solid #ce93d8',
                       '&::before': {
                         content: '""',
                         position: 'absolute',
@@ -461,7 +469,7 @@ function TimelineView() {
                         top: '-12px',
                         borderTop: '12px solid transparent',
                         borderBottom: '12px solid transparent',
-                        borderLeft: '16px solid #2c1b47',
+                        borderLeft: theme.palette.mode === 'light' ? `16px solid ${theme.palette.background.paper}` : '16px solid #2c1b47',
                         zIndex: -1
                       },
                       '&::after': {
@@ -471,7 +479,7 @@ function TimelineView() {
                         top: '-10px',
                         borderTop: '10px solid transparent',
                         borderBottom: '10px solid transparent',
-                        borderLeft: '14px solid #ce93d8',
+                        borderLeft: theme.palette.mode === 'light' ? `14px solid ${theme.palette.primary.main}` : '14px solid #ce93d8',
                         zIndex: -1
                       }
                     }} />
@@ -496,7 +504,7 @@ function TimelineView() {
                             position: 'absolute',
                             top: '-25px',
                             fontStyle: 'italic',
-                            color: '#ce93d8',
+                            color: theme.palette.mode === 'light' ? 'text.secondary' : '#ce93d8',
                             fontSize: '0.8rem',
                             whiteSpace: 'nowrap'
                           }}
@@ -507,7 +515,7 @@ function TimelineView() {
                           sx={{
                             width: '2px',
                             height: '28px',
-                            backgroundColor: 'rgba(206, 147, 216, 0.4)',
+                            backgroundColor: theme.palette.mode === 'light' ? 'text.secondary' : 'rgba(206, 147, 216, 0.4)',
                             position: 'absolute',
                             top: '-12px'
                           }}
@@ -531,12 +539,12 @@ function TimelineView() {
                         <Box sx={{
                           width: '2px',
                           height: '12px',
-                          backgroundColor: '#ce93d8', 
+                          backgroundColor: theme.palette.mode === 'light' ? 'text.secondary' : '#ce93d8', 
                           marginBottom: '5px'
                         }} />
                         <Typography variant="caption" sx={{ 
                           fontWeight: 'bold',
-                          color: '#fff' 
+                          color: theme.palette.mode === 'light' ? 'text.primary' : '#fff' 
                         }}>
                           {year}
                         </Typography>
@@ -566,8 +574,8 @@ function TimelineView() {
                               },
                               '& .event-card': {
                                 transform: 'translateX(-50%) scale(1.02)',
-                                boxShadow: '0 4px 20px rgba(156, 39, 176, 0.25)',
-                                borderColor: '#9c27b0'
+                                boxShadow: theme.palette.mode === 'light' ? '0 4px 20px rgba(156, 39, 176, 0.25)' : '0 4px 20px rgba(156, 39, 176, 0.25)',
+                                borderColor: theme.palette.mode === 'light' ? 'primary.main' : '#9c27b0'
                               }
                             }
                           }}
@@ -579,7 +587,7 @@ function TimelineView() {
                             transform: 'translateX(-50%)',
                             width: '1px',
                             height: `${40 + verticalOffset}px`,
-                            backgroundColor: 'rgba(156, 39, 176, 0.4)',
+                            backgroundColor: theme.palette.mode === 'light' ? 'text.secondary' : 'rgba(156, 39, 176, 0.4)',
                             zIndex: 1
                           }} />
                           
@@ -613,9 +621,11 @@ function TimelineView() {
                                 width: '8px',
                                 height: '8px',
                                 borderRadius: '50%',
-                                backgroundColor: '#ce93d8',
-                                border: '2px solid #2c1b47',
-                                boxShadow: '0 0 0 2px #ce93d8',
+                                backgroundColor: theme.palette.mode === 'light' ? 'primary.main' : '#ce93d8',
+                                border: theme.palette.mode === 'light' ? `2px solid ${theme.palette.background.paper}` : '2px solid #2c1b47',
+                                boxShadow: theme.palette.mode === 'light'
+                                  ? `0 0 0 2px ${theme.palette.primary.main}`
+                                  : '0 0 0 2px #ce93d8',
                                 transition: 'all 0.3s ease'
                               }}
                             />
@@ -638,9 +648,9 @@ function TimelineView() {
                               transition: 'all 0.3s ease',
                               cursor: 'pointer',
                               zIndex: selectedEvent?.id === event.id ? 10 : 1,
-                              backgroundColor: '#2c1b47',
-                              border: '1px solid #ce93d8',
-                              color: '#fff',
+                              backgroundColor: theme.palette.mode === 'light' ? 'background.paper' : '#2c1b47',
+                              border: theme.palette.mode === 'light' ? `1px solid ${theme.palette.primary.main}` : '1px solid #ce93d8',
+                              color: theme.palette.mode === 'light' ? 'text.primary' : '#fff',
                               '&:hover': {
                                 elevation: 4,
                                 transform: 'translateX(-50%) scale(1.02)',
@@ -652,7 +662,7 @@ function TimelineView() {
                             <Box sx={{ 
                               p: 1.5,
                               background: selectedEvent?.id === event.id 
-                                ? 'linear-gradient(45deg, rgba(156, 39, 176, 0.05), rgba(206, 147, 216, 0.05))'
+                                ? theme.palette.mode === 'light' ? 'linear-gradient(45deg, rgba(156, 39, 176, 0.05), rgba(206, 147, 216, 0.05))' : 'linear-gradient(45deg, rgba(156, 39, 176, 0.05), rgba(206, 147, 216, 0.05))'
                                 : 'none'
                             }}>
                               {event.image_url && selectedEvent?.id === event.id && (
@@ -735,7 +745,7 @@ function TimelineView() {
           </Box>
         </Container>
       </Box>
-      <Box sx={{ backgroundColor: '#121212', py: 4 }}>
+      <Box sx={{ backgroundColor: theme.palette.mode === 'light' ? 'background.default' : '#121212', py: 4 }}>
         <Container maxWidth="lg">
           <TimelinePosts timelineId={id} />
         </Container>
@@ -761,7 +771,7 @@ function TimelineView() {
       {/* Black space section */}
       <Box sx={{ 
         flex: 1,
-        backgroundColor: '#000',
+        backgroundColor: theme.palette.mode === 'light' ? 'background.default' : '#000',
         width: '100%',
         minHeight: '50vh' 
       }} />

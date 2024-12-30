@@ -3,16 +3,14 @@ from flask_sqlalchemy import SQLAlchemy
 from flask_jwt_extended import JWTManager, create_access_token, jwt_required, get_jwt_identity
 from flask_cors import CORS, cross_origin
 from datetime import datetime, timezone
-import os
 from werkzeug.security import generate_password_hash, check_password_hash
+import os
+from werkzeug.utils import secure_filename
 import requests
 from bs4 import BeautifulSoup
-from urllib.parse import urlparse
-from sqlalchemy import func
-from werkzeug.utils import secure_filename
-from PIL import Image
-import io
+import re
 import time
+from sqlalchemy import func, desc
 import logging
 
 app = Flask(__name__)
@@ -218,6 +216,12 @@ class User(db.Model):
     bio = db.Column(db.Text, nullable=True)
     avatar_url = db.Column(db.String(200), nullable=True)
     music = db.relationship('UserMusic', backref='user', uselist=False)
+
+    def set_password(self, password):
+        self.password_hash = generate_password_hash(password)
+
+    def check_password(self, password):
+        return check_password_hash(self.password_hash, password)
 
 class Timeline(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -833,6 +837,95 @@ def get_music_preferences():
         
     except Exception as e:
         app.logger.error(f'Error getting music preferences: {str(e)}')
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/timelines/<int:timeline_id>', methods=['DELETE'])
+@jwt_required()
+def delete_timeline(timeline_id):
+    try:
+        # Get current user
+        current_user_id = get_jwt_identity()
+        
+        # Only allow admin (user_id 1) to delete timelines
+        if current_user_id != 1:
+            return jsonify({'error': 'Unauthorized. Only admin can delete timelines'}), 403
+            
+        timeline = Timeline.query.get_or_404(timeline_id)
+        
+        # Don't allow deletion of the general timeline
+        if timeline.name == 'general':
+            return jsonify({'error': 'Cannot delete the general timeline'}), 400
+            
+        # Get all posts associated with this timeline
+        posts = Post.query.filter_by(timeline_id=timeline_id).all()
+        
+        # Move posts to general timeline
+        general_timeline = Timeline.query.filter(
+            func.lower(Timeline.name) == 'general'
+        ).first()
+        
+        if not general_timeline:
+            general_timeline = Timeline(
+                name='general',
+                description='General timeline for uncategorized posts',
+                created_by=1
+            )
+            db.session.add(general_timeline)
+            db.session.commit()
+        
+        # Move posts to general timeline
+        for post in posts:
+            post.timeline_id = general_timeline.id
+        
+        # Delete the timeline
+        db.session.delete(timeline)
+        db.session.commit()
+        
+        return jsonify({
+            'message': f'Timeline {timeline.name} deleted successfully. All posts moved to general timeline.'
+        }), 200
+        
+    except Exception as e:
+        app.logger.error(f"Error deleting timeline: {str(e)}")
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/timelines/merge', methods=['POST'])
+@jwt_required()
+def merge_timelines():
+    try:
+        # Get current user
+        current_user_id = get_jwt_identity()
+        
+        # Only allow admin (user_id 1) to merge timelines
+        if current_user_id != 1:
+            return jsonify({'error': 'Unauthorized. Only admin can merge timelines'}), 403
+            
+        data = request.get_json()
+        if not all(key in data for key in ['source_id', 'target_id']):
+            return jsonify({'error': 'Missing required fields'}), 400
+            
+        source_timeline = Timeline.query.get_or_404(data['source_id'])
+        target_timeline = Timeline.query.get_or_404(data['target_id'])
+        
+        # Don't allow merging if source is general timeline
+        if source_timeline.name == 'general':
+            return jsonify({'error': 'Cannot merge general timeline into another timeline'}), 400
+            
+        # Move all posts from source to target timeline
+        Post.query.filter_by(timeline_id=source_timeline.id).update({'timeline_id': target_timeline.id})
+        
+        # Delete the source timeline
+        db.session.delete(source_timeline)
+        db.session.commit()
+        
+        return jsonify({
+            'message': f'Timeline {source_timeline.name} merged into {target_timeline.name} successfully'
+        }), 200
+        
+    except Exception as e:
+        app.logger.error(f"Error merging timelines: {str(e)}")
+        db.session.rollback()
         return jsonify({'error': str(e)}), 500
 
 # Auth routes

@@ -76,7 +76,13 @@ const TimelinePosts = ({ timelineId }) => {
   return (
     <Box>
       <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
-        <Typography variant="h5" component="h2" sx={{ color: 'white' }}>
+        <Typography 
+          variant="h5" 
+          component="h2" 
+          sx={{ 
+            color: (theme) => theme.palette.mode === 'light' ? 'text.primary' : 'white'
+          }}
+        >
           Discussion Posts
         </Typography>
         <Button
@@ -89,23 +95,34 @@ const TimelinePosts = ({ timelineId }) => {
       </Box>
 
       {posts.map((post) => (
-        <Card key={post.id} sx={{ mb: 2, bgcolor: 'rgba(255, 255, 255, 0.05)' }}>
+        <Card 
+          key={post.id} 
+          sx={{ 
+            mb: 2, 
+            bgcolor: (theme) => theme.palette.mode === 'light' 
+              ? 'background.paper' 
+              : 'rgba(255, 255, 255, 0.05)',
+            color: (theme) => theme.palette.mode === 'light' 
+              ? 'text.primary' 
+              : 'white'
+          }}
+        >
           <CardContent>
             <Box display="flex" alignItems="center" mb={1}>
               <Avatar sx={{ mr: 1, bgcolor: 'primary.main' }}>
                 {post.username[0].toUpperCase()}
               </Avatar>
               <Box>
-                <Typography variant="h6" sx={{ color: 'white' }}>{post.title}</Typography>
-                <Typography variant="caption" sx={{ color: 'rgba(255, 255, 255, 0.7)' }}>
+                <Typography variant="h6" sx={{ color: (theme) => theme.palette.mode === 'light' ? 'text.primary' : 'white' }}>{post.title}</Typography>
+                <Typography variant="caption" sx={{ color: (theme) => theme.palette.mode === 'light' ? 'text.secondary' : 'rgba(255, 255, 255, 0.7)' }}>
                   Posted by {post.username} {formatDistanceToNow(new Date(post.created_at))} ago
                 </Typography>
               </Box>
             </Box>
-            <Typography variant="body2" sx={{ color: 'rgba(255, 255, 255, 0.7)', mt: 1 }}>
+            <Typography variant="body2" sx={{ color: (theme) => theme.palette.mode === 'light' ? 'text.secondary' : 'rgba(255, 255, 255, 0.7)', mt: 1 }}>
               Event Date: {format(new Date(post.event_date), 'MMMM d, yyyy')}
             </Typography>
-            <Typography variant="body1" sx={{ mt: 2, color: 'rgba(255, 255, 255, 0.9)' }}>
+            <Typography variant="body1" sx={{ mt: 2, color: (theme) => theme.palette.mode === 'light' ? 'text.primary' : 'rgba(255, 255, 255, 0.9)' }}>
               {post.content}
             </Typography>
             {post.url && (
@@ -113,7 +130,7 @@ const TimelinePosts = ({ timelineId }) => {
                 sx={{
                   mt: 2,
                   border: 1,
-                  borderColor: 'rgba(255, 255, 255, 0.1)',
+                  borderColor: (theme) => theme.palette.mode === 'light' ? 'divider' : 'rgba(255, 255, 255, 0.1)',
                   borderRadius: 1,
                   overflow: 'hidden',
                   '&:hover': {
@@ -148,7 +165,7 @@ const TimelinePosts = ({ timelineId }) => {
                   )}
                   <Box sx={{ p: 2, flexGrow: 1 }}>
                     {post.url_title && (
-                      <Typography variant="subtitle1" sx={{ color: 'white', fontWeight: 'medium' }}>
+                      <Typography variant="subtitle1" sx={{ color: (theme) => theme.palette.mode === 'light' ? 'text.primary' : 'white', fontWeight: 'medium' }}>
                         {post.url_title}
                       </Typography>
                     )}
@@ -156,7 +173,7 @@ const TimelinePosts = ({ timelineId }) => {
                       <Typography
                         variant="body2"
                         sx={{
-                          color: 'rgba(255, 255, 255, 0.7)',
+                          color: (theme) => theme.palette.mode === 'light' ? 'text.secondary' : 'rgba(255, 255, 255, 0.7)',
                           mt: 0.5,
                           display: '-webkit-box',
                           WebkitLineClamp: 3,
@@ -169,7 +186,7 @@ const TimelinePosts = ({ timelineId }) => {
                     )}
                     <Typography
                       variant="caption"
-                      sx={{ color: 'rgba(255, 255, 255, 0.5)', mt: 1, display: 'block' }}
+                      sx={{ color: (theme) => theme.palette.mode === 'light' ? 'text.secondary' : 'rgba(255, 255, 255, 0.5)', mt: 1, display: 'block' }}
                     >
                       {new URL(post.url).hostname}
                     </Typography>
@@ -178,13 +195,13 @@ const TimelinePosts = ({ timelineId }) => {
               </Box>
             )}
           </CardContent>
-          <Divider sx={{ bgcolor: 'rgba(255, 255, 255, 0.1)' }} />
+          <Divider sx={{ bgcolor: (theme) => theme.palette.mode === 'light' ? 'divider' : 'rgba(255, 255, 255, 0.1)' }} />
           <CardActions>
             <Button
               size="small"
               startIcon={<ThumbUp />}
               onClick={() => {/* TODO: Implement upvoting */}}
-              sx={{ color: 'rgba(255, 255, 255, 0.7)' }}
+              sx={{ color: (theme) => theme.palette.mode === 'light' ? 'text.secondary' : 'rgba(255, 255, 255, 0.7)' }}
             >
               {post.upvotes}
             </Button>
@@ -192,7 +209,7 @@ const TimelinePosts = ({ timelineId }) => {
               size="small"
               startIcon={<Comment />}
               onClick={() => {/* TODO: Implement comments */}}
-              sx={{ color: 'rgba(255, 255, 255, 0.7)' }}
+              sx={{ color: (theme) => theme.palette.mode === 'light' ? 'text.secondary' : 'rgba(255, 255, 255, 0.7)' }}
             >
               Comments
             </Button>
@@ -260,7 +277,7 @@ const TimelinePosts = ({ timelineId }) => {
               shrink: true,
             }}
             inputProps={{
-              style: { color: 'white' }
+              style: { color: (theme) => theme.palette.mode === 'light' ? 'text.primary' : 'white' }
             }}
             sx={{
               '& input::-webkit-calendar-picker-indicator': {
