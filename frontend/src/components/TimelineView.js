@@ -54,7 +54,7 @@ function TimelineView() {
 
   useEffect(() => {
     // Initialize timeline with current time centered and full day padding on both sides
-    const now = new Date('2025-01-03T11:48:21-08:00');
+    const now = new Date('2025-01-03T15:15:49-08:00');
     
     // Calculate start time by going back to midnight of the previous day plus additional padding
     const startOfToday = startOfDay(now);
@@ -179,7 +179,7 @@ function TimelineView() {
   };
 
   const getTimelineBoundaries = () => {
-    const now = new Date();
+    const now = new Date('2025-01-03T15:15:49-08:00');
     
     // Calculate how many hours we can show based on timeline width
     const timelineWidth = TIMELINE_BASE_WIDTH;
@@ -435,7 +435,119 @@ function TimelineView() {
   };
 
   // Current time state for precise marker
-  const [currentTime] = useState(new Date('2025-01-03T11:48:21-08:00'));
+  const [currentTime, setCurrentTime] = useState(new Date('2025-01-03T15:34:22-08:00'));
+
+  // Update current time every minute
+  useEffect(() => {
+    const updateTime = () => {
+      const newTime = new Date('2025-01-03T15:34:22-08:00');
+      setCurrentTime(newTime);
+      
+      // Update visible range with new current time
+      setVisibleTimeRange(prev => ({
+        ...prev,
+        now: newTime
+      }));
+
+      // Update markers to reflect new current hour
+      setTimeMarkers(prevMarkers => 
+        prevMarkers.map(marker => {
+          const nextHour = addHours(marker.time, 1);
+          const isCurrentHour = marker.time <= newTime && nextHour > newTime;
+          return {
+            ...marker,
+            isPresent: isCurrentHour
+          };
+        })
+      );
+    };
+
+    // Update immediately and then every minute
+    updateTime();
+    const interval = setInterval(updateTime, 60000);
+
+    return () => clearInterval(interval);
+  }, []); // Empty dependency array means this effect runs once on mount
+
+  useEffect(() => {
+    // Initialize timeline with current time centered and full day padding on both sides
+    const now = new Date('2025-01-03T15:15:49-08:00');
+    
+    // Calculate start time by going back to midnight of the previous day plus additional padding
+    const startOfToday = startOfDay(now);
+    const startTime = subHours(startOfToday, 24); // Start from midnight yesterday
+    const endTime = addHours(startOfToday, 48); // End at midnight tomorrow
+    
+    setVisibleTimeRange({
+      start: startTime,
+      end: endTime,
+      now: now
+    });
+
+    // Generate all markers for the 48-hour range
+    const initialMarkers = [];
+    let currentTime = new Date(startTime);
+    
+    while (currentTime <= endTime) {
+      const hourDiff = (currentTime - startTime) / (1000 * 60 * 60);
+      const isStartOfDay = currentTime.getHours() === 0;
+      
+      // Check if this is the current hour marker (immediately to the left of now)
+      const nextHour = addHours(currentTime, 1);
+      const isCurrentHour = currentTime <= now && nextHour > now;
+      
+      // Format day as "Friday the 3rd"
+      const dayLabel = isStartOfDay 
+        ? `${format(currentTime, 'EEEE')} the ${format(currentTime, 'do')}`
+        : format(currentTime, 'ha');
+      
+      initialMarkers.push({
+        time: new Date(currentTime),
+        position: hourDiff * MARKER_SPACING,
+        label: dayLabel,
+        isPresent: isCurrentHour,
+        isDay: isStartOfDay
+      });
+      currentTime = addHours(currentTime, 1);
+    }
+    
+    setTimeMarkers(initialMarkers);
+    
+    // Calculate the exact position of current time
+    const totalMinutes = (now - startTime) / (1000 * 60);
+    const totalHours = totalMinutes / 60;
+    const currentTimePosition = totalHours * MARKER_SPACING;
+    
+    // Center the timeline on the current time position
+    const centerOffset = currentTimePosition - (window.innerWidth / 2);
+    setTimelineOffset(-centerOffset);
+    setBaseOffset(-centerOffset);
+  }, []);
+
+  const handleEventClick = (event) => {
+    setSelectedEvent(event);
+  };
+
+  const handleCloseEventDialog = () => {
+    setSelectedEvent(null);
+  };
+
+  const handleEditEvent = (event) => {
+    // Navigate to edit page
+    navigate(`/timeline/${id}/event/${event.id}/edit`);
+  };
+
+  const handleDeleteEvent = async (eventId) => {
+    try {
+      await axios.delete(`http://localhost:5000/api/event/${eventId}`);
+      // Refresh events
+      const response = await axios.get(`http://localhost:5000/api/timeline/${id}/events`);
+      setEvents(response.data);
+      setSelectedEvent(null);
+    } catch (error) {
+      console.error('Error deleting event:', error);
+    }
+  };
 
   // Styles for different marker types
   const markerStyles = {
@@ -443,7 +555,8 @@ function TimelineView() {
       '& .marker-label': {
         color: theme.palette.text.primary,
         fontWeight: 'bold',
-        fontSize: '0.9rem'
+        fontSize: '0.9rem',
+        marginBottom: '4px'
       },
       '& .marker-line': {
         width: '4px',
@@ -474,39 +587,6 @@ function TimelineView() {
         backgroundColor: theme.palette.text.secondary,
         borderRadius: '1px'
       }
-    }
-  };
-
-  // Update current time every minute
-  useEffect(() => {
-    const timer = setInterval(() => {
-      // No-op
-    }, 60000);
-    return () => clearInterval(timer);
-  }, []);
-
-  const handleEventClick = (event) => {
-    setSelectedEvent(event);
-  };
-
-  const handleCloseEventDialog = () => {
-    setSelectedEvent(null);
-  };
-
-  const handleEditEvent = (event) => {
-    // Navigate to edit page
-    navigate(`/timeline/${id}/event/${event.id}/edit`);
-  };
-
-  const handleDeleteEvent = async (eventId) => {
-    try {
-      await axios.delete(`http://localhost:5000/api/event/${eventId}`);
-      // Refresh events
-      const response = await axios.get(`http://localhost:5000/api/timeline/${id}/events`);
-      setEvents(response.data);
-      setSelectedEvent(null);
-    } catch (error) {
-      console.error('Error deleting event:', error);
     }
   };
 
@@ -637,7 +717,18 @@ function TimelineView() {
                   zIndex: 2
                 }}>
                   <Typography variant="caption" sx={{ mb: 1 }}>Earlier</Typography>
-                  <IconButton onClick={() => handleScroll(-1)} size="small">
+                  <IconButton 
+                    onClick={() => handleScroll(-1)} 
+                    size="small"
+                    sx={{
+                      pointerEvents: 'auto',
+                      backgroundColor: 'white',
+                      boxShadow: 1,
+                      '&:hover': {
+                        backgroundColor: 'grey.100'
+                      }
+                    }}
+                  >
                     <NavigateBeforeIcon />
                   </IconButton>
                 </Box>
@@ -687,7 +778,13 @@ function TimelineView() {
                           flexDirection: 'column',
                           alignItems: 'center',
                           transform: 'translateX(-50%)',
-                          top: '20%',
+                          ...(marker.isDay ? {
+                            bottom: '15px',  // Position from bottom of container
+                            height: '45px',  // Fixed height for day markers
+                            justifyContent: 'flex-end'  // Align content to bottom
+                          } : {
+                            top: '20%'  // Keep hour markers as they were
+                          }),
                           ...(marker.isDay ? markerStyles.day : 
                              marker.isPresent ? markerStyles.currentHour : 
                              markerStyles.regular)
@@ -764,7 +861,18 @@ function TimelineView() {
                   zIndex: 2
                 }}>
                   <Typography variant="caption" sx={{ mb: 1 }}>Later</Typography>
-                  <IconButton onClick={() => handleScroll(1)} size="small">
+                  <IconButton 
+                    onClick={() => handleScroll(1)} 
+                    size="small"
+                    sx={{
+                      pointerEvents: 'auto',
+                      backgroundColor: 'white',
+                      boxShadow: 1,
+                      '&:hover': {
+                        backgroundColor: 'grey.100'
+                      }
+                    }}
+                  >
                     <NavigateNextIcon />
                   </IconButton>
                 </Box>
