@@ -54,63 +54,73 @@ The application features a dynamic relationship between posts and events:
 
 ## Timeline System
 
-The timeline component is the core feature of this application, requiring careful consideration for any modifications.
+The timeline component is the core feature of this application, built with modular architecture for maintainability and flexibility.
+
+### Timeline Architecture
+
+#### Timeline Bar Component
+The timeline bar consists of three independent but coordinated elements:
+1. **Base Timeline** - The continuous blue line that serves as the visual foundation
+2. **Time Markers** - Hour/day/month indicators that align with the timeline
+3. **Navigation Controls** - Fixed "Earlier" and "Later" endpoints for timeline traversal
+
+#### Key Design Principles
+- **Separation of Concerns**: Each timeline element operates independently
+- **Fixed Time Grid**: Time markers are positioned based on absolute time, not event positions
+- **Continuous Navigation**: Pre-generated markers (24 hours in each direction) ensure smooth scrolling
+- **Viewport-Based Display**: Only shows the portion of timeline within the current view
+- **Consistent Spacing**: Fixed pixel spacing between markers maintains visual rhythm
+
+### Timeline Scales
+- **Day View** (Current Implementation)
+  - 24-hour markers on each side of current time
+  - 100px spacing between hour markers
+  - Centered on current time by default
+  - Smooth scrolling with marker generation as needed
+
+- **Planned Views**
+  - Week: 7-day markers with daily increments
+  - Month: 30-day markers with daily increments
+  - Year: 12-month markers with monthly increments
+
+### Event System
+Events are independent entities that overlay on the timeline:
+- Events position themselves based on their timestamp
+- No impact on timeline marker positioning or spacing
+- Multiple events can exist at the same time point
+- Events render as overlay markers on the timeline
 
 ### Current Implementation
-- Users can create custom timelines
-- Events can be manually added to timelines
-- Visual display includes:
-  - Year markers
-  - Interactive event cards
-  - Hover effects
-  - Diagonal connecting lines
-- Chronological event ordering
-- Expandable event details
-- Fixed timeline width for consistent visualization
-- Zoom controls with four distinct scales:
-  - Day view (markers show hours)
-  - Week view (markers show days and hours)
-  - Month view (markers show dates)
-  - Year view (markers show years)
+- Modular component architecture
+- Smooth bi-directional scrolling
+- Fixed navigation controls
+- Pre-generated time markers
+- Centered current time display
+- Consistent marker spacing
 
-### Future Vision
-- Tag-Based Timeline Generation
-  - Main timelines will be automatically created from post tags
-  - Self-moderating through user engagement
-  - Popular posts automatically promote to timeline events
-- Enhanced Timeline-Centric Design
-  - Prioritize timeline visualization over event display
-  - Improve timeline navigation and interaction
-  - Add visual guides and period indicators
-  - Implement timeline overview features
+### Planned Improvements
+1. **Event Integration**
+   - Overlay event markers on timeline
+   - Event creation at specific time points
+   - Event clustering for simultaneous events
+   - Event detail display on interaction
 
-### Timeline Privacy and Sharing
-- Public Timelines
-  - Generated from hashtags
-  - Community-driven content
-  - Visible to all users
-  
-- Private Timelines
-  - Personal progress tracking
-  - One dedicated private timeline per user profile
-  - Optional sharing capabilities
-  - Ideal for sensitive or personal content
-  
-- Profile Integration
-  - Dedicated space for personal timeline
-  - User control over timeline visibility
-  - Selective sharing options
+2. **Scale Implementation**
+   - Scale switching with appropriate marker generation
+   - Scale-specific marker spacing and labeling
+   - Smooth transitions between scales
 
-### Timeline Structure
-- Main Display: Shows promoted events chronologically
-- Discussion Section: Lists related posts below timeline
-- Organization:
-  - Hashtag-based categorization
-  - Automated content promotion
-  - Community-driven curation
+3. **Visual Enhancements**
+   - Theme customization
+   - Scale-appropriate styling
+   - Event marker styling
+   - Timeline decoration options
 
-### Important Note
-The timeline component is fundamental to the project's functionality. Any modifications to its behavior or structure require careful consideration and should be treated as significant architectural decisions.
+### Technical Notes
+- Timeline width and marker spacing are configurable constants
+- Marker positions are calculated based on time differences
+- Navigation maintains a buffer of markers in both directions
+- Component state manages visible time range and marker positions
 
 ## Project Philosophy and Direction
 

@@ -8,13 +8,16 @@ import {
   Box,
   Dialog,
   DialogContent,
-  useTheme
+  useTheme,
+  IconButton
 } from '@mui/material';
-import { format } from 'date-fns';
+import { format, addHours, subHours, isSameHour } from 'date-fns';
 import axios from 'axios';
 import EventDisplay from './EventDisplay';
 import TimelinePosts from './TimelinePosts';
 import { useAuth } from '../contexts/AuthContext';
+import NavigateBeforeIcon from '@mui/icons-material/NavigateBefore';
+import NavigateNextIcon from '@mui/icons-material/NavigateNext';
 
 function TimelineView() {
   const { id } = useParams();
@@ -29,31 +32,247 @@ function TimelineView() {
   const [startX, setStartX] = useState(0);
   const [scrollLeft, setScrollLeft] = useState(0);
   const [zoomLevel, setZoomLevel] = useState('month'); // 'day', 'week', 'month', 'year'
+  const [timelineOffset, setTimelineOffset] = useState(0);
+  const [baseOffset, setBaseOffset] = useState(0); // Track our base position
+  const [visibleTimeRange, setVisibleTimeRange] = useState({
+    start: null,
+    end: null
+  });
+  const [timeMarkers, setTimeMarkers] = useState([]);
+  const [bufferMarkers, setBufferMarkers] = useState({
+    before: [],
+    after: []
+  });
   const timelineRef = useRef(null);
 
-  const handleMouseDown = (e) => {
-    // Only initiate drag if clicking on the timeline line or its hit area
-    if (e.target.closest('.timeline-line')) {
-      setIsDragging(true);
-      if (timelineRef.current) {
-        setStartX(e.pageX - timelineRef.current.offsetLeft);
-        setScrollLeft(timelineRef.current.scrollLeft);
+  const BUFFER_HOURS = 24; // Hours of markers to keep in buffer
+  const MARKER_SPACING = 100; // Pixels between each hour marker
+  const HOURS_PER_SIDE = 24; // 24 hours worth of markers on each side
+  const TIMELINE_BASE_WIDTH = MARKER_SPACING * (HOURS_PER_SIDE * 2 + 1); // Total width including both sides and center
+  const SCROLL_AMOUNT = MARKER_SPACING; // One hour per scroll
+  const HOURS_TO_ADD = 6; // Reduce the number of hours added each time to maintain better control
+
+  useEffect(() => {
+    // Initialize timeline with current time centered and full day padding on both sides
+    const now = new Date();
+    const startTime = subHours(now, HOURS_PER_SIDE); // 24 hours before
+    const endTime = addHours(now, HOURS_PER_SIDE); // 24 hours after
+    
+    setVisibleTimeRange({
+      start: startTime,
+      end: endTime,
+      now: now
+    });
+
+    // Generate all markers for the 48-hour range (24 before + current + 24 after)
+    const initialMarkers = [];
+    let currentTime = new Date(startTime);
+    
+    while (currentTime <= endTime) {
+      const hourDiff = (currentTime - startTime) / (1000 * 60 * 60);
+      initialMarkers.push({
+        time: new Date(currentTime),
+        position: hourDiff * MARKER_SPACING,
+        label: format(currentTime, 'ha'),
+        isPresent: isSameHour(currentTime, now)
+      });
+      currentTime = addHours(currentTime, 1);
+    }
+    
+    setTimeMarkers(initialMarkers);
+    
+    // Center the timeline
+    const centerOffset = (TIMELINE_BASE_WIDTH / 2) - (window.innerWidth / 2);
+    setTimelineOffset(-centerOffset);
+    setBaseOffset(-centerOffset);
+  }, []);
+
+  const generateBufferMarkers = (start, end) => {
+    const before = [];
+    const after = [];
+    
+    // Generate buffer before visible range
+    let time = new Date(start);
+    for (let i = 0; i < BUFFER_HOURS; i++) {
+      time = addHours(time, -1);
+      before.unshift({
+        time: new Date(time),
+        label: format(time, 'ha')
+      });
+    }
+    
+    // Generate buffer after visible range
+    time = new Date(end);
+    for (let i = 0; i < BUFFER_HOURS; i++) {
+      time = addHours(time, 1);
+      after.push({
+        time: new Date(time),
+        label: format(time, 'ha')
+      });
+    }
+    
+    return { before, after };
+  };
+
+  const generateInitialMarkers = (range) => {
+    if (!range || !range.start || !range.end || !range.now) return [];
+    
+    const markers = [];
+    let currentTime = new Date(range.start);
+    
+    // Add extra markers before the start time
+    let extraStart = addHours(currentTime, -12); // Add 12 hours before
+    while (extraStart < currentTime) {
+      markers.push({
+        time: new Date(extraStart),
+        position: calculateMarkerPosition(extraStart, range),
+        label: format(extraStart, 'ha'),
+        isPresent: isSameHour(extraStart, range.now)
+      });
+      extraStart = addHours(extraStart, 1);
+    }
+    
+    // Add regular markers
+    while (currentTime <= range.end) {
+      markers.push({
+        time: new Date(currentTime),
+        position: calculateMarkerPosition(currentTime, range),
+        label: format(currentTime, 'ha'),
+        isPresent: isSameHour(currentTime, range.now)
+      });
+      currentTime = addHours(currentTime, 1);
+    }
+    
+    return markers;
+  };
+
+  const getTimelineBoundaries = () => {
+    const now = new Date('2025-01-02T16:32:56-08:00');
+    
+    // Calculate how many hours we can show based on timeline width
+    const timelineWidth = TIMELINE_BASE_WIDTH;
+    const markerSpacing = MARKER_SPACING;
+    const visibleHours = Math.floor((timelineWidth * 0.94) / markerSpacing);
+    const hoursOnEachSide = Math.floor(visibleHours / 2);
+    
+    // Center the current time
+    const start = addHours(now, -hoursOnEachSide);
+    const end = addHours(now, hoursOnEachSide);
+    
+    return { 
+      start: new Date(start.setMinutes(0, 0, 0)), 
+      end: new Date(end.setMinutes(59, 59, 999)),
+      now 
+    };
+  };
+
+  const calculateMarkerPosition = (date, range) => {
+    if (!date || !range || !range.start || !range.end) return 0;
+    
+    const current = new Date(date);
+    const start = new Date(range.start);
+    
+    // Calculate position based on exact hour difference
+    const hoursDiff = (current - start) / (1000 * 60 * 60);
+    const position = hoursDiff * MARKER_SPACING;
+    
+    console.log('Position calculation:', {
+      time: current.toLocaleTimeString(),
+      startTime: start.toLocaleTimeString(),
+      hoursDiff,
+      position
+    });
+    
+    return position;
+  };
+
+  const extendTimeRange = (direction) => {
+    setVisibleTimeRange(prev => {
+      const newRange = { ...prev };
+      const hoursToAdd = direction < 0 ? -HOURS_PER_SIDE : HOURS_PER_SIDE;
+      
+      if (direction < 0) {
+        newRange.start = addHours(prev.start, hoursToAdd);
+      } else {
+        newRange.end = addHours(prev.end, hoursToAdd);
       }
+
+      setTimeMarkers(prevMarkers => {
+        const newMarkers = [];
+        let currentTime;
+        
+        if (direction < 0) {
+          // Add 24 new hours of markers to the left
+          currentTime = new Date(newRange.start);
+          while (currentTime < prev.start) {
+            const hourDiff = (currentTime - newRange.start) / (1000 * 60 * 60);
+            newMarkers.push({
+              time: new Date(currentTime),
+              position: hourDiff * MARKER_SPACING,
+              label: format(currentTime, 'ha'),
+              isPresent: isSameHour(currentTime, newRange.now)
+            });
+            currentTime = addHours(currentTime, 1);
+          }
+        } else {
+          // Add 24 new hours of markers to the right
+          currentTime = addHours(prev.end, 1);
+          while (currentTime <= newRange.end) {
+            const hourDiff = (currentTime - newRange.start) / (1000 * 60 * 60);
+            newMarkers.push({
+              time: new Date(currentTime),
+              position: hourDiff * MARKER_SPACING,
+              label: format(currentTime, 'ha'),
+              isPresent: isSameHour(currentTime, newRange.now)
+            });
+            currentTime = addHours(currentTime, 1);
+          }
+        }
+
+        // Update positions of existing markers relative to new start time
+        const updatedMarkers = prevMarkers.map(marker => {
+          const hourDiff = (marker.time - newRange.start) / (1000 * 60 * 60);
+          return {
+            ...marker,
+            position: hourDiff * MARKER_SPACING
+          };
+        });
+
+        return direction < 0 
+          ? [...newMarkers, ...updatedMarkers]
+          : [...updatedMarkers, ...newMarkers];
+      });
+      
+      return newRange;
+    });
+  };
+
+  const handleScroll = (direction) => {
+    const newOffset = timelineOffset - (direction * SCROLL_AMOUNT);
+    setTimelineOffset(newOffset);
+    
+    // When we've scrolled 12 hours worth, extend the timeline
+    const extensionThreshold = MARKER_SPACING * 12;
+    if (Math.abs(newOffset - baseOffset) > extensionThreshold) {
+      extendTimeRange(direction);
+      setBaseOffset(newOffset);
     }
   };
 
-  const handleMouseUp = () => {
-    setIsDragging(false);
+  const handleMouseDown = (e) => {
+    setIsDragging(true);
+    setStartX(e.clientX - timelineOffset);
+    e.preventDefault(); // Prevent text selection
   };
-
+  
   const handleMouseMove = (e) => {
     if (!isDragging) return;
-    e.preventDefault();
-    if (timelineRef.current) {
-      const x = e.pageX - timelineRef.current.offsetLeft;
-      const walk = (x - startX) * 2;
-      timelineRef.current.scrollLeft = scrollLeft - walk;
-    }
+    const deltaX = e.clientX - startX;
+    handleScroll(deltaX);
+  };
+  
+  const handleMouseUp = () => {
+    setIsDragging(false);
   };
 
   const handleMouseLeave = () => {
@@ -123,106 +342,53 @@ function TimelineView() {
     calculateEventRows();
   }, [events]);
 
-  const getTimelineBoundaries = () => {
-    if (events.length === 0) return { start: new Date(), end: new Date() };
-    
-    const dates = events.map(event => new Date(event.event_date));
-    const start = new Date(Math.min(...dates));
-    const end = new Date(Math.max(...dates));
-    
-    // Adjust boundaries based on zoom level
-    switch (zoomLevel) {
-      case 'day':
-        // For day view, start at beginning of the current hour
-        start.setMinutes(0, 0, 0);
-        start.setHours(start.getHours() - 1);
-        end.setMinutes(59, 59, 999);
-        end.setHours(end.getHours() + 1);
-        break;
-      case 'week':
-        // For week view, start at beginning of the day
-        start.setHours(0, 0, 0, 0);
-        start.setDate(start.getDate() - 1);
-        end.setHours(23, 59, 59, 999);
-        end.setDate(end.getDate() + 1);
-        break;
-      case 'month':
-        // For month view, start at beginning of the month
-        start.setDate(1);
-        start.setHours(0, 0, 0, 0);
-        end.setDate(new Date(end.getFullYear(), end.getMonth() + 1, 0).getDate());
-        end.setHours(23, 59, 59, 999);
-        break;
-      case 'year':
-        // For year view, start at beginning of the year
-        start.setMonth(0, 1);
-        start.setHours(0, 0, 0, 0);
-        end.setMonth(11, 31);
-        end.setHours(23, 59, 59, 999);
-        break;
-    }
-    
-    return { start, end };
+  const addHours = (date, hours) => {
+    const result = new Date(date);
+    result.setHours(result.getHours() + hours);
+    return result;
   };
 
-  const calculatePosition = (date) => {
-    const { start, end } = getTimelineBoundaries();
-    const totalTimespan = end - start;
-    const currentTimespan = new Date(date) - start;
-    // Align with the marker spacing
-    return 3 + ((currentTimespan / totalTimespan) * 94);
+  const isSameHour = (date1, date2) => {
+    if (!date1 || !date2) return false;
+    return new Date(date1).getHours() === new Date(date2).getHours();
   };
 
-  const generateTimeMarkers = () => {
-    const { start, end } = getTimelineBoundaries();
-    const markers = [];
-    const numDividers = 8;
-    const availableSpace = 94; // 94% of space for content
-    const spacing = availableSpace / (numDividers + 1); // Equal divisions including end point
-
-    for (let i = 1; i <= numDividers; i++) {
-      const position = 3 + (spacing * i); // Start at 3% and space equally
-      const timestamp = new Date(start.getTime() + ((end - start) * (i / (numDividers + 1))));
-      
-      let label;
-      switch (zoomLevel) {
-        case 'day':
-          label = format(timestamp, 'ha'); // e.g., "2PM"
-          break;
-        case 'week':
-          label = format(timestamp, 'EEE ha'); // e.g., "Mon 2PM"
-          break;
-        case 'month':
-          label = format(timestamp, 'MMM d'); // e.g., "Dec 7"
-          break;
-        case 'year':
-          label = format(timestamp, 'yyyy'); // e.g., "1997"
-          break;
-        default:
-          label = format(timestamp, 'MMM d');
-      }
-
-      markers.push({ position, label });
+  const presentDayStyles = {
+    position: 'absolute',
+    top: '-55px',
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    animation: 'float 2s ease-in-out infinite',
+    zIndex: 3,
+    '& .marker-label': {
+      color: theme.palette.primary.main,
+      fontWeight: 'bold',
+      marginBottom: '4px'
+    },
+    '& .marker-arrow': {
+      width: 0,
+      height: 0,
+      borderLeft: '6px solid transparent',
+      borderRight: '6px solid transparent',
+      borderTop: `8px solid ${theme.palette.primary.main}`,
+    },
+    '& .marker-line': {
+      width: '2px',
+      height: '15px',
+      background: `linear-gradient(to bottom, ${theme.palette.primary.main}, transparent)`
     }
-
-    return markers;
   };
 
-  const generateYearMarkers = () => {
-    if (events.length === 0) return [];
-    
-    const firstDate = new Date(events[0].event_date);
-    const lastDate = new Date(events[events.length - 1].event_date);
-    const firstYear = firstDate.getFullYear();
-    const lastYear = lastDate.getFullYear();
-    const years = [];
-    
-    for (let year = firstYear; year <= lastYear; year++) {
-      const position = calculatePosition(new Date(year, 0, 1));
-      years.push({ year, position });
+  const globalStyles = {
+    '@keyframes float': {
+      '0%, 100%': {
+        transform: 'translateY(0)',
+      },
+      '50%': {
+        transform: 'translateY(-5px)',
+      },
     }
-    
-    return years;
   };
 
   const handleEventClick = (event) => {
@@ -254,15 +420,16 @@ function TimelineView() {
     <Box sx={{ 
       display: 'flex',
       flexDirection: 'column',
-      minHeight: '100vh', 
-      bgcolor: theme.palette.mode === 'light' ? 'background.default' : '#000'
+      minHeight: 'auto', 
+      bgcolor: theme.palette.mode === 'light' ? 'background.default' : '#000',
+      overflowX: 'hidden' // Hide overflow
     }}>
       <Box sx={{ 
         width: '100%',
         position: 'relative',
         bgcolor: theme.palette.mode === 'light' ? 'background.paper' : '#2c1b47',
         color: theme.palette.mode === 'light' ? 'text.primary' : '#fff',
-        minHeight: 'fit-content',
+        minHeight: 'auto', 
         paddingBottom: '20px', 
         overflowX: 'hidden' 
       }}>
@@ -344,437 +511,154 @@ function TimelineView() {
             <Box 
               ref={timelineRef}
               className="timeline-scroll-container"
-              onMouseDown={handleMouseDown}
-              onMouseUp={handleMouseUp}
-              onMouseMove={handleMouseMove}
-              onMouseLeave={handleMouseLeave}
               sx={{
                 width: '100%',
-                overflowX: 'auto',
-                overflowY: 'hidden',
+                overflowX: 'hidden',
+                overflowY: 'visible',
                 position: 'relative',
-                height: '400px', // Reduced from default height
+                height: '300px',
+                minHeight: 'auto', 
                 mt: 2,
-                mb: 2,
-                cursor: isDragging ? 'grabbing' : 'grab',
-                '&::-webkit-scrollbar': {
-                  height: '8px',
-                },
-                '&::-webkit-scrollbar-track': {
-                  background: 'rgba(0,0,0,0.1)',
-                },
-                '&::-webkit-scrollbar-thumb': {
-                  background: theme.palette.mode === 'light' ? 'rgba(156, 39, 176, 0.5)' : 'rgba(156, 39, 176, 0.5)',
-                  borderRadius: '4px',
-                  '&:hover': {
-                    background: theme.palette.mode === 'light' ? 'rgba(156, 39, 176, 0.7)' : 'rgba(156, 39, 176, 0.7)',
-                  }
-                }
+                mb: 2
               }}
             >
-              {/* Timeline Content */}
+              {/* Timeline Container with Navigation Endpoints */}
               <Box sx={{
                 position: 'relative',
-                minWidth: '1200px', // Fixed width instead of dynamic
-                padding: '40px 200px',
-                minHeight: '200px',
-                height: 'auto',
+                width: '100%',
+                height: '100px',
                 display: 'flex',
-                flexDirection: 'column'
+                alignItems: 'center',
+                justifyContent: 'center'
               }}>
-                {/* Calculate maximum height needed for events */}
+                {/* Left Navigation */}
+                <Box sx={{
+                  position: 'absolute',
+                  left: 0,
+                  top: '50%',
+                  transform: 'translateY(-50%)',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  zIndex: 2
+                }}>
+                  <Typography variant="caption" sx={{ mb: 1 }}>Earlier</Typography>
+                  <IconButton onClick={() => handleScroll(-1)} size="small">
+                    <NavigateBeforeIcon />
+                  </IconButton>
+                </Box>
+
+                {/* Timeline Content */}
                 <Box sx={{
                   position: 'relative',
-                  width: '100%',
-                  height: `${Math.max(...Object.values(eventRows)) * 120 + 400}px`, 
+                  width: 'calc(100% - 80px)',
+                  margin: '0 40px',
+                  height: '60px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  overflow: 'hidden'
                 }}>
-                  {/* Timeline Labels */}
-                  <Typography 
-                    variant="body2" 
-                    sx={{ 
-                      position: 'absolute', 
-                      left: '0px',
-                      top: '5px',
-                      fontStyle: 'italic',
-                      color: theme.palette.mode === 'light' ? 'text.secondary' : '#ce93d8',
-                      fontSize: '0.8rem'
-                    }}
-                  >
-                    Earliest Event
-                  </Typography>
-                  <Typography 
-                    variant="body2" 
-                    sx={{ 
-                      position: 'absolute', 
-                      right: '0px',
-                      top: '5px',
-                      fontStyle: 'italic',
-                      color: theme.palette.mode === 'light' ? 'text.secondary' : '#ce93d8',
-                      fontSize: '0.8rem'
-                    }}
-                  >
-                    Latest Event
-                  </Typography>
-                  {/* Main Timeline Line */}
-                  <Box 
-                    className="timeline-line"
-                    sx={{
-                      position: 'absolute',
-                      top: '40px',
-                      width: '100%',
-                      height: '4px',
-                      background: theme.palette.mode === 'light' 
-                        ? `linear-gradient(90deg, ${theme.palette.primary.main} 0%, ${theme.palette.primary.light} 100%)`
-                        : 'linear-gradient(90deg, #9c27b0 0%, #ce93d8 100%)',
-                      borderRadius: '2px',
-                      boxShadow: '0 1px 3px rgba(0,0,0,0.3)',
-                      cursor: isDragging ? 'grabbing' : 'grab',
-                      '&::after': {
-                        content: '""',
-                        position: 'absolute',
-                        top: '-10px',
-                        bottom: '-10px',
-                        left: 0,
-                        right: 0,
-                      }
-                    }}
-                  >
-                    {/* Left endpoint circle */}
-                    <Box sx={{
-                      position: 'absolute',
-                      left: '-6px', 
-                      top: '-4px', 
-                      width: '12px',
-                      height: '12px',
-                      borderRadius: '50%',
-                      bgcolor: theme.palette.mode === 'light' ? theme.palette.primary.main : '#9c27b0',
-                      boxShadow: theme.palette.mode === 'light'
-                        ? `0 0 0 2px ${theme.palette.background.paper}, 0 0 0 4px ${theme.palette.primary.main}`
-                        : '0 0 0 2px #2c1b47, 0 0 0 4px #9c27b0',
-                    }} />
-                    {/* Right endpoint arrow */}
-                    <Box sx={{
-                      position: 'absolute',
-                      right: '-16px',
-                      top: '-6px',
-                      width: '0',
-                      height: '0',
-                      borderTop: '8px solid transparent',
-                      borderBottom: '8px solid transparent',
-                      borderLeft: theme.palette.mode === 'light' ? `12px solid ${theme.palette.primary.main}` : '12px solid #ce93d8',
-                      '&::before': {
-                        content: '""',
-                        position: 'absolute',
-                        right: '4px',
-                        top: '-12px',
-                        borderTop: '12px solid transparent',
-                        borderBottom: '12px solid transparent',
-                        borderLeft: theme.palette.mode === 'light' ? `16px solid ${theme.palette.background.paper}` : '16px solid #2c1b47',
-                        zIndex: -1
-                      },
-                      '&::after': {
-                        content: '""',
-                        position: 'absolute',
-                        right: '2px',
-                        top: '-10px',
-                        borderTop: '10px solid transparent',
-                        borderBottom: '10px solid transparent',
-                        borderLeft: theme.palette.mode === 'light' ? `14px solid ${theme.palette.primary.main}` : '14px solid #ce93d8',
-                        zIndex: -1
-                      }
-                    }} />
-                    {/* Timeline Dividers with Labels */}
-                    {generateTimeMarkers().map((marker, index) => (
+                  {/* Timeline Bar */}
+                  <Box sx={{
+                    position: 'absolute',
+                    left: 0,
+                    top: '50%',
+                    height: '2px',
+                    backgroundColor: theme.palette.primary.main,
+                    transform: `translateX(${timelineOffset}px)`,
+                    transition: 'transform 0.1s ease-out',
+                    width: TIMELINE_BASE_WIDTH
+                  }} />
+
+                  {/* Time Markers Container */}
+                  <Box sx={{
+                    position: 'absolute',
+                    left: 0,
+                    top: 0,
+                    bottom: 0,
+                    transform: `translateX(${timelineOffset}px)`,
+                    transition: 'transform 0.1s ease-out',
+                    width: TIMELINE_BASE_WIDTH,
+                    display: 'flex',
+                    alignItems: 'center'
+                  }}>
+                    {timeMarkers.map((marker, index) => (
                       <Box
-                        key={`divider-${index}`}
+                        key={index}
                         sx={{
                           position: 'absolute',
-                          left: `${marker.position}%`,
+                          left: `${marker.position}px`,
                           display: 'flex',
                           flexDirection: 'column',
                           alignItems: 'center',
-                          transform: 'translateX(-50%)',
-                          opacity: events.length >= 2 ? 1 : 0,
-                          transition: 'opacity 0.3s ease-in-out'
+                          transform: 'translateX(-50%)'
                         }}
                       >
-                        <Typography 
-                          variant="body2" 
-                          sx={{ 
-                            position: 'absolute',
-                            top: '-25px',
-                            fontStyle: 'italic',
-                            color: theme.palette.mode === 'light' ? 'text.secondary' : '#ce93d8',
-                            fontSize: '0.8rem',
-                            whiteSpace: 'nowrap'
-                          }}
-                        >
-                          {marker.label}
-                        </Typography>
+                        <Typography variant="caption" sx={{ mb: 1 }}>{marker.label}</Typography>
                         <Box
                           sx={{
                             width: '2px',
-                            height: '28px',
-                            backgroundColor: theme.palette.mode === 'light' ? 'text.secondary' : 'rgba(206, 147, 216, 0.4)',
-                            position: 'absolute',
-                            top: '-12px'
+                            height: '10px',
+                            backgroundColor: marker.isPresent ? theme.palette.secondary.main : theme.palette.text.secondary
                           }}
                         />
                       </Box>
                     ))}
-                    {/* Year Markers */}
-                    {generateYearMarkers().map(({ year, position }) => (
-                      <Box
-                        key={year}
-                        sx={{
-                          position: 'absolute',
-                          left: `${position}%`,
-                          top: '-25px',
-                          transform: 'translateX(-50%)',
-                          display: 'flex',
-                          flexDirection: 'column',
-                          alignItems: 'center'
-                        }}
-                      >
-                        <Box sx={{
-                          width: '2px',
-                          height: '12px',
-                          backgroundColor: theme.palette.mode === 'light' ? 'text.secondary' : '#ce93d8', 
-                          marginBottom: '5px'
-                        }} />
-                        <Typography variant="caption" sx={{ 
-                          fontWeight: 'bold',
-                          color: theme.palette.mode === 'light' ? 'text.primary' : '#fff' 
-                        }}>
-                          {year}
-                        </Typography>
-                      </Box>
-                    ))}
-
-                    {/* Events */}
-                    {events.map((event) => {
-                      const position = calculatePosition(event.event_date);
-                      const rowIndex = eventRows[event.id] || 0;
-                      const verticalOffset = rowIndex * 120;
-
-                      return (
-                        <Box
-                          key={event.id}
-                          data-event-id={event.id}
-                          sx={{
-                            position: 'absolute',
-                            left: `${position}%`,
-                            top: `${20 + verticalOffset}px`,
-                            transform: 'translateX(-50%)',
-                            '&:hover': {
-                              '& .event-dot-container': {
-                                '& .dot': {
-                                  transform: 'scale(1.5)',
-                                },
-                              },
-                              '& .event-card': {
-                                transform: 'translateX(-50%) scale(1.02)',
-                                boxShadow: theme.palette.mode === 'light' ? '0 4px 20px rgba(156, 39, 176, 0.25)' : '0 4px 20px rgba(156, 39, 176, 0.25)',
-                                borderColor: theme.palette.mode === 'light' ? 'primary.main' : '#9c27b0'
-                              }
-                            }
-                          }}
-                        >
-                          {/* Vertical Connection Line */}
-                          <Box sx={{
-                            position: 'absolute',
-                            left: '50%',
-                            transform: 'translateX(-50%)',
-                            width: '1px',
-                            height: `${40 + verticalOffset}px`,
-                            backgroundColor: theme.palette.mode === 'light' ? 'text.secondary' : 'rgba(156, 39, 176, 0.4)',
-                            zIndex: 1
-                          }} />
-                          
-                          {/* Event Dot with larger clickable area */}
-                          <Box
-                            className="event-dot-container"
-                            onClick={() => handleEventClick(event)}
-                            sx={{
-                              position: 'absolute',
-                              top: `-${verticalOffset + 6}px`,
-                              left: '50%',
-                              transform: 'translateX(-50%)',
-                              width: '24px', // Larger clickable area
-                              height: '24px', // Larger clickable area
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              cursor: 'pointer',
-                              zIndex: 2,
-                              '&:hover': {
-                                '& .dot': {
-                                  transform: 'scale(1.5)',
-                                }
-                              }
-                            }}
-                          >
-                            {/* Actual visible dot */}
-                            <Box
-                              className="dot"
-                              sx={{
-                                width: '8px',
-                                height: '8px',
-                                borderRadius: '50%',
-                                backgroundColor: theme.palette.mode === 'light' ? 'primary.main' : '#ce93d8',
-                                border: theme.palette.mode === 'light' ? `2px solid ${theme.palette.background.paper}` : '2px solid #2c1b47',
-                                boxShadow: theme.palette.mode === 'light'
-                                  ? `0 0 0 2px ${theme.palette.primary.main}`
-                                  : '0 0 0 2px #ce93d8',
-                                transition: 'all 0.3s ease'
-                              }}
-                            />
-                          </Box>
-                          
-                          {/* Event Card */}
-                          <Paper
-                            className="event-card"
-                            elevation={selectedEvent?.id === event.id ? 8 : 1}
-                            sx={{
-                              position: 'absolute',
-                              top: '50px',
-                              left: '50%',
-                              transform: selectedEvent?.id === event.id 
-                                ? 'translateX(-50%) scale(1.05)' 
-                                : 'translateX(-50%)',
-                              width: selectedEvent?.id === event.id ? '300px' : '180px',
-                              height: selectedEvent?.id === event.id ? 'auto' : '70px',
-                              overflow: 'visible',
-                              transition: 'all 0.3s ease',
-                              cursor: 'pointer',
-                              zIndex: selectedEvent?.id === event.id ? 10 : 1,
-                              backgroundColor: theme.palette.mode === 'light' ? 'background.paper' : '#2c1b47',
-                              border: theme.palette.mode === 'light' ? `1px solid ${theme.palette.primary.main}` : '1px solid #ce93d8',
-                              color: theme.palette.mode === 'light' ? 'text.primary' : '#fff',
-                              '&:hover': {
-                                elevation: 4,
-                                transform: 'translateX(-50%) scale(1.02)',
-                                zIndex: 5
-                              }
-                            }}
-                            onClick={() => handleEventClick(event)}
-                          >
-                            <Box sx={{ 
-                              p: 1.5,
-                              background: selectedEvent?.id === event.id 
-                                ? theme.palette.mode === 'light' ? 'linear-gradient(45deg, rgba(156, 39, 176, 0.05), rgba(206, 147, 216, 0.05))' : 'linear-gradient(45deg, rgba(156, 39, 176, 0.05), rgba(206, 147, 216, 0.05))'
-                                : 'none'
-                            }}>
-                              {event.image_url && selectedEvent?.id === event.id && (
-                                <Box
-                                  component="img"
-                                  src={event.image_url}
-                                  alt={event.title}
-                                  sx={{
-                                    width: '100%',
-                                    height: '150px',
-                                    objectFit: 'cover',
-                                    borderRadius: '4px',
-                                    marginBottom: 1
-                                  }}
-                                />
-                              )}
-                              <Typography 
-                                variant="subtitle2" 
-                                sx={{ 
-                                  fontWeight: 'bold',
-                                  overflow: 'hidden',
-                                  textOverflow: 'ellipsis',
-                                  whiteSpace: selectedEvent?.id === event.id ? 'normal' : 'nowrap',
-                                  fontSize: '0.875rem',
-                                  lineHeight: '1.2'
-                                }}
-                              >
-                                {event.title}
-                              </Typography>
-                              <Typography 
-                                variant="caption" 
-                                color="textSecondary"
-                                sx={{ 
-                                  display: 'block', 
-                                  marginBottom: selectedEvent?.id === event.id ? 1 : 0,
-                                  fontSize: '0.75rem'
-                                }}
-                              >
-                                {format(new Date(event.event_date), 'MMM d, yyyy')}
-                              </Typography>
-                              {selectedEvent?.id === event.id && (
-                                <Box>
-                                  <Typography 
-                                    variant="body2" 
-                                    sx={{ 
-                                      fontSize: '0.875rem',
-                                      lineHeight: '1.4'
-                                    }}
-                                  >
-                                    {event.content}
-                                  </Typography>
-                                  {event.url && (
-                                    <Button
-                                      variant="text"
-                                      color="primary"
-                                      href={event.url}
-                                      target="_blank"
-                                      rel="noopener noreferrer"
-                                      sx={{ 
-                                        mt: 1,
-                                        fontSize: '0.875rem',
-                                        textTransform: 'none'
-                                      }}
-                                    >
-                                      Visit Link →
-                                    </Button>
-                                  )}
-                                </Box>
-                              )}
-                            </Box>
-                          </Paper>
-                        </Box>
-                      );
-                    })}
                   </Box>
+                </Box>
 
+                {/* Right Navigation */}
+                <Box sx={{
+                  position: 'absolute',
+                  right: 0,
+                  top: '50%',
+                  transform: 'translateY(-50%)',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  zIndex: 2
+                }}>
+                  <Typography variant="caption" sx={{ mb: 1 }}>Later</Typography>
+                  <IconButton onClick={() => handleScroll(1)} size="small">
+                    <NavigateNextIcon />
+                  </IconButton>
                 </Box>
               </Box>
             </Box>
+            {/* Timeline Posts */}
+            <Box sx={{ backgroundColor: theme.palette.mode === 'light' ? 'background.default' : '#121212', py: 4 }}>
+              <Container maxWidth="lg">
+                <TimelinePosts timelineId={id} />
+              </Container>
+            </Box>
+            {/* Event Dialog */}
+            <Dialog
+              open={Boolean(selectedEvent)}
+              onClose={handleCloseEventDialog}
+              maxWidth="md"
+              fullWidth
+            >
+              <DialogContent>
+                {selectedEvent && (
+                  <EventDisplay
+                    event={selectedEvent}
+                    onEdit={handleEditEvent}
+                    onDelete={handleDeleteEvent}
+                    currentUserId={1} // TODO: Replace with actual logged-in user ID
+                  />
+                )}
+              </DialogContent>
+            </Dialog>
+            {/* Black space section */}
+            <Box sx={{ 
+              flex: 1,
+              backgroundColor: theme.palette.mode === 'light' ? 'background.default' : '#000',
+              width: '100%',
+              minHeight: '50vh' 
+            }} />
           </Box>
         </Container>
       </Box>
-      <Box sx={{ backgroundColor: theme.palette.mode === 'light' ? 'background.default' : '#121212', py: 4 }}>
-        <Container maxWidth="lg">
-          <TimelinePosts timelineId={id} />
-        </Container>
-      </Box>
-      {/* Event Dialog */}
-      <Dialog
-        open={Boolean(selectedEvent)}
-        onClose={handleCloseEventDialog}
-        maxWidth="md"
-        fullWidth
-      >
-        <DialogContent>
-          {selectedEvent && (
-            <EventDisplay
-              event={selectedEvent}
-              onEdit={handleEditEvent}
-              onDelete={handleDeleteEvent}
-              currentUserId={1} // TODO: Replace with actual logged-in user ID
-            />
-          )}
-        </DialogContent>
-      </Dialog>
-      {/* Black space section */}
-      <Box sx={{ 
-        flex: 1,
-        backgroundColor: theme.palette.mode === 'light' ? 'background.default' : '#000',
-        width: '100%',
-        minHeight: '50vh' 
-      }} />
     </Box>
   );
 }

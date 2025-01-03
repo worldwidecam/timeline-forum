@@ -1,202 +1,104 @@
 from flask import Flask, request, jsonify, send_from_directory
 from flask_sqlalchemy import SQLAlchemy
 from flask_jwt_extended import JWTManager, create_access_token, jwt_required, get_jwt_identity
-from flask_cors import CORS, cross_origin
-from datetime import datetime, timezone
+from flask_cors import CORS
+from datetime import datetime
 from werkzeug.security import generate_password_hash, check_password_hash
-import os
 from werkzeug.utils import secure_filename
-import requests
-from bs4 import BeautifulSoup
-import re
-import time
-from sqlalchemy import func, desc
+import os
 import logging
 
+# Configure logging
+logging.basicConfig(level=logging.DEBUG)
+logger = logging.getLogger(__name__)
+
 app = Flask(__name__)
-app.logger.setLevel(logging.INFO)
 
-# Configuration
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///timeline_forum.db'
-app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-app.config['JWT_SECRET_KEY'] = 'your-secret-key'  # Change this in production
-app.config['JWT_ACCESS_TOKEN_EXPIRES'] = False  # Tokens don't expire
+# Basic configurations
+app.config.update(
+    SQLALCHEMY_DATABASE_URI='sqlite:///timeline_forum.db',
+    SQLALCHEMY_TRACK_MODIFICATIONS=False,
+    JWT_SECRET_KEY='your-secret-key',  # Change this in production
+    JWT_ACCESS_TOKEN_EXPIRES=False,
+    MAX_CONTENT_LENGTH=16 * 1024 * 1024  # 16MB max file size
+)
 
-# Initialize extensions
-db = SQLAlchemy(app)
-jwt = JWTManager(app)
+# Configure CORS
 CORS(app, resources={
     r"/*": {
         "origins": ["http://localhost:3000"],
         "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
         "allow_headers": ["Content-Type", "Authorization"],
-        "supports_credentials": True,
-        "expose_headers": ["Content-Type", "Authorization"]
+        "supports_credentials": True
     }
 })
 
+# Configure upload paths
+base_dir = os.path.abspath(os.path.dirname(__file__))
+app.config['UPLOAD_FOLDER'] = os.path.join(base_dir, 'static', 'uploads')
+app.config['STATIC_FOLDER'] = os.path.join(base_dir, 'static')
+
+# Create necessary directories
+os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
+os.makedirs(app.config['STATIC_FOLDER'], exist_ok=True)
+
+# Initialize extensions
+db = SQLAlchemy(app)
+jwt = JWTManager(app)
+
 # File upload configuration
-UPLOAD_FOLDER = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'uploads')
 ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif'}
-app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
-app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB max file size
-
-# Create uploads directory if it doesn't exist
-if not os.path.exists(UPLOAD_FOLDER):
-    os.makedirs(UPLOAD_FOLDER)
-
-# Serve static files
-@app.route('/uploads/<path:filename>')
-def serve_file(filename):
-    return send_from_directory(app.config['UPLOAD_FOLDER'], filename)
 
 def allowed_file(filename):
-    return '.' in filename and \
-           filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
+    return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
-def allowed_audio_file(filename):
-    return '.' in filename and \
-           filename.rsplit('.', 1)[1].lower() in {'mp3', 'wav', 'ogg'}
-
-def get_favicon_url(url, soup):
+@app.route('/api/upload', methods=['POST'])
+@jwt_required()
+def upload_file():
     try:
-        # Try different favicon possibilities
-        favicon = (
-            soup.find('link', rel='icon') or
-            soup.find('link', rel='shortcut icon') or
-            soup.find('link', rel='apple-touch-icon')
-        )
-        if favicon and favicon.get('href'):
-            favicon_url = favicon['href']
-            if not bool(urlparse(favicon_url).netloc):
-                base_url = '{uri.scheme}://{uri.netloc}'.format(uri=urlparse(url))
-                favicon_url = base_url + favicon_url if favicon_url.startswith('/') else base_url + '/' + favicon_url
-            return favicon_url
+        logger.info("Starting file upload process")
+        logger.info(f"Request files: {request.files}")
+        logger.info(f"Request headers: {dict(request.headers)}")
         
-        # If no favicon found in HTML, try the default /favicon.ico location
-        base_url = '{uri.scheme}://{uri.netloc}'.format(uri=urlparse(url))
-        return f"{base_url}/favicon.ico"
-    except:
-        return None
-
-def get_link_preview(url):
-    try:
-        # Special handling for different platforms
-        parsed_url = urlparse(url)
-        domain = parsed_url.netloc.lower()
-
-        # YouTube and YouTube Music
-        if 'youtube.com' in domain or 'youtu.be' in domain:
-            video_id = None
-            if 'watch?v=' in url:
-                video_id = url.split('watch?v=')[1].split('&')[0]
-            elif 'youtu.be/' in url:
-                video_id = url.split('youtu.be/')[1].split('?')[0]
-            
-            if video_id:
-                return {
-                    'url_title': 'YouTube Video',
-                    'url_description': 'Click to watch on YouTube',
-                    'url_image': f'https://img.youtube.com/vi/{video_id}/maxresdefault.jpg'
-                }
-
-        # Spotify
-        elif 'spotify.com' in domain:
-            if '/track/' in url or '/album/' in url or '/playlist/' in url or '/artist/' in url:
-                spotify_id = url.split('/')[-1].split('?')[0]
-                content_type = 'track' if '/track/' in url else 'album' if '/album/' in url else 'playlist' if '/playlist/' in url else 'artist'
-                return {
-                    'url_title': f'Spotify {content_type.title()}',
-                    'url_description': f'Click to listen on Spotify',
-                    'url_image': 'https://developer.spotify.com/images/guidelines/design/icon3@2x.png'  # Spotify logo as fallback
-                }
-
-        # Twitter/X
-        elif 'twitter.com' in domain or 'x.com' in domain:
-            return {
-                'url_title': 'Twitter Post',
-                'url_description': 'Click to view on Twitter',
-                'url_image': 'https://abs.twimg.com/responsive-web/client-web/icon-ios.b1fc727a.png'
-            }
-
-        # Instagram
-        elif 'instagram.com' in domain:
-            return {
-                'url_title': 'Instagram Post',
-                'url_description': 'Click to view on Instagram',
-                'url_image': 'https://www.instagram.com/static/images/ico/favicon-192.png/68d99ba29cc8.png'
-            }
-
-        # TikTok
-        elif 'tiktok.com' in domain:
-            return {
-                'url_title': 'TikTok Video',
-                'url_description': 'Click to watch on TikTok',
-                'url_image': 'https://sf16-scmcdn-va.ibytedtos.com/goofy/tiktok/web/node/_next/static/images/logo-dark-e95da587b6efa1520dcd11f4b45c0cf6.svg'
-            }
-
-        # Default handling for other URLs
-        headers = {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
-        }
-        response = requests.get(url, headers=headers, timeout=5)
-        response.raise_for_status()
+        if 'file' not in request.files:
+            logger.error("No file part in request")
+            return jsonify({'error': 'No file part'}), 400
         
-        soup = BeautifulSoup(response.text, 'lxml')
+        file = request.files['file']
+        if file.filename == '':
+            logger.error("No selected file")
+            return jsonify({'error': 'No selected file'}), 400
         
-        # Try to get OpenGraph metadata first
-        title = (
-            soup.find('meta', property='og:title') or 
-            soup.find('meta', property='twitter:title') or 
-            soup.find('title')
-        )
-        title = title.get('content', '') if title and title.get('content') else title.string if title else ''
+        if not allowed_file(file.filename):
+            logger.error(f"Invalid file type: {file.filename}")
+            return jsonify({'error': 'Invalid file type'}), 400
         
-        description = (
-            soup.find('meta', property='og:description') or 
-            soup.find('meta', property='twitter:description') or 
-            soup.find('meta', attrs={'name': 'description'})
-        )
-        description = description.get('content', '') if description else ''
+        # Generate secure filename
+        filename = secure_filename(file.filename)
+        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S_')
+        filename = timestamp + filename
         
-        image = (
-            soup.find('meta', property='og:image') or 
-            soup.find('meta', property='twitter:image')
-        )
-        image = image.get('content', '') if image else ''
+        # Save file
+        file_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+        logger.info(f"Saving file to: {file_path}")
+        file.save(file_path)
         
-        # Clean up URLs
-        if image and not bool(urlparse(image).netloc):
-            base_url = '{uri.scheme}://{uri.netloc}'.format(uri=urlparse(url))
-            image = base_url + image if image.startswith('/') else base_url + '/' + image
-
-        # If no image found, try to get favicon
-        if not image:
-            image = get_favicon_url(url, soup)
-            
-        return {
-            'url_title': title[:500] if title else '',
-            'url_description': description[:1000] if description else '',
-            'url_image': image[:500] if image else ''
-        }
+        # Generate URL
+        file_url = f'/static/uploads/{filename}'
+        logger.info(f"File saved successfully. URL: {file_url}")
+        
+        return jsonify({
+            'url': file_url,
+            'filename': filename
+        })
+    
     except Exception as e:
-        print(f"Error fetching link preview: {str(e)}")
-        # Return domain name and try to get favicon as fallback
-        try:
-            domain = urlparse(url).netloc
-            base_url = '{uri.scheme}://{uri.netloc}'.format(uri=urlparse(url))
-            favicon_url = f"{base_url}/favicon.ico"
-            return {
-                'url_title': domain,
-                'url_description': 'Click to visit website',
-                'url_image': favicon_url
-            }
-        except:
-            return {
-                'url_title': url,
-                'url_description': 'Click to visit website',
-                'url_image': ''
-            }
+        logger.error(f"Error in upload_file: {str(e)}", exc_info=True)
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/static/uploads/<path:filename>')
+def serve_file(filename):
+    return send_from_directory(app.config['UPLOAD_FOLDER'], filename)
 
 # Models
 class UserMusic(db.Model):
@@ -204,15 +106,15 @@ class UserMusic(db.Model):
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'), unique=True)
     music_url = db.Column(db.String(500), nullable=True)
     music_platform = db.Column(db.String(20), nullable=True)  # 'youtube', 'soundcloud', or 'spotify'
-    created_at = db.Column(db.DateTime, default=datetime.now(timezone.utc))
-    updated_at = db.Column(db.DateTime, default=datetime.now(timezone.utc), onupdate=datetime.now(timezone.utc))
+    created_at = db.Column(db.DateTime, default=datetime.now())
+    updated_at = db.Column(db.DateTime, default=datetime.now(), onupdate=datetime.now())
 
 class User(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     username = db.Column(db.String(80), unique=True, nullable=False)
     email = db.Column(db.String(120), unique=True, nullable=False)
     password_hash = db.Column(db.String(128))
-    created_at = db.Column(db.DateTime, default=datetime.now(timezone.utc))
+    created_at = db.Column(db.DateTime, default=datetime.now())
     bio = db.Column(db.Text, nullable=True)
     avatar_url = db.Column(db.String(200), nullable=True)
     music = db.relationship('UserMusic', backref='user', uselist=False)
@@ -228,7 +130,7 @@ class Timeline(db.Model):
     name = db.Column(db.String(100), unique=True, nullable=False)
     description = db.Column(db.Text)
     created_by = db.Column(db.Integer, db.ForeignKey('user.id'))
-    created_at = db.Column(db.DateTime, default=datetime.now(timezone.utc))
+    created_at = db.Column(db.DateTime, default=datetime.now())
 
 class Post(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -239,16 +141,17 @@ class Post(db.Model):
     url_title = db.Column(db.String(500))
     url_description = db.Column(db.Text)
     url_image = db.Column(db.String(500))
+    image = db.Column(db.String(500))  # New field for uploaded images
     timeline_id = db.Column(db.Integer, db.ForeignKey('timeline.id'))
     created_by = db.Column(db.Integer, db.ForeignKey('user.id'))
-    created_at = db.Column(db.DateTime, default=datetime.now(timezone.utc))
+    created_at = db.Column(db.DateTime, default=datetime.now())
     upvotes = db.Column(db.Integer, default=0)
     comments = db.relationship('Comment', backref='post', lazy=True)
     promoted_to_event = db.Column(db.Boolean, default=False)
     promotion_score = db.Column(db.Float, default=0.0)
     source_count = db.Column(db.Integer, default=0)
     promotion_votes = db.Column(db.Integer, default=0)
-    last_score_update = db.Column(db.DateTime, default=datetime.now(timezone.utc))
+    last_score_update = db.Column(db.DateTime, default=datetime.now())
 
     def update_promotion_score(self):
         base_score = self.upvotes
@@ -258,7 +161,7 @@ class Post(db.Model):
         promotion_bonus = self.promotion_votes * 1.5
 
         self.promotion_score = base_score + comment_bonus + source_bonus + content_bonus + promotion_bonus
-        self.last_score_update = datetime.now(timezone.utc)
+        self.last_score_update = datetime.now()
         return self.promotion_score
 
 class Event(db.Model):
@@ -272,7 +175,7 @@ class Event(db.Model):
     url_image = db.Column(db.String(500))
     timeline_id = db.Column(db.Integer, db.ForeignKey('timeline.id'))
     created_by = db.Column(db.Integer, db.ForeignKey('user.id'))
-    created_at = db.Column(db.DateTime, default=datetime.now(timezone.utc))
+    created_at = db.Column(db.DateTime, default=datetime.now())
     upvotes = db.Column(db.Integer, default=0)
     comments = db.relationship('Comment', backref='event', lazy=True)
 
@@ -282,8 +185,8 @@ class Comment(db.Model):
     event_id = db.Column(db.Integer, db.ForeignKey('event.id'))
     post_id = db.Column(db.Integer, db.ForeignKey('post.id'))
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'))
-    created_at = db.Column(db.DateTime, default=datetime.now(timezone.utc))
-    updated_at = db.Column(db.DateTime, default=datetime.now(timezone.utc), onupdate=datetime.now(timezone.utc))
+    created_at = db.Column(db.DateTime, default=datetime.now())
+    updated_at = db.Column(db.DateTime, default=datetime.now(), onupdate=datetime.now())
 
 # Routes
 @app.route('/api/timeline', methods=['POST'])
@@ -541,88 +444,68 @@ def create_post(timeline_id):
         return jsonify({'error': str(e)}), 500
 
 @app.route('/api/posts', methods=['POST'])
+@jwt_required()
 def create_post_without_timeline():
     try:
+        current_user_id = get_jwt_identity()
         data = request.get_json()
-        print(f"Received post data: {data}")  # Debug log
-        
-        if not all(key in data for key in ['title', 'content', 'date']):
+
+        title = data.get('title')
+        content = data.get('content')
+        date_str = data.get('date')
+        url = data.get('url')
+        tags = data.get('tags', [])
+        image = data.get('image')  # Get the image URL from the request
+
+        if not all([title, content, date_str]):
             return jsonify({'error': 'Missing required fields'}), 400
 
-        # Create timelines from tags if they don't exist
-        timelines = []
-        if 'tags' in data and data['tags']:
-            for tag in data['tags']:
-                # Convert tag to lowercase for case-insensitive comparison
-                normalized_tag = tag.lower()
-                # First try to find an existing timeline with case-insensitive search
-                timeline = Timeline.query.filter(func.lower(Timeline.name) == normalized_tag).first()
-                if not timeline:
-                    timeline = Timeline(
-                        name=normalized_tag,  # Store the tag in lowercase
-                        description=f"Timeline for {tag}",
-                        created_by=1  # Default user ID
-                    )
-                    db.session.add(timeline)
-                    db.session.commit()
-                timelines.append(timeline)
-        
-        # If no tags provided, use or create the default timeline
-        if not timelines:
-            timeline = Timeline.query.filter_by(name='general').first()  # Use lowercase for consistency
-            if not timeline:
-                timeline = Timeline(
-                    name='general',  # Use lowercase for consistency
-                    description='General timeline for uncategorized posts',
-                    created_by=1  # Default user ID
-                )
-                db.session.add(timeline)
-                db.session.commit()
-            timelines.append(timeline)
+        try:
+            event_date = datetime.fromisoformat(date_str.replace('Z', '+00:00'))
+        except ValueError:
+            return jsonify({'error': 'Invalid date format'}), 400
 
-        # Create the post
+        # Create new post
         new_post = Post(
-            title=data['title'],
-            content=data['content'],
-            event_date=datetime.fromisoformat(data['date']),
-            url=data.get('url', ''),
-            created_by=1,  # Default user ID
-            timeline_id=timelines[0].id
+            title=title,
+            content=content,
+            event_date=event_date,
+            created_by=current_user_id,
+            url=url,
+            image=image  # Add the image URL to the post
         )
-        
-        if new_post.url:
-            try:
-                link_preview = get_link_preview(new_post.url)
-                new_post.url_title = link_preview.get('url_title')
-                new_post.url_description = link_preview.get('url_description')
-                new_post.url_image = link_preview.get('url_image')
-            except Exception as preview_error:
-                print(f"Error fetching link preview: {str(preview_error)}")
-                pass
-        
+
+        # If URL is provided, fetch preview data
+        if url:
+            preview_data = get_link_preview(url)
+            if preview_data:
+                new_post.url_title = preview_data.get('title')
+                new_post.url_description = preview_data.get('description')
+                new_post.url_image = preview_data.get('image')
+
         db.session.add(new_post)
         db.session.commit()
-        
+
+        # Add tags
+        for tag_name in tags:
+            tag = Tag.query.filter_by(name=tag_name.lower()).first()
+            if not tag:
+                tag = Tag(name=tag_name.lower())
+                db.session.add(tag)
+            
+            post_tag = PostTag(post_id=new_post.id, tag_id=tag.id)
+            db.session.add(post_tag)
+
+        db.session.commit()
+
         return jsonify({
-            'id': new_post.id,
-            'title': new_post.title,
-            'content': new_post.content,
-            'event_date': new_post.event_date.isoformat(),
-            'url': new_post.url,
-            'url_title': new_post.url_title,
-            'url_description': new_post.url_description,
-            'url_image': new_post.url_image,
-            'created_by': new_post.created_by,
-            'created_at': new_post.created_at.isoformat(),
-            'upvotes': new_post.upvotes,
-            'timeline': {
-                'id': timelines[0].id,
-                'name': timelines[0].name
-            }
+            'message': 'Post created successfully',
+            'post_id': new_post.id
         }), 201
+
     except Exception as e:
-        print(f"Error creating post: {str(e)}")  # Debug log
         db.session.rollback()
+        app.logger.error(f"Error creating post: {str(e)}")
         return jsonify({'error': str(e)}), 500
 
 @app.route('/api/posts', methods=['GET'])
@@ -715,7 +598,7 @@ def check_timeline_promotions(timeline_id):
                     url_image=post.url_image,
                     timeline_id=timeline_id,
                     created_by=post.created_by,
-                    created_at=datetime.now(timezone.utc),
+                    created_at=datetime.now(),
                     upvotes=post.upvotes
                 )
                 
@@ -928,7 +811,6 @@ def merge_timelines():
         db.session.rollback()
         return jsonify({'error': str(e)}), 500
 
-# Auth routes
 @app.route('/api/auth/register', methods=['POST'])
 def register():
     data = request.get_json()
