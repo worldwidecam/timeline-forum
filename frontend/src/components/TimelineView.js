@@ -11,7 +11,7 @@ import {
   useTheme,
   IconButton
 } from '@mui/material';
-import { format, addHours, subHours, isSameHour } from 'date-fns';
+import { format, addHours, subHours, isSameHour, startOfDay } from 'date-fns';
 import axios from 'axios';
 import EventDisplay from './EventDisplay';
 import TimelinePosts from './TimelinePosts';
@@ -54,9 +54,12 @@ function TimelineView() {
 
   useEffect(() => {
     // Initialize timeline with current time centered and full day padding on both sides
-    const now = new Date();
-    const startTime = subHours(now, HOURS_PER_SIDE); // 24 hours before
-    const endTime = addHours(now, HOURS_PER_SIDE); // 24 hours after
+    const now = new Date('2025-01-03T11:48:21-08:00');
+    
+    // Calculate start time by going back to midnight of the previous day plus additional padding
+    const startOfToday = startOfDay(now);
+    const startTime = subHours(startOfToday, 24); // Start from midnight yesterday
+    const endTime = addHours(startOfToday, 48); // End at midnight tomorrow
     
     setVisibleTimeRange({
       start: startTime,
@@ -64,25 +67,42 @@ function TimelineView() {
       now: now
     });
 
-    // Generate all markers for the 48-hour range (24 before + current + 24 after)
+    // Generate all markers for the 48-hour range
     const initialMarkers = [];
     let currentTime = new Date(startTime);
     
     while (currentTime <= endTime) {
       const hourDiff = (currentTime - startTime) / (1000 * 60 * 60);
+      const isStartOfDay = currentTime.getHours() === 0;
+      
+      // Check if this is the current hour marker (immediately to the left of now)
+      const nextHour = addHours(currentTime, 1);
+      const isCurrentHour = currentTime <= now && nextHour > now;
+      
+      // Format day as "Friday the 3rd"
+      const dayLabel = isStartOfDay 
+        ? `${format(currentTime, 'EEEE')} the ${format(currentTime, 'do')}`
+        : format(currentTime, 'ha');
+      
       initialMarkers.push({
         time: new Date(currentTime),
         position: hourDiff * MARKER_SPACING,
-        label: format(currentTime, 'ha'),
-        isPresent: isSameHour(currentTime, now)
+        label: dayLabel,
+        isPresent: isCurrentHour,
+        isDay: isStartOfDay
       });
       currentTime = addHours(currentTime, 1);
     }
     
     setTimeMarkers(initialMarkers);
     
-    // Center the timeline
-    const centerOffset = (TIMELINE_BASE_WIDTH / 2) - (window.innerWidth / 2);
+    // Calculate the exact position of current time
+    const totalMinutes = (now - startTime) / (1000 * 60);
+    const totalHours = totalMinutes / 60;
+    const currentTimePosition = totalHours * MARKER_SPACING;
+    
+    // Center the timeline on the current time position
+    const centerOffset = currentTimePosition - (window.innerWidth / 2);
     setTimelineOffset(-centerOffset);
     setBaseOffset(-centerOffset);
   }, []);
@@ -127,18 +147,30 @@ function TimelineView() {
         time: new Date(extraStart),
         position: calculateMarkerPosition(extraStart, range),
         label: format(extraStart, 'ha'),
-        isPresent: isSameHour(extraStart, range.now)
+        isPresent: false
       });
       extraStart = addHours(extraStart, 1);
     }
     
     // Add regular markers
     while (currentTime <= range.end) {
+      const isStartOfDay = currentTime.getHours() === 0;
+      
+      // Check if this is the current hour marker (immediately to the left of now)
+      const nextHour = addHours(currentTime, 1);
+      const isCurrentHour = currentTime <= range.now && nextHour > range.now;
+      
+      // Format day as "Friday the 3rd"
+      const dayLabel = isStartOfDay 
+        ? `${format(currentTime, 'EEEE')} the ${format(currentTime, 'do')}`
+        : format(currentTime, 'ha');
+      
       markers.push({
         time: new Date(currentTime),
         position: calculateMarkerPosition(currentTime, range),
-        label: format(currentTime, 'ha'),
-        isPresent: isSameHour(currentTime, range.now)
+        label: dayLabel,
+        isPresent: isCurrentHour,
+        isDay: isStartOfDay
       });
       currentTime = addHours(currentTime, 1);
     }
@@ -147,7 +179,7 @@ function TimelineView() {
   };
 
   const getTimelineBoundaries = () => {
-    const now = new Date('2025-01-02T16:32:56-08:00');
+    const now = new Date();
     
     // Calculate how many hours we can show based on timeline width
     const timelineWidth = TIMELINE_BASE_WIDTH;
@@ -186,6 +218,31 @@ function TimelineView() {
     return position;
   };
 
+  const calculateExactTimePosition = (date) => {
+    if (!date || !visibleTimeRange.start) {
+      console.log('Missing time data:', { date, startTime: visibleTimeRange.start });
+      return 0;
+    }
+    
+    // Calculate hours since start of timeline
+    const startTime = visibleTimeRange.start;
+    const totalMinutes = (date - startTime) / (1000 * 60);
+    const totalHours = totalMinutes / 60;
+    
+    // Calculate position based on hours from start
+    const position = totalHours * MARKER_SPACING;
+    
+    console.log('Position calculation:', {
+      date: date.toLocaleTimeString(),
+      startTime: startTime.toLocaleTimeString(),
+      totalMinutes,
+      totalHours,
+      position
+    });
+    
+    return position;
+  };
+
   const extendTimeRange = (direction) => {
     setVisibleTimeRange(prev => {
       const newRange = { ...prev };
@@ -206,11 +263,23 @@ function TimelineView() {
           currentTime = new Date(newRange.start);
           while (currentTime < prev.start) {
             const hourDiff = (currentTime - newRange.start) / (1000 * 60 * 60);
+            const isStartOfDay = currentTime.getHours() === 0;
+            
+            // Check if this is the current hour marker (immediately to the left of now)
+            const nextHour = addHours(currentTime, 1);
+            const isCurrentHour = currentTime <= newRange.now && nextHour > newRange.now;
+            
+            // Format day as "Friday the 3rd"
+            const dayLabel = isStartOfDay 
+              ? `${format(currentTime, 'EEEE')} the ${format(currentTime, 'do')}`
+              : format(currentTime, 'ha');
+            
             newMarkers.push({
               time: new Date(currentTime),
               position: hourDiff * MARKER_SPACING,
-              label: format(currentTime, 'ha'),
-              isPresent: isSameHour(currentTime, newRange.now)
+              label: dayLabel,
+              isPresent: isCurrentHour,
+              isDay: isStartOfDay
             });
             currentTime = addHours(currentTime, 1);
           }
@@ -219,11 +288,23 @@ function TimelineView() {
           currentTime = addHours(prev.end, 1);
           while (currentTime <= newRange.end) {
             const hourDiff = (currentTime - newRange.start) / (1000 * 60 * 60);
+            const isStartOfDay = currentTime.getHours() === 0;
+            
+            // Check if this is the current hour marker (immediately to the left of now)
+            const nextHour = addHours(currentTime, 1);
+            const isCurrentHour = currentTime <= newRange.now && nextHour > newRange.now;
+            
+            // Format day as "Friday the 3rd"
+            const dayLabel = isStartOfDay 
+              ? `${format(currentTime, 'EEEE')} the ${format(currentTime, 'do')}`
+              : format(currentTime, 'ha');
+            
             newMarkers.push({
               time: new Date(currentTime),
               position: hourDiff * MARKER_SPACING,
-              label: format(currentTime, 'ha'),
-              isPresent: isSameHour(currentTime, newRange.now)
+              label: dayLabel,
+              isPresent: isCurrentHour,
+              isDay: isStartOfDay
             });
             currentTime = addHours(currentTime, 1);
           }
@@ -353,43 +434,56 @@ function TimelineView() {
     return new Date(date1).getHours() === new Date(date2).getHours();
   };
 
-  const presentDayStyles = {
-    position: 'absolute',
-    top: '-55px',
-    display: 'flex',
-    flexDirection: 'column',
-    alignItems: 'center',
-    animation: 'float 2s ease-in-out infinite',
-    zIndex: 3,
-    '& .marker-label': {
-      color: theme.palette.primary.main,
-      fontWeight: 'bold',
-      marginBottom: '4px'
+  // Current time state for precise marker
+  const [currentTime] = useState(new Date('2025-01-03T11:48:21-08:00'));
+
+  // Styles for different marker types
+  const markerStyles = {
+    day: {
+      '& .marker-label': {
+        color: theme.palette.text.primary,
+        fontWeight: 'bold',
+        fontSize: '0.9rem'
+      },
+      '& .marker-line': {
+        width: '4px',
+        height: '20px',
+        backgroundColor: theme.palette.text.primary,
+        borderRadius: '2px'
+      }
     },
-    '& .marker-arrow': {
-      width: 0,
-      height: 0,
-      borderLeft: '6px solid transparent',
-      borderRight: '6px solid transparent',
-      borderTop: `8px solid ${theme.palette.primary.main}`,
+    currentHour: {
+      '& .marker-label': {
+        color: theme.palette.primary.main,
+        fontWeight: 'bold'
+      },
+      '& .marker-line': {
+        width: '3px',
+        height: '15px',
+        backgroundColor: theme.palette.primary.main,
+        borderRadius: '1.5px'
+      }
     },
-    '& .marker-line': {
-      width: '2px',
-      height: '15px',
-      background: `linear-gradient(to bottom, ${theme.palette.primary.main}, transparent)`
+    regular: {
+      '& .marker-label': {
+        color: theme.palette.text.secondary
+      },
+      '& .marker-line': {
+        width: '2px',
+        height: '10px',
+        backgroundColor: theme.palette.text.secondary,
+        borderRadius: '1px'
+      }
     }
   };
 
-  const globalStyles = {
-    '@keyframes float': {
-      '0%, 100%': {
-        transform: 'translateY(0)',
-      },
-      '50%': {
-        transform: 'translateY(-5px)',
-      },
-    }
-  };
+  // Update current time every minute
+  useEffect(() => {
+    const timer = setInterval(() => {
+      // No-op
+    }, 60000);
+    return () => clearInterval(timer);
+  }, []);
 
   const handleEventClick = (event) => {
     setSelectedEvent(event);
@@ -556,18 +650,18 @@ function TimelineView() {
                   height: '60px',
                   display: 'flex',
                   alignItems: 'center',
-                  overflow: 'hidden'
+                  overflow: 'visible' // Changed to allow markers to show above
                 }}>
                   {/* Timeline Bar */}
                   <Box sx={{
                     position: 'absolute',
                     left: 0,
-                    top: '50%',
+                    top: '75%',
                     height: '2px',
                     backgroundColor: theme.palette.primary.main,
                     transform: `translateX(${timelineOffset}px)`,
                     transition: 'transform 0.1s ease-out',
-                    width: TIMELINE_BASE_WIDTH
+                    width: `${timeMarkers.length * MARKER_SPACING}px` // Dynamic width based on markers
                   }} />
 
                   {/* Time Markers Container */}
@@ -578,10 +672,11 @@ function TimelineView() {
                     bottom: 0,
                     transform: `translateX(${timelineOffset}px)`,
                     transition: 'transform 0.1s ease-out',
-                    width: TIMELINE_BASE_WIDTH,
+                    width: `${timeMarkers.length * MARKER_SPACING}px`, // Dynamic width based on markers
                     display: 'flex',
                     alignItems: 'center'
                   }}>
+                    {/* Time markers */}
                     {timeMarkers.map((marker, index) => (
                       <Box
                         key={index}
@@ -591,19 +686,69 @@ function TimelineView() {
                           display: 'flex',
                           flexDirection: 'column',
                           alignItems: 'center',
-                          transform: 'translateX(-50%)'
+                          transform: 'translateX(-50%)',
+                          top: '20%',
+                          ...(marker.isDay ? markerStyles.day : 
+                             marker.isPresent ? markerStyles.currentHour : 
+                             markerStyles.regular)
                         }}
                       >
-                        <Typography variant="caption" sx={{ mb: 1 }}>{marker.label}</Typography>
+                        <Typography 
+                          className="marker-label"
+                          variant="caption" 
+                          sx={{ mb: 1 }}
+                        >
+                          {marker.label}
+                        </Typography>
+                        <Box className="marker-line" />
+                      </Box>
+                    ))}
+
+                    {/* Precise Time Marker */}
+                    <Box
+                      sx={{
+                        position: 'absolute',
+                        left: 0,
+                        right: 0,
+                        top: 0,
+                        bottom: 0,
+                        pointerEvents: 'none'
+                      }}
+                    >
+                      <Box
+                        sx={{
+                          position: 'absolute',
+                          left: `${calculateExactTimePosition(currentTime)}px`,
+                          top: '-35px',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          alignItems: 'center',
+                          transform: 'translateX(-50%)',
+                          zIndex: 1000
+                        }}
+                      >
+                        <Typography
+                          sx={{
+                            color: '#000',
+                            fontSize: '0.75rem',
+                            fontWeight: 'bold',
+                            marginBottom: '4px',
+                            whiteSpace: 'nowrap'
+                          }}
+                        >
+                          You are here
+                        </Typography>
                         <Box
                           sx={{
-                            width: '2px',
-                            height: '10px',
-                            backgroundColor: marker.isPresent ? theme.palette.secondary.main : theme.palette.text.secondary
+                            width: 0,
+                            height: 0,
+                            borderLeft: '6px solid transparent',
+                            borderRight: '6px solid transparent',
+                            borderTop: '6px solid #000'
                           }}
                         />
                       </Box>
-                    ))}
+                    </Box>
                   </Box>
                 </Box>
 
