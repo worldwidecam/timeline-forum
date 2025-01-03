@@ -10,13 +10,16 @@ import {
   Alert,
   Chip,
   Stack,
-  IconButton
+  IconButton,
+  Card,
+  CardMedia
 } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
+import AddPhotoAlternateIcon from '@mui/icons-material/AddPhotoAlternate';
+import DeleteIcon from '@mui/icons-material/Delete';
 import { DateTimePicker } from '@mui/x-date-pickers/DateTimePicker';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
-import axios from 'axios';
 
 function CreatePost() {
   const navigate = useNavigate();
@@ -28,6 +31,91 @@ function CreatePost() {
   const [currentTag, setCurrentTag] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [image, setImage] = useState(null);
+  const [imagePreview, setImagePreview] = useState('');
+  const [uploadProgress, setUploadProgress] = useState(0);
+
+  const handleImageUpload = async (event) => {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    // Validate file size
+    if (file.size > 16 * 1024 * 1024) {
+      setError('File size must be less than 16MB');
+      return;
+    }
+
+    // Validate file type
+    const allowedTypes = ['image/png', 'image/jpeg', 'image/jpg', 'image/gif'];
+    if (!allowedTypes.includes(file.type)) {
+      setError('File type must be PNG, JPG, JPEG, or GIF');
+      return;
+    }
+
+    // Preview
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      setImagePreview(reader.result);
+    };
+    reader.readAsDataURL(file);
+
+    // Upload
+    const formData = new FormData();
+    formData.append('file', file);
+
+    try {
+      const token = localStorage.getItem('token');
+      if (!token) {
+        throw new Error('Please log in to upload images');
+      }
+
+      console.log('Starting image upload...');
+      console.log('File details:', {
+        name: file.name,
+        type: file.type,
+        size: file.size
+      });
+
+      const response = await fetch('http://localhost:5000/api/upload', {
+        method: 'POST',
+        body: formData,
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+
+      console.log('Response status:', response.status);
+      
+      let data;
+      const textResponse = await response.text();
+      console.log('Raw response:', textResponse);
+      
+      try {
+        data = JSON.parse(textResponse);
+        console.log('Parsed response:', data);
+      } catch (e) {
+        console.error('Error parsing response:', e);
+        throw new Error('Invalid response format from server');
+      }
+
+      if (!response.ok) {
+        throw new Error(data?.error || `Upload failed with status: ${response.status}`);
+      }
+
+      if (data && data.url) {
+        const fullUrl = `http://localhost:5000${data.url}`;
+        setImage(fullUrl);
+        setError('');
+        console.log('Upload successful, image URL:', fullUrl);
+      } else {
+        throw new Error('Invalid response from server');
+      }
+    } catch (err) {
+      console.error('Upload error:', err);
+      setError(err.message || 'Failed to upload image');
+      setImagePreview('');
+    }
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -40,14 +128,21 @@ function CreatePost() {
         content,
         date: date.toISOString(),
         url: url || null,
-        tags
+        tags,
+        image: image || null
       };
 
-      await axios.post('http://localhost:5000/api/posts', postData);
+      await fetch('http://localhost:5000/api/posts', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(postData),
+      });
       navigate('/');
     } catch (err) {
       console.error('Error creating post:', err);
-      setError(err.response?.data?.error || 'Failed to create post');
+      setError(err.message || 'Failed to create post');
     } finally {
       setLoading(false);
     }
@@ -66,6 +161,12 @@ function CreatePost() {
 
   const handleDeleteTag = (tagToDelete) => {
     setTags(tags.filter(tag => tag !== tagToDelete));
+  };
+
+  const handleRemoveImage = () => {
+    setImage(null);
+    setImagePreview('');
+    setUploadProgress(0);
   };
 
   return (
@@ -101,6 +202,48 @@ function CreatePost() {
             required
             margin="normal"
           />
+
+          <Box sx={{ my: 2 }}>
+            {!image ? (
+              <Button
+                component="label"
+                variant="outlined"
+                startIcon={<AddPhotoAlternateIcon />}
+                sx={{ width: '100%', height: '200px' }}
+              >
+                Add Cover Image
+                <input
+                  type="file"
+                  hidden
+                  accept="image/*"
+                  onChange={handleImageUpload}
+                />
+              </Button>
+            ) : (
+              <Card sx={{ position: 'relative' }}>
+                <CardMedia
+                  component="img"
+                  height="200"
+                  image={imagePreview || `http://localhost:5000${image}`}
+                  alt="Post cover"
+                />
+                <IconButton
+                  sx={{
+                    position: 'absolute',
+                    top: 8,
+                    right: 8,
+                    bgcolor: 'rgba(0, 0, 0, 0.5)',
+                    '&:hover': {
+                      bgcolor: 'rgba(0, 0, 0, 0.7)',
+                    },
+                  }}
+                  onClick={handleRemoveImage}
+                >
+                  <DeleteIcon sx={{ color: 'white' }} />
+                </IconButton>
+              </Card>
+            )}
+          </Box>
 
           <TextField
             fullWidth

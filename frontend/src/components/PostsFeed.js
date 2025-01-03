@@ -84,9 +84,19 @@ function PostsFeed() {
           variant="h3" 
           component="h1" 
           sx={{ 
-            fontFamily: 'serif',
+            fontFamily: 'Playfair Display, serif',
             fontWeight: 'bold',
-            borderBottom: '3px double #000'
+            borderBottom: '3px double #000',
+            position: 'relative',
+            '&::after': {
+              content: '""',
+              position: 'absolute',
+              bottom: '-10px',
+              left: '0',
+              width: '100%',
+              height: '1px',
+              backgroundColor: '#000',
+            }
           }}
         >
           Today's Headlines
@@ -130,30 +140,47 @@ function PostsFeed() {
               sx={{ 
                 borderRadius: 2,
                 boxShadow: 3,
-                transition: 'transform 0.2s',
+                transition: 'all 0.3s ease-in-out',
                 '&:hover': {
-                  transform: 'scale(1.01)'
-                }
+                  transform: 'translateY(-4px)',
+                  boxShadow: 6,
+                },
+                position: 'relative',
+                overflow: 'hidden',
               }}
             >
               <CardContent sx={{ p: 0 }}>
                 <Box sx={{ display: 'flex', flexDirection: 'column' }}>
-                  {post.url_image && (
+                  {(post.image || post.url_image) && (
                     <Box 
                       sx={{ 
                         width: '100%',
                         height: 300,
                         overflow: 'hidden',
-                        position: 'relative'
+                        position: 'relative',
+                        '&::after': {
+                          content: '""',
+                          position: 'absolute',
+                          bottom: 0,
+                          left: 0,
+                          right: 0,
+                          height: '30%',
+                          background: 'linear-gradient(to top, rgba(0,0,0,0.7) 0%, rgba(0,0,0,0) 100%)',
+                        }
                       }}
                     >
                       <img
-                        src={post.url_image}
+                        src={post.image ? `http://localhost:5000${post.image}` : post.url_image}
                         alt={post.title}
                         style={{
                           width: '100%',
                           height: '100%',
-                          objectFit: 'cover'
+                          objectFit: 'cover',
+                          transition: 'transform 0.3s ease-in-out',
+                        }}
+                        onError={(e) => {
+                          e.target.onerror = null;
+                          e.target.src = 'https://via.placeholder.com/800x400?text=No+Image+Available';
                         }}
                       />
                     </Box>
@@ -165,7 +192,8 @@ function PostsFeed() {
                         variant="overline" 
                         sx={{ 
                           color: 'text.secondary',
-                          fontFamily: 'serif'
+                          fontFamily: 'Playfair Display, serif',
+                          letterSpacing: 1
                         }}
                       >
                         {format(new Date(post.created_at), 'MMMM dd, yyyy')}
@@ -177,8 +205,12 @@ function PostsFeed() {
                             label={tag}
                             size="small"
                             sx={{
-                              bgcolor: '#f0f0f0',
-                              fontFamily: 'serif'
+                              bgcolor: 'primary.main',
+                              color: 'white',
+                              fontFamily: 'Playfair Display, serif',
+                              '&:hover': {
+                                bgcolor: 'primary.dark',
+                              }
                             }}
                           />
                         ))}
@@ -187,27 +219,38 @@ function PostsFeed() {
 
                     <Typography 
                       variant="h4" 
-                      component="h2" 
-                      gutterBottom
+                      component={Link}
+                      to={`/post/${post.id}`}
                       sx={{ 
-                        fontFamily: 'serif',
+                        fontFamily: 'Playfair Display, serif',
                         fontWeight: 'bold',
-                        lineHeight: 1.2
+                        lineHeight: 1.2,
+                        color: 'text.primary',
+                        textDecoration: 'none',
+                        display: 'block',
+                        mb: 2,
+                        '&:hover': {
+                          color: 'primary.main',
+                        }
                       }}
                     >
                       {post.title}
                     </Typography>
 
                     <Typography 
-                      variant="subtitle1" 
+                      variant="body1" 
                       color="text.secondary"
                       sx={{ 
                         mb: 2,
-                        fontFamily: 'serif',
-                        fontStyle: 'italic'
+                        display: '-webkit-box',
+                        WebkitLineClamp: 3,
+                        WebkitBoxOrient: 'vertical',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        fontFamily: 'Georgia, serif'
                       }}
                     >
-                      {post.content.substring(0, 150)}...
+                      {post.content}
                     </Typography>
 
                     <Divider sx={{ my: 2 }} />
@@ -217,7 +260,7 @@ function PostsFeed() {
                         <Avatar src={post.author.avatar_url} alt={post.author.username} />
                         <Typography 
                           variant="subtitle2"
-                          sx={{ fontFamily: 'serif' }}
+                          sx={{ fontFamily: 'Playfair Display, serif' }}
                         >
                           By {post.author.username}
                         </Typography>
