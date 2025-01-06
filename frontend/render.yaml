@@ -1,0 +1,9 @@
+services:
+  - type: web
+    name: timeline-forum-frontend
+    env: static
+    buildCommand: chmod +x build.sh && ./build.sh
+    staticPublishPath: ./dist
+    envVars:
+      - key: REACT_APP_API_URL
+        value: https://timeline-forum.onrender.com
