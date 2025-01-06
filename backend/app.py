@@ -16,9 +16,9 @@ app = Flask(__name__)
 
 # Basic configurations
 app.config.update(
-    SQLALCHEMY_DATABASE_URI='sqlite:///timeline_forum.db',
+    SQLALCHEMY_DATABASE_URI=os.getenv('DATABASE_URL', 'sqlite:///timeline_forum.db'),
     SQLALCHEMY_TRACK_MODIFICATIONS=False,
-    JWT_SECRET_KEY='your-secret-key',  # Change this in production
+    JWT_SECRET_KEY=os.getenv('JWT_SECRET_KEY', 'your-secret-key'),  # Change this in production
     JWT_ACCESS_TOKEN_EXPIRES=False,
     MAX_CONTENT_LENGTH=16 * 1024 * 1024  # 16MB max file size
 )
@@ -26,7 +26,7 @@ app.config.update(
 # Configure CORS
 CORS(app, resources={
     r"/*": {
-        "origins": ["http://localhost:3000"],
+        "origins": [os.getenv('FRONTEND_URL', 'http://localhost:3000')],
         "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
         "allow_headers": ["Content-Type", "Authorization"],
         "supports_credentials": True
