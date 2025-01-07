@@ -124,40 +124,104 @@ Events are independent entities that overlay on the timeline:
 
 ## Project Philosophy and Direction
 
-### Core Concepts
-- Timelines are the heart of this application
-- Content flows from community engagement to historical record
-- User experience prioritizes natural content curation
+### User Experience First
+Our development approach prioritizes seamless user experience over technical implementation. Every feature is designed with the following principles:
+- Intuitive navigation that feels natural
+- Smooth transitions without jarring changes
+- Technical complexity hidden from the user
+- Consistent and predictable behavior
 
-### Key Principles
-1. **Timeline-Centric Design**
-   - All features should enhance or complement the timeline experience
-   - Timeline modifications require careful architectural consideration
-   - Visual clarity and intuitive navigation are essential
+### Timeline Navigation Design
+The timeline implements smart navigation that adapts to user behavior:
+- Initial view shows 24 hours before and after the current time
+- Smooth scrolling between time markers
+- Intelligent extension of timeline range based on navigation patterns
+- "Return to Present" button appears contextually when needed
+- Seamless loading of additional time periods without disrupting user flow
 
-2. **Community-Driven Content**
-   - Posts naturally evolve into timeline events through engagement
-   - Hashtags create self-moderating timeline communities
-   - Balance between public discourse and personal progress tracking
+### Timeline Types and Visual Language
+1. **Hashtag Timelines (#)**
+   - System-generated timelines for hashtag aggregation
+   - Visually identified by the # symbol prefix
+   - Automatically collect and display relevant posts
 
-3. **Progressive Enhancement**
-   - Start with core functionality, then add features
-   - Authentication and privacy controls evolve with user needs
-   - Maintain focus on timeline visualization and interaction
+2. **User/Company Timelines (Planned)**
+   - Custom timelines with personalized tracking
+   - Distinct visual identifiers for different timeline types
+   - Flexible hashtag integration
 
-### Development Priorities
-1. Timeline-centric visualization and interaction
-2. Post-to-event promotion system
-3. User authentication and profiles
-4. Privacy controls and sharing features
+### Core Features
+- **Smart Navigation**
+  - Contextual loading of timeline markers
+  - Smooth scrolling with consistent behavior
+  - Automatic range extension based on navigation patterns
+  - Visual indicators for current time and day boundaries
 
-### Future Considerations
-When suggesting improvements, consider:
-- How does it enhance the timeline experience?
-- Does it maintain the natural flow from posts to events?
-- Does it prioritize the timeline over individual events?
-- Will it scale with community growth?
-- Does it respect user privacy needs?
+- **Visual Hierarchy**
+  - Clear timeline type indicators
+  - Consistent visual language across components
+  - Intuitive navigation controls
+  - Clean separation of timeline elements
+
+### Technical Implementation
+- Client-side time management for consistency
+- Dynamic marker generation and positioning
+- Efficient timeline extension mechanism
+- Responsive navigation controls
+- Smart buffer management for smooth scrolling
+
+### Future Enhancements
+- Timeline filters (day/week/month/year)
+- Event creation and display
+- Discussion posts integration
+- Enhanced hashtag system
+- Social features (comments, likes, sharing)
+- Additional timeline type support
+
+### Development Approach
+We maintain a balance between immediate functionality and future extensibility:
+1. Focus on core user experience first
+2. Implement features iteratively
+3. Maintain consistent design language
+4. Hide technical complexity from users
+5. Build for future feature integration
+
+## Development Context
+
+### Current Implementation Status
+- Working timeline with accurate time display and navigation
+- Client-side time management for consistent user experience
+- Hour and day markers with proper display
+- Smooth navigation controls with "Earlier" and "Later" buttons
+- "Return to Present" button appears when current time is out of view
+- Timeline types indicated by prefix symbols (e.g., # for hashtag timelines)
+
+### Timeline Types
+1. **Hashtag Timelines (#)**
+   - System-generated timelines
+   - Automatically collect and display posts with specific hashtags
+   - Identified by the # symbol prefix
+
+2. **User/Company Timelines (Planned)**
+   - Custom timelines created by users or organizations
+   - Can track multiple hashtags of interest
+   - Will have distinct identifying symbols
+   - Allows for personalized event tracking and curation
+
+### Core Timeline Features
+- Accurate time display with current time marker
+- 24-hour buffer on each side for context
+- Dynamic loading of markers when scrolling
+- Smart navigation with instant "Return to Present" option
+- Visual indicators for timeline types
+
+### Future Features
+- Timeline filters (day/week/month/year)
+- Event creation and display
+- Discussion posts integration
+- Enhanced hashtag system
+- Social features (comments, likes, sharing)
+- Additional timeline type support
 
 ## UI Components and Terminology
 

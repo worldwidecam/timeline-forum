@@ -43,6 +43,8 @@ function TimelineView() {
     before: [],
     after: []
   });
+  const [scrollClickCount, setScrollClickCount] = useState({ left: 0, right: 0 });
+  const [isPresentVisible, setIsPresentVisible] = useState(true);
   const timelineRef = useRef(null);
 
   const BUFFER_HOURS = 24; // Hours of markers to keep in buffer
@@ -50,11 +52,12 @@ function TimelineView() {
   const HOURS_PER_SIDE = 24; // 24 hours worth of markers on each side
   const TIMELINE_BASE_WIDTH = MARKER_SPACING * (HOURS_PER_SIDE * 2 + 1); // Total width including both sides and center
   const SCROLL_AMOUNT = MARKER_SPACING; // One hour per scroll
-  const HOURS_TO_ADD = 6; // Reduce the number of hours added each time to maintain better control
+  const CLICK_THRESHOLD = 5;
+  const EXTENSION_STEP = 6; // Hours to add each time threshold is reached
 
   useEffect(() => {
     // Initialize timeline with current time centered and full day padding on both sides
-    const now = new Date('2025-01-03T15:15:49-08:00');
+    const now = new Date();
     
     // Calculate start time by going back to midnight of the previous day plus additional padding
     const startOfToday = startOfDay(now);
@@ -179,7 +182,7 @@ function TimelineView() {
   };
 
   const getTimelineBoundaries = () => {
-    const now = new Date('2025-01-03T15:15:49-08:00');
+    const now = new Date();
     
     // Calculate how many hours we can show based on timeline width
     const timelineWidth = TIMELINE_BASE_WIDTH;
@@ -243,13 +246,12 @@ function TimelineView() {
     return position;
   };
 
-  const extendTimeRange = (direction) => {
+  const extendTimeRange = (direction, hoursToAdd = HOURS_PER_SIDE) => {
     setVisibleTimeRange(prev => {
       const newRange = { ...prev };
-      const hoursToAdd = direction < 0 ? -HOURS_PER_SIDE : HOURS_PER_SIDE;
       
       if (direction < 0) {
-        newRange.start = addHours(prev.start, hoursToAdd);
+        newRange.start = addHours(prev.start, -hoursToAdd);
       } else {
         newRange.end = addHours(prev.end, hoursToAdd);
       }
@@ -259,17 +261,15 @@ function TimelineView() {
         let currentTime;
         
         if (direction < 0) {
-          // Add 24 new hours of markers to the left
+          // Add new hours of markers to the left
           currentTime = new Date(newRange.start);
           while (currentTime < prev.start) {
             const hourDiff = (currentTime - newRange.start) / (1000 * 60 * 60);
             const isStartOfDay = currentTime.getHours() === 0;
             
-            // Check if this is the current hour marker (immediately to the left of now)
             const nextHour = addHours(currentTime, 1);
             const isCurrentHour = currentTime <= newRange.now && nextHour > newRange.now;
             
-            // Format day as "Friday the 3rd"
             const dayLabel = isStartOfDay 
               ? `${format(currentTime, 'EEEE')} the ${format(currentTime, 'do')}`
               : format(currentTime, 'ha');
@@ -284,17 +284,15 @@ function TimelineView() {
             currentTime = addHours(currentTime, 1);
           }
         } else {
-          // Add 24 new hours of markers to the right
+          // Add new hours of markers to the right
           currentTime = addHours(prev.end, 1);
           while (currentTime <= newRange.end) {
             const hourDiff = (currentTime - newRange.start) / (1000 * 60 * 60);
             const isStartOfDay = currentTime.getHours() === 0;
             
-            // Check if this is the current hour marker (immediately to the left of now)
             const nextHour = addHours(currentTime, 1);
             const isCurrentHour = currentTime <= newRange.now && nextHour > newRange.now;
             
-            // Format day as "Friday the 3rd"
             const dayLabel = isStartOfDay 
               ? `${format(currentTime, 'EEEE')} the ${format(currentTime, 'do')}`
               : format(currentTime, 'ha');
@@ -332,11 +330,42 @@ function TimelineView() {
     const newOffset = timelineOffset - (direction * SCROLL_AMOUNT);
     setTimelineOffset(newOffset);
     
-    // When we've scrolled 12 hours worth, extend the timeline
+    // Update click count
+    if (direction < 0) {
+      setScrollClickCount(prev => ({
+        ...prev,
+        left: prev.left + 1
+      }));
+    } else {
+      setScrollClickCount(prev => ({
+        ...prev,
+        right: prev.right + 1
+      }));
+    }
+
+    // Check if we need to extend timeline
     const extensionThreshold = MARKER_SPACING * 12;
     if (Math.abs(newOffset - baseOffset) > extensionThreshold) {
       extendTimeRange(direction);
       setBaseOffset(newOffset);
+    }
+
+    // Check if we've reached the click threshold
+    if (direction < 0 && scrollClickCount.left >= CLICK_THRESHOLD) {
+      // Going backwards in time
+      extendTimeRange(direction, EXTENSION_STEP);
+      setScrollClickCount(prev => ({ ...prev, left: 0 }));
+      
+      // Adjust offset to maintain visual position
+      const adjustedOffset = timelineOffset + (EXTENSION_STEP * MARKER_SPACING * direction);
+      setTimelineOffset(adjustedOffset);
+      setBaseOffset(adjustedOffset);
+    } else if (direction > 0 && scrollClickCount.right >= CLICK_THRESHOLD) {
+      // Going forwards in time
+      extendTimeRange(direction, EXTENSION_STEP);
+      setScrollClickCount(prev => ({ ...prev, right: 0 }));
+      
+      // No need to adjust offset when extending forward
     }
   };
 
@@ -435,12 +464,12 @@ function TimelineView() {
   };
 
   // Current time state for precise marker
-  const [currentTime, setCurrentTime] = useState(new Date('2025-01-03T15:34:22-08:00'));
+  const [currentTime, setCurrentTime] = useState(new Date());
 
   // Update current time every minute
   useEffect(() => {
     const updateTime = () => {
-      const newTime = new Date('2025-01-03T15:34:22-08:00');
+      const newTime = new Date();
       setCurrentTime(newTime);
       
       // Update visible range with new current time
@@ -471,7 +500,7 @@ function TimelineView() {
 
   useEffect(() => {
     // Initialize timeline with current time centered and full day padding on both sides
-    const now = new Date('2025-01-03T15:15:49-08:00');
+    const now = new Date();
     
     // Calculate start time by going back to midnight of the previous day plus additional padding
     const startOfToday = startOfDay(now);
@@ -549,6 +578,47 @@ function TimelineView() {
     }
   };
 
+  const checkPresentMarkerVisibility = () => {
+    const now = new Date();
+    const startTime = visibleTimeRange.start;
+    
+    if (!startTime) return true;
+
+    // Calculate the current time's position
+    const totalMinutes = (now - startTime) / (1000 * 60);
+    const totalHours = totalMinutes / 60;
+    const currentPosition = totalHours * MARKER_SPACING;
+
+    // Calculate visible range based on timeline offset
+    const visibleStart = -timelineOffset;
+    const visibleEnd = visibleStart + window.innerWidth;
+
+    // Update visibility state
+    setIsPresentVisible(currentPosition >= visibleStart && currentPosition <= visibleEnd);
+  };
+
+  useEffect(() => {
+    checkPresentMarkerVisibility();
+  }, [timelineOffset]);
+
+  const snapToPresent = () => {
+    const now = new Date();
+    setVisibleTimeRange(prev => ({
+      ...prev,
+      now: now
+    }));
+
+    // Calculate position to center the current time
+    const totalMinutes = (now - visibleTimeRange.start) / (1000 * 60);
+    const totalHours = totalMinutes / 60;
+    const currentTimePosition = totalHours * MARKER_SPACING;
+    
+    // Center the timeline on the current time position
+    const centerOffset = currentTimePosition - (window.innerWidth / 2);
+    setTimelineOffset(-centerOffset);
+    setBaseOffset(-centerOffset);
+  };
+
   // Styles for different marker types
   const markerStyles = {
     day: {
@@ -596,7 +666,7 @@ function TimelineView() {
       flexDirection: 'column',
       minHeight: 'auto', 
       bgcolor: theme.palette.mode === 'light' ? 'background.default' : '#000',
-      overflowX: 'hidden' // Hide overflow
+      overflowX: 'hidden'
     }}>
       <Box sx={{ 
         width: '100%',
@@ -613,19 +683,36 @@ function TimelineView() {
           overflowX: 'hidden' 
         }}>
           <Box my={4}>
+            <Box display="flex" alignItems="center" gap={2}>
+              <Typography variant="h4" component="h1" gutterBottom>
+                <Box component="span" sx={{ 
+                  fontWeight: 'bold',
+                  color: theme.palette.mode === 'light' ? 'primary.main' : '#ce93d8',
+                  mr: 1
+                }}>
+                  #
+                </Box>
+                {timelineInfo?.name || "new timeline"}
+              </Typography>
+              {!isPresentVisible && (
+                <Button
+                  variant="outlined"
+                  size="small"
+                  onClick={snapToPresent}
+                  startIcon={<NavigateNextIcon sx={{ transform: 'rotate(-90deg)' }} />}
+                  sx={{
+                    borderRadius: '20px',
+                    textTransform: 'none',
+                    ml: 2
+                  }}
+                >
+                  Return to Present
+                </Button>
+              )}
+            </Box>
             <Box display="flex" justifyContent="space-between" alignItems="flex-start" mb={4}>
               <Box>
-                <Typography variant="h4" component="h1" gutterBottom>
-                  <Box component="span" sx={{ 
-                    fontWeight: 'bold',
-                    color: theme.palette.mode === 'light' ? 'primary.main' : '#ce93d8',
-                    mr: 1
-                  }}>
-                    #
-                  </Box>
-                  {timelineInfo?.name || 'Loading...'}
-                </Typography>
-                <Typography variant="subtitle1" color="textSecondary">
+                <Typography variant="body1" color="text.secondary">
                   Timeline View
                 </Typography>
               </Box>
@@ -714,16 +801,26 @@ function TimelineView() {
                   display: 'flex',
                   flexDirection: 'column',
                   alignItems: 'center',
-                  zIndex: 2
+                  zIndex: 2,
+                  backgroundColor: 'white',
+                  borderRadius: '20px',
+                  padding: '4px',
+                  boxShadow: 1
                 }}>
-                  <Typography variant="caption" sx={{ mb: 1 }}>Earlier</Typography>
+                  <Typography 
+                    variant="caption" 
+                    sx={{ 
+                      mb: 1,
+                      color: 'text.secondary'
+                    }}
+                  >
+                    Earlier
+                  </Typography>
                   <IconButton 
                     onClick={() => handleScroll(-1)} 
                     size="small"
                     sx={{
                       pointerEvents: 'auto',
-                      backgroundColor: 'white',
-                      boxShadow: 1,
                       '&:hover': {
                         backgroundColor: 'grey.100'
                       }
@@ -858,16 +955,26 @@ function TimelineView() {
                   display: 'flex',
                   flexDirection: 'column',
                   alignItems: 'center',
-                  zIndex: 2
+                  zIndex: 2,
+                  backgroundColor: 'white',
+                  borderRadius: '20px',
+                  padding: '4px',
+                  boxShadow: 1
                 }}>
-                  <Typography variant="caption" sx={{ mb: 1 }}>Later</Typography>
+                  <Typography 
+                    variant="caption" 
+                    sx={{ 
+                      mb: 1,
+                      color: 'text.secondary'
+                    }}
+                  >
+                    Later
+                  </Typography>
                   <IconButton 
                     onClick={() => handleScroll(1)} 
                     size="small"
                     sx={{
                       pointerEvents: 'auto',
-                      backgroundColor: 'white',
-                      boxShadow: 1,
                       '&:hover': {
                         backgroundColor: 'grey.100'
                       }
