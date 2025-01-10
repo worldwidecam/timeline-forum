@@ -1,0 +1,22 @@
+services:
+  - type: web
+    name: timeline-forum-backend
+    env: python
+    buildCommand: ./build.sh
+    startCommand: gunicorn app:app
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.0
+      - key: DATABASE_URL
+        fromDatabase:
+          name: timeline-forum-db
+          property: connectionString
+      - key: JWT_SECRET_KEY
+        generateValue: true
+      - key: FRONTEND_URL
+        value: https://your-frontend-domain.com  # You'll update this later
+
+databases:
+  - name: timeline-forum-db
+    databaseName: timeline_forum
+    plan: free

@@ -7,6 +7,7 @@ from werkzeug.security import generate_password_hash, check_password_hash
 from werkzeug.utils import secure_filename
 import os
 import logging
+import time
 
 # Configure logging
 logging.basicConfig(level=logging.DEBUG)
@@ -16,9 +17,9 @@ app = Flask(__name__)
 
 # Basic configurations
 app.config.update(
-    SQLALCHEMY_DATABASE_URI='sqlite:///timeline_forum.db',
+    SQLALCHEMY_DATABASE_URI=os.getenv('DATABASE_URL').replace('postgres://', 'postgresql://') if os.getenv('DATABASE_URL') else 'sqlite:///timeline_forum.db',
     SQLALCHEMY_TRACK_MODIFICATIONS=False,
-    JWT_SECRET_KEY='your-secret-key',  # Change this in production
+    JWT_SECRET_KEY=os.getenv('JWT_SECRET_KEY', 'your-secret-key'),  # Change this in production
     JWT_ACCESS_TOKEN_EXPIRES=False,
     MAX_CONTENT_LENGTH=16 * 1024 * 1024  # 16MB max file size
 )
@@ -26,7 +27,7 @@ app.config.update(
 # Configure CORS
 CORS(app, resources={
     r"/*": {
-        "origins": ["http://localhost:3000"],
+        "origins": [os.getenv('FRONTEND_URL', 'http://localhost:3000')],
         "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
         "allow_headers": ["Content-Type", "Authorization"],
         "supports_credentials": True
@@ -48,9 +49,13 @@ jwt = JWTManager(app)
 
 # File upload configuration
 ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif'}
+ALLOWED_AUDIO_EXTENSIONS = {'mp3', 'wav', 'ogg'}
 
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
+
+def allowed_audio_file(filename):
+    return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_AUDIO_EXTENSIONS
 
 @app.route('/api/upload', methods=['POST'])
 @jwt_required()
@@ -680,7 +685,7 @@ def update_music_preferences():
                 music_prefs = UserMusic(user_id=user.id)
                 db.session.add(music_prefs)
             
-            music_prefs.music_url = f'http://localhost:5000/uploads/{filename}'
+            music_prefs.music_url = f'http://localhost:5000/static/uploads/{filename}'
             
             db.session.commit()
             app.logger.info('Music preferences updated successfully')
@@ -906,7 +911,7 @@ def update_profile():
                 filename = secure_filename(f'avatar_{current_user_id}_{int(time.time())}.{file.filename.rsplit(".", 1)[1].lower()}')
                 file_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
                 file.save(file_path)
-                user.avatar_url = f'http://localhost:5000/uploads/{filename}'
+                user.avatar_url = f'http://localhost:5000/static/uploads/{filename}'
                 app.logger.info(f'Updated avatar URL to: {user.avatar_url}')
                 
         db.session.commit()
