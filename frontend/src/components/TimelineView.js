@@ -22,6 +22,9 @@ import TimeMarkers from './timeline/TimeMarkers';
 import TimelineNavigation from './timeline/TimelineNavigation';
 import TimelineBar from './timeline/TimelineBar';
 import TimelineHeader from './timeline/TimelineHeader';
+import EventDialog from './timeline/EventDialog';
+import TimelinePostsSection from './timeline/TimelinePostsSection';
+import TimelineBackground from './timeline/TimelineBackground';
 
 function TimelineView() {
   const { id } = useParams();
@@ -768,36 +771,19 @@ function TimelineView() {
             </Box>
           </Box>
           {/* Timeline Posts */}
-          <Box sx={{ backgroundColor: theme.palette.mode === 'light' ? 'background.default' : '#121212', py: 4 }}>
-            <Container maxWidth="lg">
-              <TimelinePosts timelineId={id} />
-            </Container>
-          </Box>
+          <TimelinePostsSection timelineId={id} />
+
           {/* Event Dialog */}
-          <Dialog
-            open={Boolean(selectedEvent)}
+          <EventDialog
+            selectedEvent={selectedEvent}
             onClose={handleCloseEventDialog}
-            maxWidth="md"
-            fullWidth
-          >
-            <DialogContent>
-              {selectedEvent && (
-                <EventDisplay
-                  event={selectedEvent}
-                  onEdit={handleEditEvent}
-                  onDelete={handleDeleteEvent}
-                  currentUserId={1} // TODO: Replace with actual logged-in user ID
-                />
-              )}
-            </DialogContent>
-          </Dialog>
+            onEdit={handleEditEvent}
+            onDelete={handleDeleteEvent}
+            currentUserId={1} // TODO: Replace with actual logged-in user ID
+          />
+
           {/* Black space section */}
-          <Box sx={{ 
-            flex: 1,
-            backgroundColor: theme.palette.mode === 'light' ? 'background.default' : '#000',
-            width: '100%',
-            minHeight: '50vh' 
-          }} />
+          <TimelineBackground />
         </Container>
       </Box>
     </Box>

@@ -201,8 +201,12 @@ We maintain a balance between immediate functionality and future extensibility:
   - `/src/components/timeline/`
     - `TimelineHeader.js` - Title, zoom controls, and create event button
     - `TimelineBar.js` - The horizontal timeline bar
-    - `TimelineMarkers.js` - Time markers and "You are here" indicator
+    - `TimelineMarkers.js` - Time markers and scale indicators
     - `TimelineNavigation.js` - Left/Right navigation controls
+    - `TimelinePostsSection.js` - Container for timeline posts
+    - `TimelineBackground.js` - Background and spacing component
+    - `EventDialog.js` - Event details dialog
+    - `PresentTimeMarker.js` - "You are here" indicator
 
 ### Timeline Components
 
@@ -220,13 +224,32 @@ The timeline view is composed of several reusable components:
 
 3. **TimelineMarkers**
    - Time markers for hours and days
-   - Current time indicator ("You are here")
-   - Dynamic scaling based on zoom level
+   - Scale indicators based on zoom level
 
-4. **TimelineNavigation**
+4. **PresentTimeMarker**
+   - Animated "You are here" indicator
+   - Visual pointer to current time
+   - Smooth transitions on timeline updates
+
+5. **TimelineNavigation**
    - "Earlier" and "Later" navigation buttons
    - Smooth scrolling controls
    - Visual indicators for timeline navigation
+
+6. **TimelinePostsSection**
+   - Container for timeline posts
+   - Handles post layout and spacing
+   - Maintains theme consistency
+
+7. **EventDialog**
+   - Modal display for event details
+   - Edit and delete functionality
+   - Responsive layout
+
+8. **TimelineBackground**
+   - Provides consistent background
+   - Handles theme-based styling
+   - Maintains proper spacing
 
 Each component maintains consistent styling and follows Material-UI design principles while being independently maintainable and reusable.
 
