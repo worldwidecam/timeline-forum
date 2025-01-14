@@ -186,44 +186,121 @@ We maintain a balance between immediate functionality and future extensibility:
 4. Hide technical complexity from users
 5. Build for future feature integration
 
-## Development Context
+## Project Structure
 
-### Current Implementation Status
-- Working timeline with accurate time display and navigation
-- Client-side time management for consistent user experience
-- Hour and day markers with proper display
-- Smooth navigation controls with "Earlier" and "Later" buttons
-- "Return to Present" button appears when current time is out of view
-- Timeline types indicated by prefix symbols (e.g., # for hashtag timelines)
+- `/backend`
+  - Flask server
+  - SQLite database
+  - API endpoints
+  - Data models
+- `/frontend`
+  - React components
+  - Material-UI styling
+  - Timeline visualization
+  - Event management
+  - `/src/components/timeline/`
+    - `TimelineHeader.js` - Title, zoom controls, and create event button
+    - `TimelineBar.js` - The horizontal timeline bar
+    - `TimelineMarkers.js` - Time markers and scale indicators
+    - `TimelineNavigation.js` - Left/Right navigation controls
+    - `TimelinePostsSection.js` - Container for timeline posts
+    - `TimelineBackground.js` - Background and spacing component
+    - `EventDialog.js` - Event details dialog
+    - `PresentTimeMarker.js` - "You are here" indicator
 
-### Timeline Types
-1. **Hashtag Timelines (#)**
-   - System-generated timelines
-   - Automatically collect and display posts with specific hashtags
-   - Identified by the # symbol prefix
+### Timeline Components
 
-2. **User/Company Timelines (Planned)**
-   - Custom timelines created by users or organizations
-   - Can track multiple hashtags of interest
-   - Will have distinct identifying symbols
-   - Allows for personalized event tracking and curation
+The timeline view is composed of several reusable components:
 
-### Core Timeline Features
-- Accurate time display with current time marker
-- 24-hour buffer on each side for context
-- Dynamic loading of markers when scrolling
-- Smart navigation with instant "Return to Present" option
-- Visual indicators for timeline types
+1. **TimelineHeader**
+   - Timeline title with hashtag
+   - Zoom level controls (day/week/month/year)
+   - Create Event button
+   - "Return to Present" button when applicable
 
-### Future Features
-- Timeline filters (day/week/month/year)
-- Event creation and display
-- Discussion posts integration
-- Enhanced hashtag system
-- Social features (comments, likes, sharing)
-- Additional timeline type support
+2. **TimelineBar**
+   - Main horizontal timeline bar
+   - Visual representation of the timeline's scale
 
-## UI Components and Terminology
+3. **TimelineMarkers**
+   - Time markers for hours and days
+   - Scale indicators based on zoom level
+
+4. **PresentTimeMarker**
+   - Animated "You are here" indicator
+   - Visual pointer to current time
+   - Smooth transitions on timeline updates
+
+5. **TimelineNavigation**
+   - "Earlier" and "Later" navigation buttons
+   - Smooth scrolling controls
+   - Visual indicators for timeline navigation
+
+6. **TimelinePostsSection**
+   - Container for timeline posts
+   - Handles post layout and spacing
+   - Maintains theme consistency
+
+7. **EventDialog**
+   - Modal display for event details
+   - Edit and delete functionality
+   - Responsive layout
+
+8. **TimelineBackground**
+   - Provides consistent background
+   - Handles theme-based styling
+   - Maintains proper spacing
+
+Each component maintains consistent styling and follows Material-UI design principles while being independently maintainable and reusable.
+
+### Component Interactions
+
+The timeline components work together through the following interaction patterns:
+
+1. **Timeline Navigation Flow**
+   ```
+   TimelineNavigation → TimelineView → TimelineBar + TimelineMarkers
+   ├─ "Earlier/Later" clicks trigger handleScroll in TimelineView
+   ├─ TimelineView updates timelineOffset state
+   └─ TimelineBar and TimelineMarkers update positions
+   ```
+
+2. **Zoom Level Changes**
+   ```
+   TimelineHeader → TimelineView → TimelineMarkers
+   ├─ Zoom control changes trigger setZoomLevel
+   ├─ TimelineView recalculates marker spacing
+   └─ TimelineMarkers updates with new scale
+   ```
+
+3. **Present Time Tracking**
+   ```
+   TimelineMarkers ←→ TimelineView ←→ TimelineHeader
+   ├─ TimelineView tracks current time position
+   ├─ TimelineMarkers shows "You are here" indicator
+   └─ TimelineHeader shows/hides "Return to Present" button
+   ```
+
+4. **Event Creation Flow**
+   ```
+   TimelineHeader → TimelineView
+   ├─ "Create Event" triggers navigation
+   └─ New event gets added to timeline after creation
+   ```
+
+Key State Management:
+- `timelineOffset`: Controlled by TimelineView, consumed by all components
+- `zoomLevel`: Set by TimelineHeader, affects marker calculations
+- `isPresentVisible`: Calculated by TimelineView, used by TimelineHeader
+- `timeMarkers`: Generated by TimelineView, used by TimelineMarkers
+
+This component architecture ensures:
+- Clear separation of concerns
+- Predictable data flow
+- Centralized state management
+- Efficient updates and rendering
+
+### UI Components and Terminology
 
 ### Navigation Elements
 - **View Profile Button**: Direct access to user profile page, located in the top-right navbar

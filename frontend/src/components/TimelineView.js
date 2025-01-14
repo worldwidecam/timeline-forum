@@ -18,6 +18,13 @@ import TimelinePosts from './TimelinePosts';
 import { useAuth } from '../contexts/AuthContext';
 import NavigateBeforeIcon from '@mui/icons-material/NavigateBefore';
 import NavigateNextIcon from '@mui/icons-material/NavigateNext';
+import TimeMarkers from './timeline/TimeMarkers';
+import TimelineNavigation from './timeline/TimelineNavigation';
+import TimelineBar from './timeline/TimelineBar';
+import TimelineHeader from './timeline/TimelineHeader';
+import EventDialog from './timeline/EventDialog';
+import TimelinePostsSection from './timeline/TimelinePostsSection';
+import TimelineBackground from './timeline/TimelineBackground';
 
 function TimelineView() {
   const { id } = useParams();
@@ -682,341 +689,101 @@ function TimelineView() {
           maxWidth: '100vw', 
           overflowX: 'hidden' 
         }}>
-          <Box my={4}>
-            <Box display="flex" alignItems="center" gap={2}>
-              <Typography variant="h4" component="h1" gutterBottom>
-                <Box component="span" sx={{ 
-                  fontWeight: 'bold',
-                  color: theme.palette.mode === 'light' ? 'primary.main' : '#ce93d8',
-                  mr: 1
-                }}>
-                  #
-                </Box>
-                {timelineInfo?.name || "new timeline"}
-              </Typography>
-              {!isPresentVisible && (
-                <Button
-                  variant="outlined"
-                  size="small"
-                  onClick={snapToPresent}
-                  startIcon={<NavigateNextIcon sx={{ transform: 'rotate(-90deg)' }} />}
-                  sx={{
-                    borderRadius: '20px',
-                    textTransform: 'none',
-                    ml: 2
-                  }}
-                >
-                  Return to Present
-                </Button>
-              )}
-            </Box>
-            <Box display="flex" justifyContent="space-between" alignItems="flex-start" mb={4}>
-              <Box>
-                <Typography variant="body1" color="text.secondary">
-                  Timeline View
-                </Typography>
-              </Box>
-              <Box sx={{ display: 'flex', gap: 2, alignItems: 'center' }}>
-                <Box sx={{ 
-                  display: 'flex', 
-                  bgcolor: theme.palette.mode === 'light' ? 'background.paper' : '#2c1b47',
-                  borderRadius: '20px',
-                  padding: '4px',
-                  border: theme.palette.mode === 'light' 
-                    ? `1px solid ${theme.palette.primary.main}` 
-                    : `1px solid #ce93d8`
-                }}>
-                  {['day', 'week', 'month', 'year'].map((level) => (
-                    <Button
-                      key={level}
-                      size="small"
-                      onClick={() => setZoomLevel(level)}
-                      sx={{
-                        minWidth: '60px',
-                        color: zoomLevel === level ? '#fff' : theme.palette.mode === 'light' ? 'primary.main' : '#ce93d8',
-                        backgroundColor: zoomLevel === level ? theme.palette.mode === 'light' ? 'primary.main' : '#9c27b0' : 'transparent',
-                        borderRadius: '16px',
-                        textTransform: 'capitalize',
-                        '&:hover': {
-                          backgroundColor: zoomLevel === level ? theme.palette.mode === 'light' ? 'primary.main' : '#9c27b0' : 'rgba(156, 39, 176, 0.1)'
-                        }
-                      }}
-                    >
-                      {level}
-                    </Button>
-                  ))}
-                </Box>
-                {user ? (
-                  <Button
-                    variant="contained"
-                    color="primary"
-                    onClick={() => navigate(`/timeline/${id}/event/create`)}
-                  >
-                    Create Event
-                  </Button>
-                ) : (
-                  <Button
-                    variant="contained"
-                    color="primary"
-                    component={Link}
-                    to="/login"
-                    sx={{ color: '#fff' }}
-                  >
-                    Login to Create Event
-                  </Button>
-                )}
-              </Box>
-            </Box>
+          <TimelineHeader
+            timelineInfo={timelineInfo}
+            zoomLevel={zoomLevel}
+            setZoomLevel={setZoomLevel}
+            isPresentVisible={isPresentVisible}
+            snapToPresent={snapToPresent}
+            user={user}
+            theme={theme}
+            id={id}
+            navigate={navigate}
+          />
 
-            {/* Timeline Container */}
-            <Box 
-              ref={timelineRef}
-              className="timeline-scroll-container"
-              sx={{
-                width: '100%',
-                overflowX: 'hidden',
-                overflowY: 'visible',
-                position: 'relative',
-                height: '300px',
-                minHeight: 'auto', 
-                mt: 2,
-                mb: 2
-              }}
-            >
-              {/* Timeline Container with Navigation Endpoints */}
+          {/* Timeline Container */}
+          <Box 
+            ref={timelineRef}
+            className="timeline-scroll-container"
+            sx={{
+              width: '100%',
+              overflowX: 'hidden',
+              overflowY: 'visible',
+              position: 'relative',
+              height: '300px',
+              minHeight: 'auto', 
+              mt: 2,
+              mb: 2
+            }}
+          >
+            {/* Timeline Container with Navigation Endpoints */}
+            <Box sx={{
+              position: 'relative',
+              width: '100%',
+              height: '100px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center'
+            }}>
+              {/* Left Navigation */}
+              <TimelineNavigation
+                position="left"
+                onNavigate={handleScroll}
+                label="Earlier"
+              />
+
+              {/* Timeline Content */}
               <Box sx={{
                 position: 'relative',
-                width: '100%',
-                height: '100px',
+                width: 'calc(100% - 80px)',
+                margin: '0 40px',
+                height: '60px',
                 display: 'flex',
                 alignItems: 'center',
-                justifyContent: 'center'
+                overflow: 'visible' // Changed to allow markers to show above
               }}>
-                {/* Left Navigation */}
-                <Box sx={{
-                  position: 'absolute',
-                  left: 0,
-                  top: '50%',
-                  transform: 'translateY(-50%)',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  alignItems: 'center',
-                  zIndex: 2,
-                  backgroundColor: 'white',
-                  borderRadius: '20px',
-                  padding: '4px',
-                  boxShadow: 1
-                }}>
-                  <Typography 
-                    variant="caption" 
-                    sx={{ 
-                      mb: 1,
-                      color: 'text.secondary'
-                    }}
-                  >
-                    Earlier
-                  </Typography>
-                  <IconButton 
-                    onClick={() => handleScroll(-1)} 
-                    size="small"
-                    sx={{
-                      pointerEvents: 'auto',
-                      '&:hover': {
-                        backgroundColor: 'grey.100'
-                      }
-                    }}
-                  >
-                    <NavigateBeforeIcon />
-                  </IconButton>
-                </Box>
+                {/* Timeline Bar */}
+                <TimelineBar
+                  timelineOffset={timelineOffset}
+                  timeMarkers={timeMarkers}
+                  MARKER_SPACING={MARKER_SPACING}
+                  theme={theme}
+                />
 
-                {/* Timeline Content */}
-                <Box sx={{
-                  position: 'relative',
-                  width: 'calc(100% - 80px)',
-                  margin: '0 40px',
-                  height: '60px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  overflow: 'visible' // Changed to allow markers to show above
-                }}>
-                  {/* Timeline Bar */}
-                  <Box sx={{
-                    position: 'absolute',
-                    left: 0,
-                    top: '75%',
-                    height: '2px',
-                    backgroundColor: theme.palette.primary.main,
-                    transform: `translateX(${timelineOffset}px)`,
-                    transition: 'transform 0.1s ease-out',
-                    width: `${timeMarkers.length * MARKER_SPACING}px` // Dynamic width based on markers
-                  }} />
-
-                  {/* Time Markers Container */}
-                  <Box sx={{
-                    position: 'absolute',
-                    left: 0,
-                    top: 0,
-                    bottom: 0,
-                    transform: `translateX(${timelineOffset}px)`,
-                    transition: 'transform 0.1s ease-out',
-                    width: `${timeMarkers.length * MARKER_SPACING}px`, // Dynamic width based on markers
-                    display: 'flex',
-                    alignItems: 'center'
-                  }}>
-                    {/* Time markers */}
-                    {timeMarkers.map((marker, index) => (
-                      <Box
-                        key={index}
-                        sx={{
-                          position: 'absolute',
-                          left: `${marker.position}px`,
-                          display: 'flex',
-                          flexDirection: 'column',
-                          alignItems: 'center',
-                          transform: 'translateX(-50%)',
-                          ...(marker.isDay ? {
-                            bottom: '15px',  // Position from bottom of container
-                            height: '45px',  // Fixed height for day markers
-                            justifyContent: 'flex-end'  // Align content to bottom
-                          } : {
-                            top: '20%'  // Keep hour markers as they were
-                          }),
-                          ...(marker.isDay ? markerStyles.day : 
-                             marker.isPresent ? markerStyles.currentHour : 
-                             markerStyles.regular)
-                        }}
-                      >
-                        <Typography 
-                          className="marker-label"
-                          variant="caption" 
-                          sx={{ mb: 1 }}
-                        >
-                          {marker.label}
-                        </Typography>
-                        <Box className="marker-line" />
-                      </Box>
-                    ))}
-
-                    {/* Precise Time Marker */}
-                    <Box
-                      sx={{
-                        position: 'absolute',
-                        left: 0,
-                        right: 0,
-                        top: 0,
-                        bottom: 0,
-                        pointerEvents: 'none'
-                      }}
-                    >
-                      <Box
-                        sx={{
-                          position: 'absolute',
-                          left: `${calculateExactTimePosition(currentTime)}px`,
-                          top: '-35px',
-                          display: 'flex',
-                          flexDirection: 'column',
-                          alignItems: 'center',
-                          transform: 'translateX(-50%)',
-                          zIndex: 1000
-                        }}
-                      >
-                        <Typography
-                          sx={{
-                            color: '#000',
-                            fontSize: '0.75rem',
-                            fontWeight: 'bold',
-                            marginBottom: '4px',
-                            whiteSpace: 'nowrap'
-                          }}
-                        >
-                          You are here
-                        </Typography>
-                        <Box
-                          sx={{
-                            width: 0,
-                            height: 0,
-                            borderLeft: '6px solid transparent',
-                            borderRight: '6px solid transparent',
-                            borderTop: '6px solid #000'
-                          }}
-                        />
-                      </Box>
-                    </Box>
-                  </Box>
-                </Box>
-
-                {/* Right Navigation */}
-                <Box sx={{
-                  position: 'absolute',
-                  right: 0,
-                  top: '50%',
-                  transform: 'translateY(-50%)',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  alignItems: 'center',
-                  zIndex: 2,
-                  backgroundColor: 'white',
-                  borderRadius: '20px',
-                  padding: '4px',
-                  boxShadow: 1
-                }}>
-                  <Typography 
-                    variant="caption" 
-                    sx={{ 
-                      mb: 1,
-                      color: 'text.secondary'
-                    }}
-                  >
-                    Later
-                  </Typography>
-                  <IconButton 
-                    onClick={() => handleScroll(1)} 
-                    size="small"
-                    sx={{
-                      pointerEvents: 'auto',
-                      '&:hover': {
-                        backgroundColor: 'grey.100'
-                      }
-                    }}
-                  >
-                    <NavigateNextIcon />
-                  </IconButton>
-                </Box>
+                {/* Time Markers Container */}
+                <TimeMarkers
+                  timeMarkers={timeMarkers}
+                  timelineOffset={timelineOffset}
+                  MARKER_SPACING={MARKER_SPACING}
+                  markerStyles={markerStyles}
+                  theme={theme}
+                  calculateExactTimePosition={calculateExactTimePosition}
+                  currentTime={currentTime}
+                />
               </Box>
+
+              {/* Right Navigation */}
+              <TimelineNavigation
+                position="right"
+                onNavigate={handleScroll}
+                label="Later"
+              />
             </Box>
-            {/* Timeline Posts */}
-            <Box sx={{ backgroundColor: theme.palette.mode === 'light' ? 'background.default' : '#121212', py: 4 }}>
-              <Container maxWidth="lg">
-                <TimelinePosts timelineId={id} />
-              </Container>
-            </Box>
-            {/* Event Dialog */}
-            <Dialog
-              open={Boolean(selectedEvent)}
-              onClose={handleCloseEventDialog}
-              maxWidth="md"
-              fullWidth
-            >
-              <DialogContent>
-                {selectedEvent && (
-                  <EventDisplay
-                    event={selectedEvent}
-                    onEdit={handleEditEvent}
-                    onDelete={handleDeleteEvent}
-                    currentUserId={1} // TODO: Replace with actual logged-in user ID
-                  />
-                )}
-              </DialogContent>
-            </Dialog>
-            {/* Black space section */}
-            <Box sx={{ 
-              flex: 1,
-              backgroundColor: theme.palette.mode === 'light' ? 'background.default' : '#000',
-              width: '100%',
-              minHeight: '50vh' 
-            }} />
           </Box>
+          {/* Timeline Posts */}
+          <TimelinePostsSection timelineId={id} />
+
+          {/* Event Dialog */}
+          <EventDialog
+            selectedEvent={selectedEvent}
+            onClose={handleCloseEventDialog}
+            onEdit={handleEditEvent}
+            onDelete={handleDeleteEvent}
+            currentUserId={1} // TODO: Replace with actual logged-in user ID
+          />
+
+          {/* Black space section */}
+          <TimelineBackground />
         </Container>
       </Box>
     </Box>
