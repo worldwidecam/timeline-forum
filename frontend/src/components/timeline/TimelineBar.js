@@ -5,7 +5,8 @@ const TimelineBar = ({
   timelineOffset,
   timeMarkers,
   MARKER_SPACING,
-  theme
+  theme,
+  width
 }) => {
   return (
     <Box sx={{
@@ -16,7 +17,7 @@ const TimelineBar = ({
       backgroundColor: theme.palette.primary.main,
       transform: `translateX(${timelineOffset}px)`,
       transition: 'transform 0.1s ease-out',
-      width: `${timeMarkers.length * MARKER_SPACING}px` // Dynamic width based on markers
+      width: `${width}px` // Use the calculated width
     }} />
   );
 };
