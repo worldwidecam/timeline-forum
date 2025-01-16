@@ -4,6 +4,7 @@ import CssBaseline from '@mui/material/CssBaseline';
 import Navbar from './components/Navbar';
 import TimelineList from './components/TimelineList';
 import TimelineView from './components/TimelineView';
+import TimelineV3 from './components/timeline-v3/TimelineV3';
 import CreateTimeline from './components/CreateTimeline';
 import CreateEvent from './components/CreateEvent';
 import CreatePost from './components/CreatePost';
@@ -65,6 +66,11 @@ function App() {
                 <Route path="/timeline/:id" element={
                   <ProtectedRoute>
                     <TimelineView />
+                  </ProtectedRoute>
+                } />
+                <Route path="/timeline-v3/:id" element={
+                  <ProtectedRoute>
+                    <TimelineV3 />
                   </ProtectedRoute>
                 } />
                 <Route path="/timeline/create" element={

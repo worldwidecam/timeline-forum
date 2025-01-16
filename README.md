@@ -56,20 +56,61 @@ The application features a dynamic relationship between posts and events:
 
 The timeline component is the core feature of this application, built with modular architecture for maintainability and flexibility.
 
-### Timeline Architecture
+### Timeline V3 (Beta)
+The latest iteration of our timeline system introduces several key improvements:
 
-#### Timeline Bar Component
-The timeline bar consists of three independent but coordinated elements:
-1. **Base Timeline** - The continuous blue line that serves as the visual foundation
-2. **Time Markers** - Hour/day/month indicators that align with the timeline
-3. **Navigation Controls** - Fixed "Earlier" and "Later" endpoints for timeline traversal
+#### New Features
+1. **Dynamic Time Display**
+   - Hour-based markers in day view
+   - Special styling for midnight markers (12 AM)
+   - Day names displayed with midnight markers
+   - Exact current time display
 
-#### Key Design Principles
-- **Separation of Concerns**: Each timeline element operates independently
-- **Fixed Time Grid**: Time markers are positioned based on absolute time, not event positions
-- **Continuous Navigation**: Pre-generated markers (24 hours in each direction) ensure smooth scrolling
-- **Viewport-Based Display**: Only shows the portion of timeline within the current view
-- **Consistent Spacing**: Fixed pixel spacing between markers maintains visual rhythm
+2. **Enhanced Visual Elements**
+   - Animated hover marker showing precise time
+   - Floating animations for better user experience
+   - Adaptive styling for dark/light modes
+   - Improved visibility of time markers
+
+3. **Improved Navigation**
+   - Reference point aligned to nearest hour
+   - Smooth scrolling between time periods
+   - Clear visual hierarchy of time markers
+   - Consistent 100px spacing between markers
+
+4. **Technical Improvements**
+   - Modular component architecture
+   - Dynamic time calculations
+   - Efficient marker rendering
+   - Responsive design adaptations
+
+#### Timeline Architecture
+
+##### Core Components
+1. **TimelineV3**
+   - Main container component
+   - Handles viewport calculations
+   - Manages timeline state
+   - Coordinates child components
+
+2. **TimeMarkers**
+   - Renders hour and special markers
+   - Handles marker positioning
+   - Manages marker styling
+   - Displays time labels
+
+3. **HoverMarker**
+   - Shows exact current time
+   - Animated floating effect
+   - Interactive hover states
+   - Adaptive styling
+
+##### Design Principles
+- **Time-Centric**: All markers and positions based on actual time
+- **Responsive**: Adapts to viewport changes
+- **Interactive**: Smooth animations and hover effects
+- **Consistent**: Fixed spacing and visual rhythm
+- **Accessible**: Clear visual hierarchy and readable text
 
 ### Timeline Scales
 - **Day View** (Current Implementation)
@@ -154,11 +195,21 @@ Events are independent entities that overlay on the timeline:
 - Adjusted week view initialization range
 - Fixed Return to Present functionality
 
-### Technical Notes
-- Timeline width and marker spacing are configurable constants
-- Marker positions are calculated based on time differences
-- Navigation maintains a buffer of markers in both directions
-- Component state manages visible time range and marker positions
+## Recent Updates
+
+### January 2025
+- Introduced Timeline V3 Beta with improved time display
+- Added animated hover marker with exact time
+- Enhanced midnight marker styling
+- Improved timeline navigation
+- Added beta access button in timeline list
+
+### Planned Improvements
+1. **Timeline V3 Enhancements**
+   - Additional view modes (week, month, year)
+   - Event integration
+   - Timeline sharing features
+   - Performance optimizations
 
 ## Project Philosophy and Direction
 
@@ -634,12 +685,3 @@ The authentication system is in its early phases:
   - Refined user permissions
   - Enhanced profile system for social sharing
   - Clear differentiation between anonymous and authenticated user capabilities
-
-## Recent Updates
-- Added profile music player feature
-  - Upload and play audio files on profiles
-  - Simple play/pause controls
-  - Volume adjustment with mute option
-  - Automatic cleanup of old audio files
-- Improved profile picture handling
-- Enhanced error handling for file uploads
