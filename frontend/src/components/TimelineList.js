@@ -51,31 +51,32 @@ function TimelineList() {
       }}
     >
       <Box sx={{ p: 2, borderBottom: 1, borderColor: 'divider' }}>
-        <Box display="flex" justifyContent="space-between" alignItems="center">
-          <Typography variant="h6" component="h1">
-            Timelines
-          </Typography>
-          {user ? (
-            <Button
-              variant="contained"
-              color="primary"
-              size="small"
-              onClick={handleCreateTimeline}
-            >
-              Create
-            </Button>
-          ) : (
-            <Button
-              component={Link}
-              to="/login"
-              variant="contained"
-              color="primary"
-              size="small"
-            >
-              Login to Create
-            </Button>
-          )}
-        </Box>
+        <Button
+          variant="contained"
+          color="primary"
+          fullWidth
+          onClick={handleCreateTimeline}
+          sx={{ mb: 2 }}
+        >
+          Create Timeline
+        </Button>
+        <Button
+          component={Link}
+          to="/timeline-v3/1"
+          variant="outlined"
+          color="primary"
+          fullWidth
+          sx={{
+            mb: 2,
+            borderStyle: 'dashed',
+            '&:hover': {
+              borderStyle: 'dashed',
+              backgroundColor: 'rgba(25, 118, 210, 0.04)'
+            }
+          }}
+        >
+          Try Timeline V3 Beta
+        </Button>
       </Box>
 
       <Box sx={{ flex: 1, overflow: 'auto', p: 2 }}>
