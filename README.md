@@ -57,7 +57,13 @@ The application features a dynamic relationship between posts and events:
 The timeline component is the core feature of this application, built with modular architecture for maintainability and flexibility.
 
 ### Timeline V3 (Beta)
-The latest iteration of our timeline system introduces several key improvements:
+The latest iteration of our timeline system introduces a fundamental architectural improvement:
+
+#### Core Concept
+- **Coordinate-Based System**: Instead of using start/end times, the timeline is built around a coordinate system
+- **Reference Point Zero**: All positions are calculated relative to position 0 (the reference point)
+- **Bidirectional Growth**: Timeline can infinitely extend in both directions from the reference point
+- **Simplified Logic**: Clean, mathematical approach to timeline navigation and marker placement
 
 #### New Features
 1. **Dynamic Time Display**
@@ -80,8 +86,8 @@ The latest iteration of our timeline system introduces several key improvements:
 
 4. **Technical Improvements**
    - Modular component architecture
-   - Dynamic time calculations
-   - Efficient marker rendering
+   - Pure coordinate-based calculations
+   - Efficient marker generation
    - Responsive design adaptations
 
 #### Timeline Architecture
@@ -89,13 +95,13 @@ The latest iteration of our timeline system introduces several key improvements:
 ##### Core Components
 1. **TimelineV3**
    - Main container component
+   - Manages coordinate system
    - Handles viewport calculations
-   - Manages timeline state
    - Coordinates child components
 
 2. **TimeMarkers**
-   - Renders hour and special markers
-   - Handles marker positioning
+   - Renders markers based on coordinate position
+   - Translates coordinates to time display
    - Manages marker styling
    - Displays time labels
 
@@ -169,13 +175,11 @@ Events are independent entities that overlay on the timeline:
 
 #### Known Issues
 1. Week View
-   - Marker doubling when scrolling Earlier (needs fix)
    - Timeline end boundaries too easily reachable (~15 clicks)
    - Need to maintain infinite scrolling feel
 
 #### Next Steps
 1. Fix Week View Issues
-   - Implement proper marker merging for Earlier scrolling
    - Adjust timeline extension amounts to prevent reaching boundaries
    - Ensure consistent marker spacing and positioning
 

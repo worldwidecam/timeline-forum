@@ -31,21 +31,13 @@ const HoverMarker = ({
         position: 'absolute',
         left: `${window.innerWidth/2 + (position * markerSpacing)}px`,
         top: '50%',
-        transform: `translateX(${timelineOffset}px) translateX(-50%) translateY(-50%)`,
+        transform: `translateX(${timelineOffset}px) translateX(-50%)`,
         display: 'flex',
         flexDirection: 'column',
         alignItems: 'center',
-        transition: 'transform 0.1s ease-out',
+        transition: 'all 0.1s ease-out',
         zIndex: 1,
-        '@keyframes float': {
-          '0%, 100%': {
-            transform: `translateX(${timelineOffset}px) translateX(-50%) translateY(-50%)`,
-          },
-          '50%': {
-            transform: `translateX(${timelineOffset}px) translateX(-50%) translateY(calc(-50% - 5px))`,
-          },
-        },
-        animation: 'float 3s ease-in-out infinite',
+        pointerEvents: 'none'
       }}
     >
       <Typography
@@ -77,7 +69,7 @@ const HoverMarker = ({
       <Box
         sx={{
           width: '2px',
-          height: '100px',
+          height: '40px',
           backgroundColor: theme.palette.primary.main,
           opacity: 0.8,
           position: 'relative',

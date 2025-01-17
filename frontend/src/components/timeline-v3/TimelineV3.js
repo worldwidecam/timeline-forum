@@ -21,16 +21,75 @@ function TimelineV3() {
     const currentHour = now.getHours();
     const currentMinute = now.getMinutes();
     
-    // Calculate position between current hour and next hour
-    // For example, 7:30 PM would be 0.5 between position 0 and 1
+    // Find the reference hour (position 0)
+    const referenceHour = currentHour;
+    
+    // Calculate position relative to current hour
+    // This will be between 0 and 1, where:
+    // 0 = exactly at current hour
+    // 0.5 = 30 minutes past current hour
+    // 1 = next hour
     return currentMinute / 60;
+  };
+
+  const getInitialMarkers = () => {
+    const markerSpacing = 100; // pixels between each marker
+    const screenWidth = window.innerWidth;
+    const markersNeeded = Math.ceil(screenWidth / markerSpacing);
+    // We want equal numbers on each side of zero, so we'll make it odd
+    const totalMarkers = markersNeeded + (markersNeeded % 2 === 0 ? 1 : 0);
+    const sideCount = Math.floor(totalMarkers / 2);
+    
+    return Array.from(
+      { length: totalMarkers }, 
+      (_, i) => i - sideCount
+    );
+  };
+
+  const getFormattedDate = () => {
+    const now = getCurrentDateTime();
+    return now.toLocaleDateString('en-US', {
+      weekday: 'long',
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric'
+    });
+  };
+
+  const getViewDescription = () => {
+    if (viewMode === 'day') {
+      return (
+        <>
+          <Typography variant="subtitle1" color="text.secondary" component="span" sx={{ mr: 1 }}>
+            Day View
+          </Typography>
+          <Typography variant="subtitle1" color="text.secondary" component="span">
+            {getFormattedDate()}
+          </Typography>
+        </>
+      );
+    }
+    return (
+      <>
+        <Typography variant="subtitle1" color="text.secondary" component="span" sx={{ mr: 1 }}>
+          Coordinate View
+        </Typography>
+        <Typography variant="subtitle1" color="text.secondary" component="span">
+          Reference point is position 0
+        </Typography>
+      </>
+    );
   };
 
   // Core state
   const [timelineOffset, setTimelineOffset] = useState(0);
-  const [markers, setMarkers] = useState(Array.from({ length: 11 }, (_, i) => i - 5)); // Creates [-5, -4, -3, -2, -1, 0, 1, 2, 3, 4, 5]
+  const [markers, setMarkers] = useState(getInitialMarkers());
   const [hoverPosition, setHoverPosition] = useState(getExactTimePosition());
-  const [viewMode, setViewMode] = useState('day');
+  const [viewMode, setViewMode] = useState(() => {
+    // Get view mode from URL or default to 'day'
+    const params = new URLSearchParams(window.location.search);
+    return params.get('view') || 'day';
+  });
 
   // Navigation functions
   const handleLeft = () => {
@@ -46,7 +105,18 @@ function TimelineV3() {
   };
 
   const handleRecenter = () => {
-    setTimelineOffset(0);
+    // Trigger fade out
+    const transitionElement = document.querySelector('.MuiFade-root');
+    if (transitionElement) {
+      transitionElement.style.opacity = '0';
+    }
+
+    // Wait for fade out before redirecting
+    setTimeout(() => {
+      const url = new URL(window.location.href);
+      url.searchParams.set('view', viewMode);
+      window.location.href = url.toString();
+    }, 300); // Half of the total transition time
   };
 
   // Marker styles
@@ -77,13 +147,30 @@ function TimelineV3() {
     }
   }, [viewMode]);
 
+  // Update markers on window resize
+  useEffect(() => {
+    const handleResize = () => {
+      // Only update if we're centered (timelineOffset === 0)
+      if (timelineOffset === 0) {
+        setMarkers(getInitialMarkers());
+      }
+    };
+
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, [timelineOffset]);
+
   return (
     <Box sx={{ 
       display: 'flex',
       flexDirection: 'column',
-      minHeight: 'auto',
+      minHeight: '400px',
       bgcolor: theme.palette.mode === 'light' ? 'background.default' : '#000',
-      overflowX: 'hidden'
+      overflowX: 'hidden',
+      borderRadius: '8px',
+      boxShadow: '0 1px 3px rgba(0,0,0,0.12), 0 1px 2px rgba(0,0,0,0.24)',
+      position: 'relative',
+      mb: 3
     }}>
       <Container maxWidth={false}>
         <Stack direction="row" alignItems="center" spacing={2} mb={2}>
@@ -92,12 +179,9 @@ function TimelineV3() {
               <Typography variant="h4" component="div" sx={{ color: theme.palette.primary.main }}>
                 # Timeline V3
               </Typography>
-              <Typography variant="subtitle1" sx={{ color: theme.palette.text.secondary }}>
-                Coordinate View
-              </Typography>
-              <Typography variant="subtitle2" sx={{ color: theme.palette.text.secondary }}>
-                Reference point is position 0
-              </Typography>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                {getViewDescription()}
+              </Box>
               <Fade in={timelineOffset !== 0}>
                 <Button
                   onClick={handleRecenter}
@@ -173,10 +257,11 @@ function TimelineV3() {
             theme={theme}
           />
           <HoverMarker 
-            position={viewMode === 'day' ? getExactTimePosition() : hoverPosition}
+            position={hoverPosition}
             timelineOffset={timelineOffset}
             markerSpacing={100}
             viewMode={viewMode}
+            markers={markers}
             theme={theme}
           />
           <Button
