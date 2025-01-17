@@ -18,8 +18,69 @@ An interactive web application for creating and visualizing timelines with event
 - Rich text formatting
 - Image uploads for events
 - Timeline sharing
-- Fixed-width timeline (1200px) for consistent visualization
+- Dynamic width timeline that adapts to screen size
 - Multi-scale zoom levels (day, week, month, year)
+
+#### Day View Implementation
+1. **Dynamic Timeline Width**
+   - Calculates marker count based on screen width
+   - Ensures equal number of markers on each side of zero
+   - Maintains smooth scrolling when window is resized
+   - Creates illusion of infinite scrolling
+
+2. **Hover Marker Features**
+   - Accurate positioning based on current time (hours:minutes)
+   - Moves smoothly with timeline scrolling
+   - Compact vertical indicator
+   - Updates position every minute
+   - Shows current time in AM/PM format
+   - Semi-transparent background for better visibility
+
+3. **Navigation System**
+   - Smooth left/right scrolling
+   - Maintains hover marker position during scrolling
+   - "Back to Present" button with fade transition
+   - Preserves view mode in URL parameters
+
+4. **Visual Information**
+   - "Day View" label with current date
+   - Hashtag-based timeline identification
+   - Clear hour markers (4AM, 5AM, etc.)
+   - Smooth transitions and animations
+
+#### Week View Implementation
+1. **Day Markers**
+   - Convert numeric markers to day labels (e.g., "Friday, Jan 17")
+   - Keep same spacing system as day view
+   - Style weekends differently (italic, lighter color)
+   - Show Sunday dates as week boundaries
+
+2. **Hover Marker Adaptations**
+   - Show current day and time
+   - Position accurately between days
+   - Maintain smooth movement with timeline
+
+3. **Navigation**
+   - Scroll by days instead of hours
+   - Keep "Back to Present" functionality
+   - Center on current day as reference point (position 0)
+
+4. **Visual Information**
+   - "Week View" label in header
+   - Show current month and year for context
+   - Highlight current day
+   - Weekend vs weekday styling
+
+5. **Transition Handling**
+   - Smooth transitions between views
+   - Start at reference point 0 when switching views
+   - Maintain same marker spacing system
+
+#### Month View Implementation
+(Coming soon)
+
+#### Year View Implementation
+(Coming soon)
 
 ### Social Features
 - Create posts
