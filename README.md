@@ -19,7 +19,17 @@ An interactive web application for creating and visualizing timelines with event
 - Image uploads for events
 - Timeline sharing
 - Dynamic width timeline that adapts to screen size
-- Multi-scale zoom levels (day, week, month, year)
+- Multiple view modes (currently implementing day view, with week/month/year views planned)
+
+### Timeline System
+
+The timeline component is the core feature of this application, built with modular architecture for maintainability and flexibility.
+
+#### Core Concept
+- **Coordinate-Based System**: Instead of using start/end times, the timeline is built around a coordinate system
+- **Reference Point Zero**: All positions are calculated relative to position 0 (the reference point)
+- **Bidirectional Growth**: Timeline can infinitely extend in both directions from the reference point
+- **Simplified Logic**: Clean, mathematical approach to timeline navigation and marker placement
 
 #### Day View Implementation
 1. **Dynamic Timeline Width**
@@ -48,70 +58,21 @@ An interactive web application for creating and visualizing timelines with event
    - Clear hour markers (4AM, 5AM, etc.)
    - Smooth transitions and animations
 
-#### Week View Implementation
-1. **Day Markers**
-   - Convert numeric markers to day labels (e.g., "Friday, Jan 17")
-   - Keep same spacing system as day view
-   - Style weekends differently (italic, lighter color)
-   - Show Sunday dates as week boundaries
+### Post System
 
-2. **Hover Marker Adaptations**
-   - Show current day and time
-   - Position accurately between days
-   - Maintain smooth movement with timeline
-
-3. **Navigation**
-   - Scroll by days instead of hours
-   - Keep "Back to Present" functionality
-   - Center on current day as reference point (position 0)
-
-4. **Visual Information**
-   - "Week View" label in header
-   - Show current month and year for context
-   - Highlight current day
-   - Weekend vs weekday styling
-
-5. **Transition Handling**
-   - Smooth transitions between views
-   - Start at reference point 0 when switching views
-   - Maintain same marker spacing system
-
-#### Month View Implementation
-(Coming soon)
-
-#### Year View Implementation
-(Coming soon)
-
-### Social Features
-- Create posts
-- Comment on posts
-- Like posts and comments
-- View user profiles
-- Listen to profile music while browsing
-
-## Post and Event System
-
-The application features a dynamic relationship between posts and events:
+The application uses posts as the primary form of user content:
 
 ### Posts
 - Function as the primary form of user content
 - Include titles, descriptions, dates, and URL attachments
-- Associated with specific timelines using hashtags
-- Accumulate popularity through user interactions
-- Most popular posts within 24 hours automatically promote to events
+- Associated with specific timelines using hashtags (alphanumeric characters only)
+- Support user interactions (likes, comments)
 
 ### Events
 - Represent significant timeline moments
 - Share identical visual and data structure with posts
 - Appear on the interactive timeline display
-- Generated from highly-engaged posts
 - Maintain chronological organization
-
-### Promotion System
-- Automated promotion based on 24-hour engagement metrics
-- Popular posts automatically transition to timeline events
-- Preserves post content and formatting in event display
-- Creates a natural content curation system
 
 ## Timeline System
 
@@ -126,70 +87,130 @@ The latest iteration of our timeline system introduces a fundamental architectur
 - **Bidirectional Growth**: Timeline can infinitely extend in both directions from the reference point
 - **Simplified Logic**: Clean, mathematical approach to timeline navigation and marker placement
 
-#### New Features
-1. **Dynamic Time Display**
-   - Hour-based markers in day view
+#### View Modes
+
+##### Day View
+1. **Markers**
+   - Hour-based markers (4AM, 5AM, etc.)
    - Special styling for midnight markers (12 AM)
    - Day names displayed with midnight markers
-   - Exact current time display
 
-2. **Enhanced Visual Elements**
-   - Animated hover marker showing precise time
-   - Floating animations for better user experience
-   - Adaptive styling for dark/light modes
-   - Improved visibility of time markers
+2. **Hover Marker**
+   - Shows current time in AM/PM format
+   - Position updates every minute
+   - Moves between hours based on minutes (e.g., 12:30 = halfway between 12 and 1)
+   - Semi-transparent background for better visibility
 
-3. **Improved Navigation**
-   - Reference point aligned to nearest hour
-   - Smooth scrolling between time periods
-   - Clear visual hierarchy of time markers
-   - Consistent 100px spacing between markers
+##### Week View
+1. **Markers**
+   - Day-based markers showing weekday names
+   - Compact format for regular days (e.g., "Monday")
+   - Special format for Sundays showing date (e.g., "Jan 18")
 
-4. **Technical Improvements**
-   - Modular component architecture
-   - Pure coordinate-based calculations
-   - Efficient marker generation
-   - Responsive design adaptations
+2. **Hover Marker**
+   - Shows current day and date
+   - Position reflects time of day between days
+   - Example: At 12 noon, marker is halfway (0.5) between today and tomorrow
+   - Updates position based on current time
 
-#### Timeline Architecture
+#### Navigation System
+- Smooth left/right scrolling with elevated z-index buttons
+- Maintains hover marker position during scrolling
+- "Back to Present" button with fade transition
+- Preserves view mode in URL parameters
 
-##### Core Components
-1. **TimelineV3**
-   - Main container component
-   - Manages coordinate system
-   - Handles viewport calculations
-   - Coordinates child components
+#### Visual Elements
+- Animated hover marker with pulsing effect
+- Floating animations for better user experience
+- Adaptive styling for dark/light modes
+- Improved visibility of time markers
 
-2. **TimeMarkers**
-   - Renders markers based on coordinate position
-   - Translates coordinates to time display
-   - Manages marker styling
-   - Displays time labels
+3. **Hover Marker Features**
+   - Accurate positioning based on current time (hours:minutes)
+   - Moves smoothly with timeline scrolling
+   - Compact vertical indicator
+   - Updates position every minute
+   - Shows current time in AM/PM format
+   - Semi-transparent background for better visibility
 
-3. **HoverMarker**
-   - Shows exact current time
-   - Animated floating effect
-   - Interactive hover states
-   - Adaptive styling
+4. **Navigation System**
+   - Smooth left/right scrolling
+   - Maintains hover marker position during scrolling
+   - "Back to Present" button with fade transition
+   - Preserves view mode in URL parameters
 
-##### Design Principles
-- **Time-Centric**: All markers and positions based on actual time
-- **Responsive**: Adapts to viewport changes
-- **Interactive**: Smooth animations and hover effects
-- **Consistent**: Fixed spacing and visual rhythm
-- **Accessible**: Clear visual hierarchy and readable text
+4. **Visual Information**
+   - "Day View" label with current date
+   - Hashtag-based timeline identification
+   - Clear hour markers (4AM, 5AM, etc.)
+   - Smooth transitions and animations
 
-### Timeline Scales
-- **Day View** (Current Implementation)
-  - 24-hour markers on each side of current time
-  - 100px spacing between hour markers
-  - Centered on current time by default
-  - Smooth scrolling with marker generation as needed
+### Post System
 
-- **Planned Views**
-  - Week: 7-day markers with daily increments
-  - Month: 30-day markers with daily increments
-  - Year: 12-month markers with monthly increments
+The application uses posts as the primary form of user content:
+
+### Posts
+- Function as the primary form of user content
+- Include titles, descriptions, dates, and URL attachments
+- Associated with specific timelines using hashtags (alphanumeric characters only)
+- Support user interactions (likes, comments)
+
+### Events
+- Represent significant timeline moments
+- Share identical visual and data structure with posts
+- Appear on the interactive timeline display
+- Maintain chronological organization
+
+## Timeline System
+
+The timeline component is the core feature of this application, built with modular architecture for maintainability and flexibility.
+
+### Timeline V3 (Beta)
+The latest iteration of our timeline system introduces a fundamental architectural improvement:
+
+#### Core Concept
+- **Coordinate-Based System**: Instead of using start/end times, the timeline is built around a coordinate system
+- **Reference Point Zero**: All positions are calculated relative to position 0 (the reference point)
+- **Bidirectional Growth**: Timeline can infinitely extend in both directions from the reference point
+- **Simplified Logic**: Clean, mathematical approach to timeline navigation and marker placement
+
+#### View Modes
+
+##### Day View
+1. **Markers**
+   - Hour-based markers (4AM, 5AM, etc.)
+   - Special styling for midnight markers (12 AM)
+   - Day names displayed with midnight markers
+
+2. **Hover Marker**
+   - Shows current time in AM/PM format
+   - Position updates every minute
+   - Moves between hours based on minutes (e.g., 12:30 = halfway between 12 and 1)
+   - Semi-transparent background for better visibility
+
+##### Week View
+1. **Markers**
+   - Day-based markers showing weekday names
+   - Compact format for regular days (e.g., "Monday")
+   - Special format for Sundays showing date (e.g., "Jan 18")
+
+2. **Hover Marker**
+   - Shows current day and date
+   - Position reflects time of day between days
+   - Example: At 12 noon, marker is halfway (0.5) between today and tomorrow
+   - Updates position based on current time
+
+#### Navigation System
+- Smooth left/right scrolling with elevated z-index buttons
+- Maintains hover marker position during scrolling
+- "Back to Present" button with fade transition
+- Preserves view mode in URL parameters
+
+#### Visual Elements
+- Animated hover marker with pulsing effect
+- Floating animations for better user experience
+- Adaptive styling for dark/light modes
+- Improved visibility of time markers
 
 ### Event System
 Events are independent entities that overlay on the timeline:
@@ -298,11 +319,8 @@ The timeline implements smart navigation that adapts to user behavior:
    - System-generated timelines for hashtag aggregation
    - Visually identified by the # symbol prefix
    - Automatically collect and display relevant posts
-
-2. **User/Company Timelines (Planned)**
-   - Custom timelines with personalized tracking
-   - Distinct visual identifiers for different timeline types
-   - Flexible hashtag integration
+   - Hashtags limited to alphanumeric characters only
+   - Case-insensitive matching
 
 ### Core Features
 - **Smart Navigation**
@@ -741,12 +759,55 @@ Planned features:
 - Mobile responsiveness improvements
 - Additional timeline customization options
 
-## Current Authentication System
+## Timeline Implementation Comparison
 
-The authentication system is in its early phases:
-- Basic login functionality implemented
-- User registration available
-- Future improvements planned:
-  - Refined user permissions
-  - Enhanced profile system for social sharing
-  - Clear differentiation between anonymous and authenticated user capabilities
+#### Base Coordinate System
+| Feature | Implementation |
+|---------|---------------|
+| Reference Point | Position 0 as center point |
+| Marker Spacing | Fixed 100px between markers |
+| Marker Values | Integer coordinates (-3, -2, -1, 0, 1, 2, 3) |
+| Marker Display | Simple numeric display |
+| Navigation | Smooth scrolling relative to position 0 |
+| Viewport | Dynamic width based on screen size |
+| Marker Generation | Generated based on viewport width |
+| Position Calculation | Pure mathematical coordinates |
+| Event Placement | Events positioned by converting timestamp to coordinate |
+| Current Position | No specific time representation |
+
+#### Day Filter Overlay
+| Feature | Implementation |
+|---------|---------------|
+| Reference Point | Current time as position 0 |
+| Marker Spacing | Inherited 100px from base system |
+| Marker Values | Hours (12AM, 1AM, 2AM, etc.) |
+| Marker Display | Time format with AM/PM |
+| Navigation | Same smooth scrolling with time context |
+| Viewport | Same dynamic width adaptation |
+| Marker Generation | Same generation logic with time conversion |
+| Position Calculation | Timestamp to hour coordinate conversion |
+| Event Placement | Events positioned by hour of day |
+| Current Position | Hover marker showing exact current time |
+
+#### Key Transformations (Base → Day)
+1. **Visual Representation**
+   - Base: Pure numbers (-3 to +3)
+   - Day: Time format (12AM to 11PM)
+
+2. **Reference Point**
+   - Base: Abstract position 0
+   - Day: Current time at position 0
+
+3. **Context Addition**
+   - Base: No temporal context
+   - Day: Current time, AM/PM, hour markers
+
+4. **Special Elements**
+   - Base: Basic markers only
+   - Day: Hover marker, current time indicator
+
+5. **Data Mapping**
+   - Base: Direct coordinate mapping
+   - Day: Time-to-coordinate conversion
+
+This comparison shows how the day filter preserves the core coordinate system while adding temporal context through visual and functional transformations. Future view implementations (week, month, year) should follow a similar pattern of maintaining the base system while adding appropriate context and visual representations.
