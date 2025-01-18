@@ -18,9 +18,20 @@ const HoverMarker = ({
     return `${displayHours}:${minutes.toString().padStart(2, '0')} ${ampm}`;
   };
 
+  const getCurrentDay = () => {
+    const now = new Date();
+    const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+    const month = now.toLocaleString('default', { month: 'short' });
+    const date = now.getDate();
+    return `${days[now.getDay()]}, ${month} ${date}`;
+  };
+
   const getLabel = () => {
     if (viewMode === 'day') {
       return getCurrentTime();
+    }
+    if (viewMode === 'week') {
+      return getCurrentDay();
     }
     return 'You are Here';
   };
@@ -36,7 +47,7 @@ const HoverMarker = ({
         flexDirection: 'column',
         alignItems: 'center',
         transition: 'all 0.1s ease-out',
-        zIndex: 1,
+        zIndex: 0, // Lower z-index so it stays behind buttons
         pointerEvents: 'none'
       }}
     >

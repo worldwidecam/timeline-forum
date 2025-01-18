@@ -16,22 +16,6 @@ function TimelineV3() {
     return new Date();
   };
 
-  const getExactTimePosition = () => {
-    const now = getCurrentDateTime();
-    const currentHour = now.getHours();
-    const currentMinute = now.getMinutes();
-    
-    // Find the reference hour (position 0)
-    const referenceHour = currentHour;
-    
-    // Calculate position relative to current hour
-    // This will be between 0 and 1, where:
-    // 0 = exactly at current hour
-    // 0.5 = 30 minutes past current hour
-    // 1 = next hour
-    return currentMinute / 60;
-  };
-
   const getInitialMarkers = () => {
     const markerSpacing = 100; // pixels between each marker
     const screenWidth = window.innerWidth;
@@ -44,6 +28,29 @@ function TimelineV3() {
       { length: totalMarkers }, 
       (_, i) => i - sideCount
     );
+  };
+
+  const getDayProgress = () => {
+    const now = getCurrentDateTime();
+    const minutes = now.getHours() * 60 + now.getMinutes();
+    return minutes / (24 * 60); // Returns a value between 0 and 1
+  };
+
+  const getExactTimePosition = () => {
+    const now = getCurrentDateTime();
+    const currentHour = now.getHours();
+    const currentMinute = now.getMinutes();
+    
+    if (viewMode === 'week') {
+      return getDayProgress();
+    }
+    
+    // Calculate position relative to current hour
+    // This will be between 0 and 1, where:
+    // 0 = exactly at current hour
+    // 0.5 = 30 minutes past current hour
+    // 1 = next hour
+    return currentMinute / 60;
   };
 
   const getFormattedDate = () => {
@@ -69,6 +76,18 @@ function TimelineV3() {
         </>
       );
     }
+    if (viewMode === 'week') {
+      return (
+        <>
+          <Typography variant="subtitle1" color="text.secondary" component="span" sx={{ mr: 1 }}>
+            Week View
+          </Typography>
+          <Typography variant="subtitle1" color="text.secondary" component="span">
+            {getFormattedDate()}
+          </Typography>
+        </>
+      );
+    }
     return (
       <>
         <Typography variant="subtitle1" color="text.secondary" component="span" sx={{ mr: 1 }}>
@@ -84,12 +103,40 @@ function TimelineV3() {
   // Core state
   const [timelineOffset, setTimelineOffset] = useState(0);
   const [markers, setMarkers] = useState(getInitialMarkers());
-  const [hoverPosition, setHoverPosition] = useState(getExactTimePosition());
   const [viewMode, setViewMode] = useState(() => {
     // Get view mode from URL or default to 'day'
     const params = new URLSearchParams(window.location.search);
     return params.get('view') || 'day';
   });
+  const [hoverPosition, setHoverPosition] = useState(getExactTimePosition());
+
+  // Update hover position when view mode changes
+  useEffect(() => {
+    setHoverPosition(getExactTimePosition());
+  }, [viewMode]);
+
+  // Update hover position every minute
+  useEffect(() => {
+    if (viewMode === 'day') {
+      const interval = setInterval(() => {
+        setHoverPosition(getExactTimePosition());
+      }, 60000); // Update every minute
+      return () => clearInterval(interval);
+    }
+  }, [viewMode]);
+
+  // Update markers on window resize
+  useEffect(() => {
+    const handleResize = () => {
+      // Only update if we're centered (timelineOffset === 0)
+      if (timelineOffset === 0) {
+        setMarkers(getInitialMarkers());
+      }
+    };
+
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, [timelineOffset]);
 
   // Navigation functions
   const handleLeft = () => {
@@ -136,29 +183,6 @@ function TimelineV3() {
       }
     }
   };
-
-  // Update hover position every minute
-  useEffect(() => {
-    if (viewMode === 'day') {
-      const interval = setInterval(() => {
-        setHoverPosition(getExactTimePosition());
-      }, 60000); // Update every minute
-      return () => clearInterval(interval);
-    }
-  }, [viewMode]);
-
-  // Update markers on window resize
-  useEffect(() => {
-    const handleResize = () => {
-      // Only update if we're centered (timelineOffset === 0)
-      if (timelineOffset === 0) {
-        setMarkers(getInitialMarkers());
-      }
-    };
-
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
-  }, [timelineOffset]);
 
   return (
     <Box sx={{ 
@@ -209,8 +233,9 @@ function TimelineV3() {
               Day
             </Button>
             <Button
-              variant="outlined"
+              variant={viewMode === 'week' ? "contained" : "outlined"}
               size="small"
+              onClick={() => setViewMode(viewMode === 'week' ? 'position' : 'week')}
             >
               Week
             </Button>
@@ -273,6 +298,7 @@ function TimelineV3() {
               transform: 'translateY(-50%)',
               minWidth: 100,
               bgcolor: 'background.paper',
+              zIndex: 2, // Higher z-index to stay above hover marker
               '&:hover': {
                 bgcolor: 'background.paper',
               }
@@ -289,6 +315,7 @@ function TimelineV3() {
               transform: 'translateY(-50%)',
               minWidth: 100,
               bgcolor: 'background.paper',
+              zIndex: 2, // Higher z-index to stay above hover marker
               '&:hover': {
                 bgcolor: 'background.paper',
               }

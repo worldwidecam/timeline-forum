@@ -38,12 +38,30 @@ const TimeMarkers = ({
     return `${displayHour}${ampm}`;
   };
 
+  const formatDay = (dayOffset) => {
+    const currentDate = getCurrentDateTime();
+    const targetDate = new Date(currentDate);
+    targetDate.setDate(targetDate.getDate() + dayOffset);
+    
+    const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+    const month = targetDate.toLocaleString('default', { month: 'short' });
+    const date = targetDate.getDate();
+    
+    if (targetDate.getDay() === 0) {
+      return `${month} ${date}`; // More compact Sunday format
+    }
+    return days[targetDate.getDay()]; // Just day name for other days
+  };
+
   const getMarkerLabel = (value) => {
     if (viewMode === 'day') {
       const currentHour = getCurrentHour();
       // Handle negative numbers correctly with modulo
       const hourOffset = ((currentHour + value) % 24 + 24) % 24;
       return formatHour(hourOffset, value);
+    }
+    if (viewMode === 'week') {
+      return formatDay(value);
     }
     return value;
   };
@@ -53,6 +71,14 @@ const TimeMarkers = ({
     const currentHour = getCurrentHour();
     const hourOffset = ((currentHour + value) % 24 + 24) % 24;
     return hourOffset === 0;
+  };
+
+  const isSunday = (value) => {
+    if (viewMode !== 'week') return false;
+    const currentDate = getCurrentDateTime();
+    const targetDate = new Date(currentDate);
+    targetDate.setDate(targetDate.getDate() + value);
+    return targetDate.getDay() === 0;
   };
 
   return (
@@ -70,6 +96,8 @@ const TimeMarkers = ({
     }}>
       {markers.map((value) => {
         const midnight = is12AM(value);
+        const sunday = isSunday(value);
+        const isSpecialMarker = midnight || sunday;
         return (
           <Box
             key={value}
@@ -99,8 +127,8 @@ const TimeMarkers = ({
               sx={{
                 transition: 'all 0.2s ease-out',
                 transform: 'translateY(-50%)',
-                height: midnight ? '25px' : '15px',
-                width: midnight ? '3px' : '2px'
+                height: isSpecialMarker ? '25px' : '15px',
+                width: isSpecialMarker ? '3px' : '2px'
               }}
             />
             <Typography 
@@ -109,8 +137,24 @@ const TimeMarkers = ({
               sx={{ 
                 mt: 2,
                 color: value === 0 ? theme.palette.primary.main : theme.palette.text.secondary,
-                transition: 'all 0.2s ease-out',
-                ...(midnight && {
+                transition: 'all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1)', // Bouncy transition
+                transform: 'scale(1)',
+                opacity: 1,
+                '@keyframes bubbleIn': {
+                  '0%': {
+                    opacity: 0,
+                    transform: 'scale(0.8)'
+                  },
+                  '70%': {
+                    transform: 'scale(1.1)'
+                  },
+                  '100%': {
+                    opacity: 1,
+                    transform: 'scale(1)'
+                  }
+                },
+                animation: 'bubbleIn 0.3s cubic-bezier(0.34, 1.56, 0.64, 1)',
+                ...(isSpecialMarker && {
                   fontSize: '0.85rem',
                   fontWeight: 500,
                   padding: '2px 8px',
