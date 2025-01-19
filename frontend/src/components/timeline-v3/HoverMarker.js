@@ -26,12 +26,40 @@ const HoverMarker = ({
     return `${days[now.getDay()]}, ${month} ${date}`;
   };
 
+  const getCurrentDayShort = () => {
+    const now = new Date();
+    const days = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'];
+    const date = now.getDate();
+    return `${days[now.getDay()]} ${date}${getOrdinalSuffix(date)}`;
+  };
+
+  const getCurrentMonthYear = () => {
+    const now = new Date();
+    return now.toLocaleString('default', { month: 'long', year: 'numeric' });
+  };
+
+  const getOrdinalSuffix = (day) => {
+    if (day > 3 && day < 21) return 'th';
+    switch (day % 10) {
+      case 1: return 'st';
+      case 2: return 'nd';
+      case 3: return 'rd';
+      default: return 'th';
+    }
+  };
+
   const getLabel = () => {
     if (viewMode === 'day') {
       return getCurrentTime();
     }
     if (viewMode === 'week') {
       return getCurrentDay();
+    }
+    if (viewMode === 'month') {
+      return getCurrentDayShort();
+    }
+    if (viewMode === 'year') {
+      return getCurrentMonthYear();
     }
     return 'You are Here';
   };
