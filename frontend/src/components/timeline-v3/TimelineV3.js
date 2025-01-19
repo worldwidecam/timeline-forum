@@ -235,8 +235,28 @@ function TimelineV3() {
         <Stack direction="row" alignItems="center" spacing={2} mb={2}>
           <Box sx={{ flex: 1 }}>
             <Stack direction="row" alignItems="center" spacing={2}>
-              <Typography variant="h4" component="div" sx={{ color: theme.palette.primary.main }}>
-                # Timeline V3
+              <Typography variant="h4" component="div" sx={{ display: 'flex', alignItems: 'center' }}>
+                <span style={{ color: theme.palette.primary.main }}>#</span>
+                <span style={{ 
+                  backgroundColor: theme.palette.mode === 'dark' 
+                    ? 'rgba(0, 0, 0, 0.8)' 
+                    : theme.palette.primary.dark,
+                  color: '#fff9f0',
+                  textShadow: `
+                    -2px -2px 0 #000,  
+                     2px -2px 0 #000,
+                    -2px  2px 0 #000,
+                     2px  2px 0 #000
+                  `,
+                  marginLeft: '4px',
+                  fontWeight: 'bold',
+                  padding: '2px 12px',
+                  borderRadius: '6px',
+                  boxShadow: '0 2px 4px rgba(0,0,0,0.2)',
+                  lineHeight: '1.2'
+                }}>
+                  Timeline V3
+                </span>
               </Typography>
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                 {getViewDescription()}
