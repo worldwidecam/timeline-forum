@@ -36,6 +36,13 @@ function TimelineV3() {
     return minutes / (24 * 60); // Returns a value between 0 and 1
   };
 
+  const getMonthProgress = () => {
+    const now = getCurrentDateTime();
+    const currentDay = now.getDate();
+    const totalDays = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+    return (currentDay - 1) / totalDays; // Returns a value between 0 and 1
+  };
+
   const getExactTimePosition = () => {
     const now = getCurrentDateTime();
     const currentHour = now.getHours();
@@ -43,6 +50,10 @@ function TimelineV3() {
     
     if (viewMode === 'week') {
       return getDayProgress();
+    }
+
+    if (viewMode === 'month') {
+      return getMonthProgress();
     }
     
     // Calculate position relative to current hour
@@ -81,6 +92,30 @@ function TimelineV3() {
         <>
           <Typography variant="subtitle1" color="text.secondary" component="span" sx={{ mr: 1 }}>
             Week View
+          </Typography>
+          <Typography variant="subtitle1" color="text.secondary" component="span">
+            {getFormattedDate()}
+          </Typography>
+        </>
+      );
+    }
+    if (viewMode === 'month') {
+      return (
+        <>
+          <Typography variant="subtitle1" color="text.secondary" component="span" sx={{ mr: 1 }}>
+            Month View
+          </Typography>
+          <Typography variant="subtitle1" color="text.secondary" component="span">
+            {getFormattedDate()}
+          </Typography>
+        </>
+      );
+    }
+    if (viewMode === 'year') {
+      return (
+        <>
+          <Typography variant="subtitle1" color="text.secondary" component="span" sx={{ mr: 1 }}>
+            Year View
           </Typography>
           <Typography variant="subtitle1" color="text.secondary" component="span">
             {getFormattedDate()}
@@ -200,8 +235,28 @@ function TimelineV3() {
         <Stack direction="row" alignItems="center" spacing={2} mb={2}>
           <Box sx={{ flex: 1 }}>
             <Stack direction="row" alignItems="center" spacing={2}>
-              <Typography variant="h4" component="div" sx={{ color: theme.palette.primary.main }}>
-                # Timeline V3
+              <Typography variant="h4" component="div" sx={{ display: 'flex', alignItems: 'center' }}>
+                <span style={{ color: theme.palette.primary.main }}>#</span>
+                <span style={{ 
+                  backgroundColor: theme.palette.mode === 'dark' 
+                    ? 'rgba(0, 0, 0, 0.8)' 
+                    : theme.palette.primary.dark,
+                  color: '#fff9f0',
+                  textShadow: `
+                    -2px -2px 0 #000,  
+                     2px -2px 0 #000,
+                    -2px  2px 0 #000,
+                     2px  2px 0 #000
+                  `,
+                  marginLeft: '4px',
+                  fontWeight: 'bold',
+                  padding: '2px 12px',
+                  borderRadius: '6px',
+                  boxShadow: '0 2px 4px rgba(0,0,0,0.2)',
+                  lineHeight: '1.2'
+                }}>
+                  Timeline V3
+                </span>
               </Typography>
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                 {getViewDescription()}
@@ -240,14 +295,16 @@ function TimelineV3() {
               Week
             </Button>
             <Button
-              variant="outlined"
+              variant={viewMode === 'month' ? "contained" : "outlined"}
               size="small"
+              onClick={() => setViewMode(viewMode === 'month' ? 'position' : 'month')}
             >
               Month
             </Button>
             <Button
-              variant="outlined"
+              variant={viewMode === 'year' ? "contained" : "outlined"}
               size="small"
+              onClick={() => setViewMode(viewMode === 'year' ? 'position' : 'year')}
             >
               Year
             </Button>

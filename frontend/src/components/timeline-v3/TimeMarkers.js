@@ -53,6 +53,28 @@ const TimeMarkers = ({
     return days[targetDate.getDay()]; // Just day name for other days
   };
 
+  const formatMonth = (monthOffset) => {
+    const currentDate = getCurrentDateTime();
+    const targetDate = new Date(currentDate);
+    targetDate.setMonth(targetDate.getMonth() + monthOffset);
+    
+    const monthName = targetDate.toLocaleString('default', { month: 'long' });
+    
+    // If it's January, show the year too
+    if (targetDate.getMonth() === 0) {
+      return `${monthName} ${targetDate.getFullYear()}`;
+    }
+    
+    return monthName;
+  };
+
+  const formatYear = (yearOffset) => {
+    const currentDate = getCurrentDateTime();
+    const targetDate = new Date(currentDate);
+    targetDate.setFullYear(targetDate.getFullYear() + yearOffset);
+    return targetDate.getFullYear().toString();
+  };
+
   const getMarkerLabel = (value) => {
     if (viewMode === 'day') {
       const currentHour = getCurrentHour();
@@ -62,6 +84,12 @@ const TimeMarkers = ({
     }
     if (viewMode === 'week') {
       return formatDay(value);
+    }
+    if (viewMode === 'month') {
+      return formatMonth(value);
+    }
+    if (viewMode === 'year') {
+      return formatYear(value);
     }
     return value;
   };
@@ -81,6 +109,14 @@ const TimeMarkers = ({
     return targetDate.getDay() === 0;
   };
 
+  const isJanuary = (value) => {
+    if (viewMode !== 'month') return false;
+    const currentDate = getCurrentDateTime();
+    const targetDate = new Date(currentDate);
+    targetDate.setMonth(targetDate.getMonth() + value);
+    return targetDate.getMonth() === 0;
+  };
+
   return (
     <Box sx={{
       position: 'absolute',
@@ -97,7 +133,8 @@ const TimeMarkers = ({
       {markers.map((value) => {
         const midnight = is12AM(value);
         const sunday = isSunday(value);
-        const isSpecialMarker = midnight || sunday;
+        const january = isJanuary(value);
+        const isSpecialMarker = midnight || sunday || january;
         return (
           <Box
             key={value}
