@@ -3,10 +3,8 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 import CssBaseline from '@mui/material/CssBaseline';
 import Navbar from './components/Navbar';
 import TimelineList from './components/TimelineList';
-import TimelineView from './components/TimelineView';
 import TimelineV3 from './components/timeline-v3/TimelineV3';
 import CreateTimeline from './components/CreateTimeline';
-import CreateEvent from './components/CreateEvent';
 import CreatePost from './components/CreatePost';
 import PostsFeed from './components/PostsFeed';
 import Login from './components/Login';
@@ -50,56 +48,69 @@ function App() {
                 <Routes>
                   <Route path="/login" element={<Login />} />
                   <Route path="/register" element={<Register />} />
-                  <Route path="/" element={
-                    <Box sx={{ display: 'flex' }}>
-                      <Box sx={{ flex: 1 }}>
+                  <Route 
+                    path="/" 
+                    element={
+                      <ProtectedRoute>
+                        <Box sx={{ display: 'flex' }}>
+                          <Box sx={{ flex: 1 }}>
+                            <PostsFeed />
+                          </Box>
+                          <Box sx={{ width: 300, p: 2 }}>
+                            <TimelineList />
+                          </Box>
+                        </Box>
+                      </ProtectedRoute>
+                    } 
+                  />
+                  <Route 
+                    path="/timeline/:id" 
+                    element={
+                      <ProtectedRoute>
+                        <TimelineV3 />
+                      </ProtectedRoute>
+                    } 
+                  />
+                  <Route 
+                    path="/create-timeline" 
+                    element={
+                      <ProtectedRoute>
+                        <CreateTimeline />
+                      </ProtectedRoute>
+                    } 
+                  />
+                  <Route 
+                    path="/create-post" 
+                    element={
+                      <ProtectedRoute>
+                        <CreatePost />
+                      </ProtectedRoute>
+                    } 
+                  />
+                  <Route 
+                    path="/posts" 
+                    element={
+                      <ProtectedRoute>
                         <PostsFeed />
-                      </Box>
-                      <Box sx={{ width: 300, p: 2 }}>
-                        <TimelineList />
-                      </Box>
-                    </Box>
-                  } />
-                  <Route path="/timelines" element={
-                    <ProtectedRoute>
-                      <TimelineList />
-                    </ProtectedRoute>
-                  } />
-                  <Route path="/timeline/:id" element={
-                    <ProtectedRoute>
-                      <TimelineView />
-                    </ProtectedRoute>
-                  } />
-                  <Route path="/timeline-v3/:id" element={
-                    <ProtectedRoute>
-                      <TimelineV3 />
-                    </ProtectedRoute>
-                  } />
-                  <Route path="/timeline/create" element={
-                    <ProtectedRoute>
-                      <CreateTimeline />
-                    </ProtectedRoute>
-                  } />
-                  <Route path="/timeline/:id/event/create" element={
-                    <ProtectedRoute>
-                      <CreateEvent />
-                    </ProtectedRoute>
-                  } />
-                  <Route path="/create-post" element={
-                    <ProtectedRoute>
-                      <CreatePost />
-                    </ProtectedRoute>
-                  } />
-                  <Route path="/profile" element={
-                    <ProtectedRoute>
-                      <Profile />
-                    </ProtectedRoute>
-                  } />
-                  <Route path="/profile/settings" element={
-                    <ProtectedRoute>
-                      <ProfileSettings />
-                    </ProtectedRoute>
-                  } />
+                      </ProtectedRoute>
+                    } 
+                  />
+                  <Route 
+                    path="/profile" 
+                    element={
+                      <ProtectedRoute>
+                        <Profile />
+                      </ProtectedRoute>
+                    } 
+                  />
+                  <Route 
+                    path="/profile/settings" 
+                    element={
+                      <ProtectedRoute>
+                        <ProfileSettings />
+                      </ProtectedRoute>
+                    } 
+                  />
                 </Routes>
               </Box>
             </Box>

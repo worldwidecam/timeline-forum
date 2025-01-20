@@ -6,11 +6,30 @@ import TimelineBackground from './TimelineBackground';
 import TimelineBar from './TimelineBar';
 import TimeMarkers from './TimeMarkers';
 import HoverMarker from './HoverMarker';
+import TimelinePost from './TimelinePost';
+import TimelineIcon from '../TimelineIcon';
+import axios from 'axios';
 
 function TimelineV3() {
   const { id } = useParams();
   const { user } = useAuth();
   const theme = useTheme();
+  const [timelineTitle, setTimelineTitle] = useState('Timeline V3');
+
+  useEffect(() => {
+    const fetchTimelineTitle = async () => {
+      try {
+        const response = await axios.get(`http://localhost:5000/api/timeline/${id}`);
+        setTimelineTitle(response.data.name);
+      } catch (error) {
+        console.error('Error fetching timeline:', error);
+      }
+    };
+
+    if (id) {
+      fetchTimelineTitle();
+    }
+  }, [id]);
 
   const getCurrentDateTime = () => {
     return new Date();
@@ -144,6 +163,8 @@ function TimelineV3() {
     return params.get('view') || 'day';
   });
   const [hoverPosition, setHoverPosition] = useState(getExactTimePosition());
+  const [posts, setPosts] = useState([]);
+  const [loading, setLoading] = useState(true);
 
   // Update hover position when view mode changes
   useEffect(() => {
@@ -172,6 +193,25 @@ function TimelineV3() {
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
   }, [timelineOffset]);
+
+  useEffect(() => {
+    const fetchPosts = async () => {
+      try {
+        const response = await axios.get(`http://localhost:5000/api/timeline/${id}/posts`);
+        // Filter posts that should be displayed on timeline (display_type === 'timeline')
+        const timelinePosts = response.data.filter(post => post.display_type === 'timeline');
+        setPosts(timelinePosts);
+      } catch (error) {
+        console.error('Error fetching posts:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    if (id) {
+      fetchPosts();
+    }
+  }, [id]);
 
   // Navigation functions
   const handleLeft = () => {
@@ -235,8 +275,8 @@ function TimelineV3() {
         <Stack direction="row" alignItems="center" spacing={2} mb={2}>
           <Box sx={{ flex: 1 }}>
             <Stack direction="row" alignItems="center" spacing={2}>
-              <Typography variant="h4" component="div" sx={{ display: 'flex', alignItems: 'center' }}>
-                <span style={{ color: theme.palette.primary.main }}>#</span>
+              <Typography variant="h4" component="div" sx={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <TimelineIcon timelineName={timelineTitle} />
                 <span style={{ 
                   backgroundColor: theme.palette.mode === 'dark' 
                     ? 'rgba(0, 0, 0, 0.8)' 
@@ -248,14 +288,13 @@ function TimelineV3() {
                     -2px  2px 0 #000,
                      2px  2px 0 #000
                   `,
-                  marginLeft: '4px',
                   fontWeight: 'bold',
                   padding: '2px 12px',
                   borderRadius: '6px',
                   boxShadow: '0 2px 4px rgba(0,0,0,0.2)',
                   lineHeight: '1.2'
                 }}>
-                  Timeline V3
+                  {timelineTitle}
                 </span>
               </Typography>
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
@@ -338,8 +377,16 @@ function TimelineV3() {
             viewMode={viewMode}
             theme={theme}
           />
+          {posts.map(post => (
+            <TimelinePost
+              key={post.id}
+              post={post}
+              position={hoverPosition}
+              viewMode={viewMode}
+            />
+          ))}
           <HoverMarker 
-            position={hoverPosition}
+            position={hoverPosition} 
             timelineOffset={timelineOffset}
             markerSpacing={100}
             viewMode={viewMode}

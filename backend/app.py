@@ -157,37 +157,39 @@ class Post(db.Model):
     source_count = db.Column(db.Integer, default=0)
     promotion_votes = db.Column(db.Integer, default=0)
     last_score_update = db.Column(db.DateTime, default=datetime.now())
+    display_type = db.Column(db.String(20), nullable=False, default='feed')  # 'feed' or 'timeline'
 
     def update_promotion_score(self):
-        base_score = self.upvotes
-        comment_bonus = len(self.comments) * 0.5
-        source_bonus = self.source_count * 2
-        content_bonus = min(len(self.content) / 500, 2)
-        promotion_bonus = self.promotion_votes * 1.5
-
-        self.promotion_score = base_score + comment_bonus + source_bonus + content_bonus + promotion_bonus
+        """
+        Updates the promotion score of a post and determines if it should be promoted to timeline view.
+        
+        Note: This promotion system may be updated in the future to implement a new visual spacing
+        system where promoted events will take up visual space according to their correlated marker
+        spacing in the timeline. This will provide a more integrated and visually consistent
+        experience between posts and their timeline representations.
+        """
+        # Calculate time factor (newer posts get higher scores)
+        time_diff = datetime.now() - self.created_at
+        time_factor = 1 / (1 + time_diff.days)
+        
+        # Calculate vote factor
+        vote_factor = self.promotion_votes / 10 if self.promotion_votes > 0 else 0
+        
+        # Calculate source factor
+        source_factor = self.source_count / 5 if self.source_count > 0 else 0
+        
+        # Combine factors
+        self.promotion_score = (time_factor + vote_factor + source_factor) / 3
         self.last_score_update = datetime.now()
-        return self.promotion_score
-
-class Event(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    title = db.Column(db.String(200), nullable=False)
-    content = db.Column(db.Text)
-    event_date = db.Column(db.DateTime, nullable=False)
-    url = db.Column(db.String(500))
-    url_title = db.Column(db.String(500))
-    url_description = db.Column(db.Text)
-    url_image = db.Column(db.String(500))
-    timeline_id = db.Column(db.Integer, db.ForeignKey('timeline.id'))
-    created_by = db.Column(db.Integer, db.ForeignKey('user.id'))
-    created_at = db.Column(db.DateTime, default=datetime.now())
-    upvotes = db.Column(db.Integer, default=0)
-    comments = db.relationship('Comment', backref='event', lazy=True)
+        
+        # Check if post should be promoted
+        if self.promotion_score >= 0.7 and not self.promoted_to_event:
+            self.promoted_to_event = True
+            self.display_type = 'timeline'
 
 class Comment(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     content = db.Column(db.Text, nullable=False)
-    event_id = db.Column(db.Integer, db.ForeignKey('event.id'))
     post_id = db.Column(db.Integer, db.ForeignKey('post.id'))
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'))
     created_at = db.Column(db.DateTime, default=datetime.now())
@@ -217,169 +219,9 @@ def get_timeline(timeline_id):
         'created_at': timeline.created_at.isoformat()
     })
 
-@app.route('/api/timeline/<int:timeline_id>/event', methods=['POST'])
-@jwt_required()
-def create_event(timeline_id):
-    try:
-        current_user_id = get_jwt_identity()
-        data = request.get_json()
-        print(f"Received event data: {data}")  # Debug log
-        
-        if not all(key in data for key in ['title', 'content', 'event_date']):
-            return jsonify({'error': 'Missing required fields'}), 400
-            
-        new_event = Event(
-            title=data['title'],
-            content=data['content'],
-            event_date=datetime.fromisoformat(data['event_date']),
-            url=data.get('url', ''),
-            timeline_id=timeline_id,
-            created_by=current_user_id
-        )
-        
-        if new_event.url:
-            try:
-                link_preview = get_link_preview(new_event.url)
-                new_event.url_title = link_preview['url_title']
-                new_event.url_description = link_preview['url_description']
-                new_event.url_image = link_preview['url_image']
-            except Exception as preview_error:
-                print(f"Error fetching link preview: {str(preview_error)}")
-                # Continue without link preview if it fails
-                pass
-        
-        db.session.add(new_event)
-        db.session.commit()
-        
-        return jsonify({
-            'message': 'Event created successfully',
-            'event': {
-                'id': new_event.id,
-                'title': new_event.title,
-                'content': new_event.content,
-                'event_date': new_event.event_date.isoformat(),
-                'url': new_event.url,
-                'url_title': new_event.url_title,
-                'url_description': new_event.url_description,
-                'url_image': new_event.url_image,
-                'timeline_id': new_event.timeline_id
-            }
-        }), 201
-    except Exception as e:
-        print(f"Error creating event: {str(e)}")  # Debug log
-        db.session.rollback()
-        return jsonify({'error': str(e)}), 500
-
-@app.route('/api/timeline/<int:timeline_id>/events', methods=['GET'])
-def get_timeline_events(timeline_id):
-    events = Event.query.filter_by(timeline_id=timeline_id).order_by(Event.event_date).all()
-    return jsonify([{
-        'id': event.id,
-        'title': event.title,
-        'content': event.content,
-        'event_date': event.event_date.isoformat(),
-        'url': event.url,
-        'url_title': event.url_title,
-        'url_description': event.url_description,
-        'url_image': event.url_image,
-        'upvotes': event.upvotes
-    } for event in events])
-
-@app.route('/api/timelines', methods=['GET'])
-def get_timelines():
-    search = request.args.get('search', '').lower()
-    if search:
-        timelines = Timeline.query.filter(func.lower(Timeline.name).contains(search)).all()
-    else:
-        timelines = Timeline.query.all()
-    return jsonify([{
-        'id': t.id,
-        'name': t.name,
-        'description': t.description
-    } for t in timelines])
-
-@app.route('/api/event/<int:event_id>/comments', methods=['GET'])
-def get_event_comments(event_id):
-    comments = Comment.query.filter_by(event_id=event_id).order_by(Comment.created_at.desc()).all()
-    return jsonify([{
-        'id': comment.id,
-        'content': comment.content,
-        'user_id': comment.user_id,
-        'username': User.query.get(comment.user_id).username,
-        'created_at': comment.created_at.isoformat(),
-        'updated_at': comment.updated_at.isoformat()
-    } for comment in comments])
-
-@app.route('/api/event/<int:event_id>/comments', methods=['POST'])
-def create_comment(event_id):
-    data = request.get_json()
-    
-    if not data.get('content'):
-        return jsonify({'error': 'Comment content is required'}), 400
-        
-    new_comment = Comment(
-        content=data['content'],
-        event_id=event_id,
-        user_id=1  # Temporary default user ID
-    )
-    
-    db.session.add(new_comment)
-    db.session.commit()
-    
-    return jsonify({
-        'id': new_comment.id,
-        'content': new_comment.content,
-        'user_id': new_comment.user_id,
-        'created_at': new_comment.created_at.isoformat(),
-        'updated_at': new_comment.updated_at.isoformat()
-    }), 201
-
-@app.route('/api/comments/<int:comment_id>', methods=['PUT', 'DELETE'])
-def manage_comment(comment_id):
-    comment = Comment.query.get_or_404(comment_id)
-    
-    if request.method == 'DELETE':
-        db.session.delete(comment)
-        db.session.commit()
-        return '', 204
-    
-    data = request.get_json()
-    if not data.get('content'):
-        return jsonify({'error': 'Comment content is required'}), 400
-    
-    comment.content = data['content']
-    db.session.commit()
-    
-    return jsonify({
-        'id': comment.id,
-        'content': comment.content,
-        'user_id': comment.user_id,
-        'created_at': comment.created_at.isoformat(),
-        'updated_at': comment.updated_at.isoformat()
-    })
-
-@app.route('/api/user/current', methods=['GET'])
-@jwt_required()
-def get_current_user():
-    # Convert JWT identity to integer for database query
-    current_user_id = int(get_jwt_identity())
-    user = User.query.get(current_user_id)
-    
-    if not user:
-        return jsonify({'error': 'User not found'}), 404
-        
-    return jsonify({
-        'id': user.id,
-        'username': user.username,
-        'email': user.email,
-        'bio': user.bio,
-        'avatar_url': user.avatar_url,
-        'created_at': user.created_at.isoformat()
-    })
-
 @app.route('/api/timeline/<int:timeline_id>/posts', methods=['GET'])
 def get_timeline_posts(timeline_id):
-    posts = Post.query.filter_by(timeline_id=timeline_id).order_by(Post.created_at.desc()).all()
+    posts = Post.query.filter_by(timeline_id=timeline_id).order_by(Post.event_date.desc()).all()
     return jsonify([{
         'id': post.id,
         'title': post.title,
@@ -389,10 +231,12 @@ def get_timeline_posts(timeline_id):
         'url_title': post.url_title,
         'url_description': post.url_description,
         'url_image': post.url_image,
+        'image': post.image,
         'created_by': post.created_by,
         'created_at': post.created_at.isoformat(),
         'upvotes': post.upvotes,
-        'username': User.query.get(post.created_by).username
+        'username': User.query.get(post.created_by).username,
+        'display_type': post.display_type
     } for post in posts])
 
 @app.route('/api/timeline/<int:timeline_id>/posts', methods=['POST'])
@@ -593,7 +437,7 @@ def check_timeline_promotions(timeline_id):
             # Check if post meets promotion criteria
             if current_score >= 50:  # Base threshold
                 # Create a new event from the post
-                new_event = Event(
+                new_post = Post(
                     title=post.title,
                     content=post.content,
                     event_date=post.event_date,
@@ -611,7 +455,7 @@ def check_timeline_promotions(timeline_id):
                 post.promoted_to_event = True
                 promoted_posts.append(post.id)
                 
-                db.session.add(new_event)
+                db.session.add(new_post)
         
         db.session.commit()
         
@@ -954,5 +798,7 @@ def expired_token_callback(jwt_header, jwt_data):
 
 if __name__ == '__main__':
     with app.app_context():
+        db.create_all()  # Create new tables with updated schema
+    app.run(debug=True)
         db.create_all()  # Create new tables with updated schema
     app.run(debug=True)
