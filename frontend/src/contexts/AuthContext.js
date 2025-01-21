@@ -23,7 +23,12 @@ export const AuthProvider = ({ children }) => {
       });
       setUser(response.data);
     } catch (error) {
-      localStorage.removeItem('token');
+      // Only remove token if it's an authentication error
+      if (error.response && (error.response.status === 401 || error.response.status === 403)) {
+        localStorage.removeItem('token');
+        setUser(null);
+      }
+      console.error('Error fetching user:', error);
     } finally {
       setLoading(false);
     }

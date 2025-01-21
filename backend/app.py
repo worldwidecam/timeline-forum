@@ -20,7 +20,7 @@ app.config.update(
     SQLALCHEMY_DATABASE_URI=os.getenv('DATABASE_URL').replace('postgres://', 'postgresql://') if os.getenv('DATABASE_URL') else 'sqlite:///timeline_forum.db',
     SQLALCHEMY_TRACK_MODIFICATIONS=False,
     JWT_SECRET_KEY=os.getenv('JWT_SECRET_KEY', 'your-secret-key'),  # Change this in production
-    JWT_ACCESS_TOKEN_EXPIRES=False,
+    JWT_ACCESS_TOKEN_EXPIRES=24*60*60,  # Token expires in 24 hours
     MAX_CONTENT_LENGTH=16 * 1024 * 1024  # 16MB max file size
 )
 
@@ -798,7 +798,5 @@ def expired_token_callback(jwt_header, jwt_data):
 
 if __name__ == '__main__':
     with app.app_context():
-        db.create_all()  # Create new tables with updated schema
-    app.run(debug=True)
         db.create_all()  # Create new tables with updated schema
     app.run(debug=True)
