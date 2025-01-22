@@ -6,6 +6,10 @@ import TimelineBackground from './TimelineBackground';
 import TimelineBar from './TimelineBar';
 import TimeMarkers from './TimeMarkers';
 import HoverMarker from './HoverMarker';
+import EventForm from './events/EventForm';
+import TimelineEvent from './events/TimelineEvent';
+import EventMarker from './events/EventMarker';
+import AddIcon from '@mui/icons-material/Add';
 
 function TimelineV3() {
   const { id } = useParams();
@@ -145,6 +149,89 @@ function TimelineV3() {
   });
   const [hoverPosition, setHoverPosition] = useState(getExactTimePosition());
 
+  // Add new state for events and event form
+  const [events, setEvents] = useState([]);
+  const [isEventFormOpen, setIsEventFormOpen] = useState(false);
+  const [submitError, setSubmitError] = useState(null);
+
+  // Fetch events when timeline loads
+  useEffect(() => {
+    const fetchEvents = async () => {
+      try {
+        console.log('Fetching events for timeline:', id);
+        const response = await fetch(`/api/timeline/${id}/events`);
+        if (response.ok) {
+          const data = await response.json();
+          console.log('Fetched events:', data);
+          setEvents(data);
+        } else {
+          console.error('Failed to fetch events:', await response.text());
+        }
+      } catch (error) {
+        console.error('Error fetching events:', error);
+      }
+    };
+    if (id) {
+      fetchEvents();
+    }
+  }, [id]);
+
+  const handleEventSubmit = async (eventData) => {
+    if (!id) {
+      throw new Error('Timeline ID is required');
+    }
+
+    try {
+      // If there's a media file, upload it first
+      let mediaUrl = null;
+      if (eventData.media) {
+        const formData = new FormData();
+        formData.append('file', eventData.media);
+        
+        const uploadResponse = await fetch('/api/upload', {
+          method: 'POST',
+          body: formData,
+        });
+
+        if (!uploadResponse.ok) {
+          const error = await uploadResponse.json();
+          throw new Error(error.error || 'Failed to upload media');
+        }
+
+        const uploadResult = await uploadResponse.json();
+        mediaUrl = uploadResult.url;
+      }
+
+      // Create the event
+      const response = await fetch(`/api/timeline/${id}/events`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          title: eventData.title,
+          description: eventData.description,
+          event_date: eventData.event_date,
+          url: eventData.url || '',
+          media_url: mediaUrl || '',
+          media_type: eventData.media ? eventData.media.type.split('/')[0] : '',
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to create event');
+      }
+
+      const newEvent = await response.json();
+      setEvents(prev => [...prev, newEvent]);
+      setIsEventFormOpen(false);
+    } catch (error) {
+      console.error('Error creating event:', error);
+      throw error;
+    }
+  };
+
   // Update hover position when view mode changes
   useEffect(() => {
     setHoverPosition(getExactTimePosition());
@@ -259,6 +346,18 @@ function TimelineV3() {
               </Fade>
             </Stack>
           </Box>
+
+          {/* Add Event Button */}
+          <Button
+            variant="contained"
+            color="primary"
+            startIcon={<AddIcon />}
+            onClick={() => setIsEventFormOpen(true)}
+            sx={{ mr: 2 }}
+          >
+            Add Event
+          </Button>
+
           <Stack direction="row" spacing={1}>
             <Button
               variant={viewMode === 'day' ? "contained" : "outlined"}
@@ -310,6 +409,20 @@ function TimelineV3() {
             maxMarker={Math.max(...markers)}
             theme={theme}
           />
+          
+          {/* Event Markers */}
+          {events.map((event, index) => (
+            <EventMarker
+              key={event.id}
+              event={event}
+              position={index}
+              timelineOffset={timelineOffset}
+              markerSpacing={100}
+              viewMode={viewMode}
+              theme={theme}
+            />
+          ))}
+
           <TimeMarkers 
             timelineOffset={timelineOffset}
             markerSpacing={100}
@@ -362,6 +475,14 @@ function TimelineV3() {
           </Button>
         </Box>
       </Container>
+
+      {/* Event Creation Form */}
+      <EventForm
+        open={isEventFormOpen}
+        onClose={() => setIsEventFormOpen(false)}
+        onSubmit={handleEventSubmit}
+        error={submitError}
+      />
     </Box>
   );
 }

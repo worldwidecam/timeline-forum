@@ -172,17 +172,17 @@ class Post(db.Model):
 class Event(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     title = db.Column(db.String(200), nullable=False)
-    content = db.Column(db.Text)
+    description = db.Column(db.Text)
     event_date = db.Column(db.DateTime, nullable=False)
-    url = db.Column(db.String(500))
-    url_title = db.Column(db.String(500))
-    url_description = db.Column(db.Text)
-    url_image = db.Column(db.String(500))
+    media_url = db.Column(db.String(500))  # For images or audio files
+    media_type = db.Column(db.String(10))  # 'image' or 'audio'
+    url = db.Column(db.String(500))        # External URL
+    url_title = db.Column(db.String(500))  # Title from URL preview
+    url_description = db.Column(db.Text)    # Description from URL preview
+    url_image = db.Column(db.String(500))   # Image from URL preview
     timeline_id = db.Column(db.Integer, db.ForeignKey('timeline.id'))
     created_by = db.Column(db.Integer, db.ForeignKey('user.id'))
-    created_at = db.Column(db.DateTime, default=datetime.now())
-    upvotes = db.Column(db.Integer, default=0)
-    comments = db.relationship('Comment', backref='event', lazy=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
 class Comment(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -217,73 +217,80 @@ def get_timeline(timeline_id):
         'created_at': timeline.created_at.isoformat()
     })
 
-@app.route('/api/timeline/<int:timeline_id>/event', methods=['POST'])
+@app.route('/api/timeline/<timeline_id>/events', methods=['POST'])
 @jwt_required()
 def create_event(timeline_id):
     try:
         current_user_id = get_jwt_identity()
         data = request.get_json()
-        print(f"Received event data: {data}")  # Debug log
         
-        if not all(key in data for key in ['title', 'content', 'event_date']):
-            return jsonify({'error': 'Missing required fields'}), 400
-            
+        # Validate required fields
+        required_fields = ['title', 'description', 'event_date']
+        for field in required_fields:
+            if not data.get(field):
+                return jsonify({'error': f'Missing required field: {field}'}), 400
+
+        # Create new event
         new_event = Event(
             title=data['title'],
-            content=data['content'],
-            event_date=datetime.fromisoformat(data['event_date']),
+            description=data['description'],
+            event_date=datetime.fromisoformat(data['event_date'].replace('Z', '+00:00')),
             url=data.get('url', ''),
+            url_title=data.get('url_title', ''),
+            url_description=data.get('url_description', ''),
+            url_image=data.get('url_image', ''),
+            media_url=data.get('media_url', ''),
+            media_type=data.get('media_type', ''),
             timeline_id=timeline_id,
             created_by=current_user_id
         )
-        
-        if new_event.url:
-            try:
-                link_preview = get_link_preview(new_event.url)
-                new_event.url_title = link_preview['url_title']
-                new_event.url_description = link_preview['url_description']
-                new_event.url_image = link_preview['url_image']
-            except Exception as preview_error:
-                print(f"Error fetching link preview: {str(preview_error)}")
-                # Continue without link preview if it fails
-                pass
         
         db.session.add(new_event)
         db.session.commit()
         
         return jsonify({
-            'message': 'Event created successfully',
-            'event': {
-                'id': new_event.id,
-                'title': new_event.title,
-                'content': new_event.content,
-                'event_date': new_event.event_date.isoformat(),
-                'url': new_event.url,
-                'url_title': new_event.url_title,
-                'url_description': new_event.url_description,
-                'url_image': new_event.url_image,
-                'timeline_id': new_event.timeline_id
-            }
+            'id': new_event.id,
+            'title': new_event.title,
+            'description': new_event.description,
+            'event_date': new_event.event_date.isoformat(),
+            'url': new_event.url,
+            'url_title': new_event.url_title,
+            'url_description': new_event.url_description,
+            'url_image': new_event.url_image,
+            'media_url': new_event.media_url,
+            'media_type': new_event.media_type,
+            'created_by': new_event.created_by,
+            'created_at': new_event.created_at.isoformat()
         }), 201
+        
+    except ValueError as e:
+        return jsonify({'error': 'Invalid date format'}), 400
     except Exception as e:
-        print(f"Error creating event: {str(e)}")  # Debug log
         db.session.rollback()
-        return jsonify({'error': str(e)}), 500
+        app.logger.error(f'Error creating event: {str(e)}')
+        return jsonify({'error': 'Failed to create event'}), 500
 
 @app.route('/api/timeline/<int:timeline_id>/events', methods=['GET'])
 def get_timeline_events(timeline_id):
-    events = Event.query.filter_by(timeline_id=timeline_id).order_by(Event.event_date).all()
-    return jsonify([{
-        'id': event.id,
-        'title': event.title,
-        'content': event.content,
-        'event_date': event.event_date.isoformat(),
-        'url': event.url,
-        'url_title': event.url_title,
-        'url_description': event.url_description,
-        'url_image': event.url_image,
-        'upvotes': event.upvotes
-    } for event in events])
+    try:
+        events = Event.query.filter_by(timeline_id=timeline_id).order_by(Event.event_date).all()
+        return jsonify([{
+            'id': event.id,
+            'title': event.title,
+            'description': event.description,
+            'event_date': event.event_date.isoformat(),
+            'media_url': event.media_url,
+            'media_type': event.media_type,
+            'url': event.url,
+            'url_title': event.url_title,
+            'url_description': event.url_description,
+            'url_image': event.url_image,
+            'created_by': event.created_by,
+            'created_at': event.created_at.isoformat()
+        } for event in events])
+    except Exception as e:
+        app.logger.error(f"Error fetching events: {str(e)}")
+        return jsonify({'error': str(e)}), 500
 
 @app.route('/api/timelines', methods=['GET'])
 def get_timelines():
@@ -595,7 +602,7 @@ def check_timeline_promotions(timeline_id):
                 # Create a new event from the post
                 new_event = Event(
                     title=post.title,
-                    content=post.content,
+                    description=post.content,
                     event_date=post.event_date,
                     url=post.url,
                     url_title=post.url_title,
