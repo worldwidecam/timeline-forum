@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import { Box, Container, useTheme, Button, Fade, Stack, Typography } from '@mui/material';
 import { useAuth } from '../../contexts/AuthContext';
+import axios from 'axios';
 import TimelineBackground from './TimelineBackground';
 import TimelineBar from './TimelineBar';
 import TimeMarkers from './TimeMarkers';
@@ -9,12 +10,15 @@ import HoverMarker from './HoverMarker';
 import EventForm from './events/EventForm';
 import TimelineEvent from './events/TimelineEvent';
 import EventMarker from './events/EventMarker';
+import EventCounter from './events/EventCounter';
+import EventList from './events/EventList';
 import AddIcon from '@mui/icons-material/Add';
 
 function TimelineV3() {
   const { id } = useParams();
   const { user } = useAuth();
   const theme = useTheme();
+  const [timelineId, setTimelineId] = useState(id);
 
   const getCurrentDateTime = () => {
     return new Date();
@@ -153,81 +157,108 @@ function TimelineV3() {
   const [events, setEvents] = useState([]);
   const [isEventFormOpen, setIsEventFormOpen] = useState(false);
   const [submitError, setSubmitError] = useState(null);
+  const [timelineCreated, setTimelineCreated] = useState(false);
+
+  // Create timeline when component mounts
+  useEffect(() => {
+    const createTimeline = async () => {
+      try {
+        const response = await axios.post('/api/timeline-v3', {
+          name: 'Timeline V3',
+          description: 'A new timeline created with Timeline V3'
+        }, {
+          headers: {
+            'Authorization': `Bearer ${localStorage.getItem('token')}`
+          }
+        });
+        setTimelineId(response.data.id);
+        setTimelineCreated(true);
+        console.log('Timeline created:', response.data);
+      } catch (error) {
+        console.error('Error creating timeline:', error);
+      }
+    };
+    
+    if (!timelineId) {
+      createTimeline();
+    }
+  }, [timelineId]);
 
   // Fetch events when timeline loads
   useEffect(() => {
     const fetchEvents = async () => {
       try {
-        console.log('Fetching events for timeline:', id);
-        const response = await fetch(`/api/timeline/${id}/events`);
-        if (response.ok) {
-          const data = await response.json();
-          console.log('Fetched events:', data);
-          setEvents(data);
-        } else {
-          console.error('Failed to fetch events:', await response.text());
-        }
+        console.log('Fetching events for timeline:', timelineId);
+        const response = await axios.get(`/api/timeline-v3/${timelineId}/events`, {
+          headers: {
+            'Authorization': `Bearer ${localStorage.getItem('token')}`
+          }
+        });
+        console.log('Events response:', response.data);
+        setEvents(response.data);
       } catch (error) {
         console.error('Error fetching events:', error);
       }
     };
-    if (id) {
+    
+    if (timelineId && timelineCreated) {
       fetchEvents();
     }
-  }, [id]);
+  }, [timelineId, timelineCreated]);
 
   const handleEventSubmit = async (eventData) => {
-    if (!id) {
+    if (!timelineId) {
       throw new Error('Timeline ID is required');
     }
 
     try {
+      setSubmitError(null);
+      console.log('Creating event with data:', eventData);
+      console.log('Timeline ID:', timelineId);
+      console.log('Auth token:', localStorage.getItem('token'));
+      
       // If there's a media file, upload it first
       let mediaUrl = null;
       if (eventData.media) {
         const formData = new FormData();
         formData.append('file', eventData.media);
         
-        const uploadResponse = await fetch('/api/upload', {
-          method: 'POST',
-          body: formData,
+        console.log('Uploading media file:', eventData.media);
+        const uploadResponse = await axios.post('/api/upload', formData, {
+          headers: {
+            'Authorization': `Bearer ${localStorage.getItem('token')}`,
+            'Content-Type': 'multipart/form-data'
+          }
         });
-
-        if (!uploadResponse.ok) {
-          const error = await uploadResponse.json();
-          throw new Error(error.error || 'Failed to upload media');
-        }
-
-        const uploadResult = await uploadResponse.json();
-        mediaUrl = uploadResult.url;
+        console.log('Media upload response:', uploadResponse.data);
+        mediaUrl = uploadResponse.data.url;
       }
 
       // Create the event
-      const response = await fetch(`/api/timeline/${id}/events`, {
-        method: 'POST',
+      console.log('Sending event creation request to:', `/api/timeline-v3/${timelineId}/events`);
+      const response = await axios.post(`/api/timeline-v3/${timelineId}/events`, {
+        title: eventData.title,
+        description: eventData.description,
+        event_date: eventData.event_date,
+        url: eventData.url || '',
+        media_url: mediaUrl || '',
+        media_type: eventData.media ? eventData.media.type.split('/')[0] : '',
+      }, {
         headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          title: eventData.title,
-          description: eventData.description,
-          event_date: eventData.event_date,
-          url: eventData.url || '',
-          media_url: mediaUrl || '',
-          media_type: eventData.media ? eventData.media.type.split('/')[0] : '',
-        }),
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        }
       });
+      console.log('Event creation response:', response.data);
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to create event');
-      }
-
-      const newEvent = await response.json();
+      // Add the new event to state and close form
+      const newEvent = response.data;
       setEvents(prev => [...prev, newEvent]);
       setIsEventFormOpen(false);
     } catch (error) {
       console.error('Error creating event:', error);
+      console.error('Error response:', error.response);
+      console.error('Error request:', error.request);
+      setSubmitError(error.response?.data?.error || 'Failed to create event');
       throw error;
     }
   };
@@ -328,6 +359,21 @@ function TimelineV3() {
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                 {getViewDescription()}
               </Box>
+              <Button
+                onClick={() => setIsEventFormOpen(true)}
+                variant="contained"
+                startIcon={<AddIcon />}
+                sx={{
+                  bgcolor: theme.palette.success.main,
+                  color: 'white',
+                  '&:hover': {
+                    bgcolor: theme.palette.success.dark,
+                  },
+                  boxShadow: 2
+                }}
+              >
+                Add Event
+              </Button>
               <Fade in={timelineOffset !== 0}>
                 <Button
                   onClick={handleRecenter}
@@ -346,17 +392,6 @@ function TimelineV3() {
               </Fade>
             </Stack>
           </Box>
-
-          {/* Add Event Button */}
-          <Button
-            variant="contained"
-            color="primary"
-            startIcon={<AddIcon />}
-            onClick={() => setIsEventFormOpen(true)}
-            sx={{ mr: 2 }}
-          >
-            Add Event
-          </Button>
 
           <Stack direction="row" spacing={1}>
             <Button
@@ -410,6 +445,11 @@ function TimelineV3() {
             theme={theme}
           />
           
+          {/* Event Counter - only show in base coordinate view */}
+          {viewMode === 'position' && (
+            <EventCounter count={events.length} />
+          )}
+
           {/* Event Markers */}
           {events.map((event, index) => (
             <EventMarker
@@ -476,12 +516,20 @@ function TimelineV3() {
         </Box>
       </Container>
 
+      {/* Event List */}
+      <Container maxWidth={false}>
+        <EventList events={events} />
+      </Container>
+
       {/* Event Creation Form */}
       <EventForm
         open={isEventFormOpen}
         onClose={() => setIsEventFormOpen(false)}
-        onSubmit={handleEventSubmit}
-        error={submitError}
+        timelineId={timelineId}
+        onEventCreated={(newEvent) => {
+          setEvents(prev => [...prev, newEvent]);
+          setIsEventFormOpen(false);
+        }}
       />
     </Box>
   );

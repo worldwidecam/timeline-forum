@@ -10,33 +10,34 @@ import {
   IconButton,
   Typography,
   CircularProgress,
+  Alert,
+  Stack
 } from '@mui/material';
 import { Close as CloseIcon } from '@mui/icons-material';
-import FileUpload from '../shared/FileUpload';
+import { DateTimePicker } from '@mui/x-date-pickers/DateTimePicker';
+import axios from 'axios';
 
-const EventForm = ({ open, onClose, onSubmit }) => {
+const EventForm = ({ open, onClose, timelineId, onEventCreated }) => {
   const [formData, setFormData] = useState({
     title: '',
     description: '',
-    event_date: new Date().toISOString().slice(0, 16),
-    url: '',
-    media: null,
+    event_date: new Date().toISOString(),
+    url: ''
   });
 
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
   useEffect(() => {
     if (open) {
+      // Reset form when opened
       setFormData({
         title: '',
         description: '',
-        event_date: new Date().toISOString().slice(0, 16),
-        url: '',
-        media: null,
+        event_date: new Date().toISOString(),
+        url: ''
       });
       setError('');
-      setIsSubmitting(false);
     }
   }, [open]);
 
@@ -44,151 +45,173 @@ const EventForm = ({ open, onClose, onSubmit }) => {
     const { name, value } = e.target;
     setFormData(prev => ({
       ...prev,
-      [name]: value,
+      [name]: value
     }));
     setError('');
   };
 
-  const handleFileUpload = (file) => {
-    setFormData(prev => ({
-      ...prev,
-      media: file,
-    }));
-    setError('');
+  const handleDateChange = (newDate) => {
+    if (newDate && !isNaN(newDate)) {
+      setFormData(prev => ({
+        ...prev,
+        event_date: newDate.toISOString()
+      }));
+      setError('');
+    }
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setError('');
-    setIsSubmitting(true);
+    
+    // Validation
+    if (!formData.title.trim()) {
+      setError('Title is required');
+      return;
+    }
 
     try {
-      await onSubmit(formData);
+      setLoading(true);
+      setError('');
+
+      const response = await axios.post(
+        `/api/timeline-v3/${timelineId}/events`,
+        formData,
+        {
+          headers: {
+            'Authorization': `Bearer ${localStorage.getItem('token')}`
+          }
+        }
+      );
+
+      // Call the callback with the new event
+      if (onEventCreated) {
+        onEventCreated(response.data);
+      }
+
+      // Close the dialog
+      onClose();
     } catch (error) {
-      setError(error.message || 'Failed to create event');
+      console.error('Error creating event:', error);
+      setError(
+        error.response?.data?.error || 
+        'Failed to create event. Please try again.'
+      );
     } finally {
-      setIsSubmitting(false);
+      setLoading(false);
     }
   };
 
   return (
-    <Dialog
-      open={open}
-      onClose={onClose}
+    <Dialog 
+      open={open} 
+      onClose={loading ? undefined : onClose}
       maxWidth="sm"
       fullWidth
       PaperProps={{
-        component: 'form',
-        onSubmit: handleSubmit,
         sx: {
           borderRadius: 2,
-          bgcolor: 'background.paper',
-        },
+          overflow: 'hidden'
+        }
       }}
     >
-      <DialogTitle>
-        <Box display="flex" justifyContent="space-between" alignItems="center">
-          <Typography variant="h6">Add New Event</Typography>
+      <DialogTitle 
+        sx={{ 
+          m: 0, 
+          p: 2, 
+          display: 'flex', 
+          alignItems: 'center', 
+          justifyContent: 'space-between',
+          bgcolor: 'background.paper',
+          borderBottom: 1,
+          borderColor: 'divider'
+        }}
+      >
+        <Typography variant="h6">Add New Event</Typography>
+        {!loading && (
           <IconButton
+            aria-label="close"
             onClick={onClose}
-            size="small"
-            edge="end"
-            disabled={isSubmitting}
+            sx={{ color: 'text.secondary' }}
           >
             <CloseIcon />
           </IconButton>
-        </Box>
+        )}
       </DialogTitle>
 
-      <DialogContent sx={{ pt: 2 }}>
-        {error && (
-          <Box
-            sx={{
-              p: 2,
-              mb: 2,
-              borderRadius: 1,
-              bgcolor: 'error.light',
-              color: 'error.dark',
-            }}
+      <form onSubmit={handleSubmit}>
+        <DialogContent sx={{ pt: 2 }}>
+          <Stack spacing={3}>
+            {error && (
+              <Alert severity="error" sx={{ width: '100%' }}>
+                {error}
+              </Alert>
+            )}
+
+            <TextField
+              name="title"
+              label="Event Title"
+              fullWidth
+              value={formData.title}
+              onChange={handleChange}
+              required
+              disabled={loading}
+              autoFocus
+            />
+
+            <TextField
+              name="description"
+              label="Description"
+              fullWidth
+              multiline
+              rows={3}
+              value={formData.description}
+              onChange={handleChange}
+              disabled={loading}
+            />
+
+            <DateTimePicker
+              label="Event Date & Time"
+              value={new Date(formData.event_date)}
+              onChange={handleDateChange}
+              disabled={loading}
+              slotProps={{
+                textField: {
+                  fullWidth: true,
+                  required: true
+                }
+              }}
+            />
+
+            <TextField
+              name="url"
+              label="Reference URL (optional)"
+              fullWidth
+              value={formData.url}
+              onChange={handleChange}
+              disabled={loading}
+              type="url"
+              helperText="Add a link to an article or resource related to this event"
+            />
+          </Stack>
+        </DialogContent>
+
+        <DialogActions sx={{ p: 2, borderTop: 1, borderColor: 'divider' }}>
+          <Button 
+            onClick={onClose} 
+            disabled={loading}
           >
-            <Typography variant="body2">{error}</Typography>
-          </Box>
-        )}
-
-        <TextField
-          fullWidth
-          label="Title"
-          name="title"
-          value={formData.title}
-          onChange={handleChange}
-          required
-          error={!!error}
-          disabled={isSubmitting}
-          sx={{ mb: 2 }}
-        />
-
-        <TextField
-          fullWidth
-          label="Description"
-          name="description"
-          value={formData.description}
-          onChange={handleChange}
-          multiline
-          rows={4}
-          required
-          error={!!error}
-          disabled={isSubmitting}
-          sx={{ mb: 2 }}
-        />
-
-        <TextField
-          fullWidth
-          label="Date and Time"
-          name="event_date"
-          type="datetime-local"
-          value={formData.event_date}
-          onChange={handleChange}
-          required
-          error={!!error}
-          disabled={isSubmitting}
-          InputLabelProps={{ shrink: true }}
-          sx={{ mb: 2 }}
-        />
-
-        <TextField
-          fullWidth
-          label="URL (optional)"
-          name="url"
-          value={formData.url}
-          onChange={handleChange}
-          disabled={isSubmitting}
-          sx={{ mb: 2 }}
-        />
-
-        <Box sx={{ mt: 2 }}>
-          <FileUpload
-            onFileSelect={handleFileUpload}
-            disabled={isSubmitting}
-          />
-        </Box>
-      </DialogContent>
-
-      <DialogActions sx={{ p: 2, bgcolor: 'background.default' }}>
-        <Button
-          onClick={onClose}
-          disabled={isSubmitting}
-        >
-          Cancel
-        </Button>
-        <Button
-          type="submit"
-          variant="contained"
-          color="primary"
-          disabled={isSubmitting || !formData.title || !formData.description || !formData.event_date}
-        >
-          {isSubmitting ? <CircularProgress size={24} /> : 'Submit'}
-        </Button>
-      </DialogActions>
+            Cancel
+          </Button>
+          <Button 
+            type="submit"
+            variant="contained"
+            disabled={loading}
+            sx={{ minWidth: 100 }}
+          >
+            {loading ? <CircularProgress size={24} /> : 'Add Event'}
+          </Button>
+        </DialogActions>
+      </form>
     </Dialog>
   );
 };

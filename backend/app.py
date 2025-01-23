@@ -172,17 +172,29 @@ class Post(db.Model):
 class Event(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     title = db.Column(db.String(200), nullable=False)
-    description = db.Column(db.Text)
+    description = db.Column(db.Text, nullable=True, default='')
     event_date = db.Column(db.DateTime, nullable=False)
-    media_url = db.Column(db.String(500))  # For images or audio files
-    media_type = db.Column(db.String(10))  # 'image' or 'audio'
-    url = db.Column(db.String(500))        # External URL
-    url_title = db.Column(db.String(500))  # Title from URL preview
-    url_description = db.Column(db.Text)    # Description from URL preview
-    url_image = db.Column(db.String(500))   # Image from URL preview
-    timeline_id = db.Column(db.Integer, db.ForeignKey('timeline.id'))
-    created_by = db.Column(db.Integer, db.ForeignKey('user.id'))
+    
+    # URL-related fields
+    url = db.Column(db.String(500), nullable=True)
+    url_title = db.Column(db.String(500), nullable=True)
+    url_description = db.Column(db.Text, nullable=True)
+    url_image = db.Column(db.String(500), nullable=True)
+    
+    # Media-related fields
+    media_url = db.Column(db.String(500), nullable=True)
+    media_type = db.Column(db.String(50), nullable=True)
+    
+    # Reference fields
+    timeline_id = db.Column(db.Integer, db.ForeignKey('timeline.id'), nullable=False)
+    created_by = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    
+    # Metadata
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    def __repr__(self):
+        return f'<Event {self.title}>'
 
 class Comment(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -958,6 +970,169 @@ def expired_token_callback(jwt_header, jwt_data):
         'error': 'Token has expired',
         'message': 'Please log in again'
     }), 401
+
+# Timeline V3 Routes
+@app.route('/api/timeline-v3', methods=['GET'])
+def get_timelines_v3():
+    try:
+        timelines = Timeline.query.order_by(Timeline.created_at.desc()).all()
+        return jsonify([{
+            'id': timeline.id,
+            'name': timeline.name,
+            'description': timeline.description,
+            'created_at': timeline.created_at.isoformat()
+        } for timeline in timelines])
+        
+    except Exception as e:
+        app.logger.error(f'Error fetching timelines: {str(e)}')
+        return jsonify({'error': 'Failed to fetch timelines'}), 500
+
+@app.route('/api/timeline-v3', methods=['POST'])
+def create_timeline_v3():
+    try:
+        data = request.get_json()
+        
+        if not data or not data.get('name'):
+            return jsonify({'error': 'Name is required'}), 400
+            
+        new_timeline = Timeline(
+            name=data['name'],
+            description=data.get('description', ''),
+            created_by=1  # Temporary default user ID
+        )
+        
+        db.session.add(new_timeline)
+        db.session.commit()
+        
+        return jsonify({
+            'id': new_timeline.id,
+            'name': new_timeline.name,
+            'description': new_timeline.description,
+            'created_by': new_timeline.created_by,
+            'created_at': new_timeline.created_at.isoformat()
+        }), 201
+        
+    except Exception as e:
+        db.session.rollback()
+        app.logger.error(f'Error creating timeline: {str(e)}')
+        return jsonify({'error': 'Failed to create timeline'}), 500
+
+@app.route('/api/timeline-v3/<timeline_id>/events', methods=['GET'])
+def get_timeline_v3_events(timeline_id):
+    try:
+        app.logger.info(f'Getting events for timeline {timeline_id}')
+        events = Event.query.filter_by(timeline_id=timeline_id).order_by(Event.event_date.asc()).all()
+        app.logger.info(f'Found {len(events)} events')
+        return jsonify([{
+            'id': event.id,
+            'title': event.title,
+            'description': event.description,
+            'event_date': event.event_date.isoformat(),
+            'url': event.url,
+            'url_title': event.url_title,
+            'url_description': event.url_description,
+            'url_image': event.url_image,
+            'media_url': event.media_url,
+            'media_type': event.media_type,
+            'created_by': event.created_by,
+            'created_at': event.created_at.isoformat()
+        } for event in events])
+    except Exception as e:
+        app.logger.error(f'Error getting events: {str(e)}')
+        return jsonify({'error': 'Failed to get events'}), 500
+
+@app.route('/api/timeline-v3/<timeline_id>/events', methods=['POST'])
+def create_timeline_v3_event(timeline_id):
+    try:
+        app.logger.info(f'Creating event for timeline {timeline_id}')
+        # First, check if timeline exists
+        timeline = Timeline.query.get(timeline_id)
+        if not timeline:
+            app.logger.error(f'Timeline {timeline_id} not found')
+            return jsonify({'error': 'Timeline not found'}), 404
+            
+        # Get and validate the data
+        data = request.get_json()
+        if not data:
+            app.logger.error('No data provided in request')
+            return jsonify({'error': 'No data provided'}), 400
+            
+        app.logger.info(f'Received event data: {data}')
+        
+        # Required fields validation
+        required_fields = {
+            'title': str,
+            'event_date': str,
+        }
+        
+        for field, field_type in required_fields.items():
+            value = data.get(field)
+            if not value:
+                app.logger.error(f'Missing required field: {field}')
+                return jsonify({'error': f'Missing required field: {field}'}), 400
+            if not isinstance(value, field_type):
+                app.logger.error(f'Invalid type for field {field}')
+                return jsonify({'error': f'Invalid type for field {field}. Expected {field_type.__name__}'}), 400
+        
+        try:
+            # Parse the date, support both with and without timezone
+            date_str = data['event_date'].replace('Z', '+00:00')
+            event_date = datetime.fromisoformat(date_str)
+            app.logger.info(f'Parsed event date: {event_date}')
+        except ValueError as e:
+            app.logger.error(f'Date parsing error: {str(e)}')
+            return jsonify({'error': 'Invalid date format. Please use ISO format (YYYY-MM-DDTHH:MM:SS)'}), 400
+        
+        # Create the event with required fields
+        new_event = Event(
+            title=data['title'],
+            description=data.get('description', ''),
+            event_date=event_date,
+            timeline_id=timeline_id,
+            created_by=1  # Temporary default user ID
+        )
+        
+        # Handle optional URL data
+        if 'url' in data and data['url']:
+            new_event.url = data['url']
+            new_event.url_title = data.get('url_title', '')
+            new_event.url_description = data.get('url_description', '')
+            new_event.url_image = data.get('url_image', '')
+        
+        # Handle optional media data
+        if 'media_url' in data and data['media_url']:
+            new_event.media_url = data['media_url']
+            new_event.media_type = data.get('media_type', '')
+        
+        app.logger.info('Attempting to save event to database')
+        try:
+            db.session.add(new_event)
+            db.session.commit()
+            app.logger.info('Event saved successfully')
+            
+            return jsonify({
+                'id': new_event.id,
+                'title': new_event.title,
+                'description': new_event.description,
+                'event_date': new_event.event_date.isoformat(),
+                'url': new_event.url,
+                'url_title': new_event.url_title,
+                'url_description': new_event.url_description,
+                'url_image': new_event.url_image,
+                'media_url': new_event.media_url,
+                'media_type': new_event.media_type,
+                'created_by': new_event.created_by,
+                'created_at': new_event.created_at.isoformat()
+            }), 201
+            
+        except Exception as db_error:
+            db.session.rollback()
+            app.logger.error(f'Database error while saving event: {str(db_error)}')
+            return jsonify({'error': f'Database error: {str(db_error)}'}), 500
+            
+    except Exception as e:
+        app.logger.error(f'Error creating event: {str(e)}')
+        return jsonify({'error': f'Failed to save event: {str(e)}'}), 500
 
 if __name__ == '__main__':
     with app.app_context():
