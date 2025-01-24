@@ -19,6 +19,15 @@ function TimelineV3() {
   const { user } = useAuth();
   const theme = useTheme();
   const [timelineId, setTimelineId] = useState(id);
+  const [timelineName, setTimelineName] = useState('');
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const name = params.get('name');
+    if (name) {
+      setTimelineName(name);
+    }
+  }, []);
 
   const getCurrentDateTime = () => {
     return new Date();
@@ -51,25 +60,32 @@ function TimelineV3() {
     return (currentDay - 1) / totalDays; // Returns a value between 0 and 1
   };
 
+  const getYearProgress = () => {
+    const now = getCurrentDateTime();
+    const startOfYear = new Date(now.getFullYear(), 0, 1);
+    const diff = now - startOfYear;
+    const oneYear = 1000 * 60 * 60 * 24 * 365; // milliseconds in a year
+    return diff / oneYear; // Returns a value between 0 and 1
+  };
+
   const getExactTimePosition = () => {
     const now = getCurrentDateTime();
-    const currentHour = now.getHours();
-    const currentMinute = now.getMinutes();
     
-    if (viewMode === 'week') {
-      return getDayProgress();
+    if (viewMode === 'year') {
+      return getYearProgress();
     }
-
+    
     if (viewMode === 'month') {
       return getMonthProgress();
     }
     
-    // Calculate position relative to current hour
-    // This will be between 0 and 1, where:
-    // 0 = exactly at current hour
-    // 0.5 = 30 minutes past current hour
-    // 1 = next hour
-    return currentMinute / 60;
+    if (viewMode === 'week') {
+      return getDayProgress();
+    }
+    
+    // Day view - Calculate position relative to current hour
+    const currentMinute = now.getMinutes();
+    return currentMinute / 60; // Returns a value between 0 and 1
   };
 
   const getFormattedDate = () => {
@@ -163,9 +179,13 @@ function TimelineV3() {
   useEffect(() => {
     const createTimeline = async () => {
       try {
+        // Get timeline name from URL parameters
+        const params = new URLSearchParams(window.location.search);
+        const timelineName = params.get('name') || 'Timeline V3';
+        
         const response = await axios.post('/api/timeline-v3', {
-          name: 'Timeline V3',
-          description: 'A new timeline created with Timeline V3'
+          name: timelineName,
+          description: `A new timeline created: ${timelineName}`
         }, {
           headers: {
             'Authorization': `Bearer ${localStorage.getItem('token')}`
@@ -354,7 +374,7 @@ function TimelineV3() {
           <Box sx={{ flex: 1 }}>
             <Stack direction="row" alignItems="center" spacing={2}>
               <Typography variant="h4" component="div" sx={{ color: theme.palette.primary.main }}>
-                # Timeline V3
+                # {timelineName || 'Timeline V3'}
               </Typography>
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                 {getViewDescription()}

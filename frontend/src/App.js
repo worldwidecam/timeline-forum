@@ -131,7 +131,8 @@ const Homepage = () => {
       setTimelines(prev => [response.data, ...prev]);
       
       handleDialogClose();
-      navigate(`/timeline-v3/${response.data.id}`);
+      // Pass the timeline name as a URL parameter
+      navigate(`/timeline-v3/${response.data.id}?name=${encodeURIComponent(formData.name)}`);
     } catch (error) {
       console.error('Error creating timeline:', error);
       alert('Failed to create timeline. Please try again.');
