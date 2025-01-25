@@ -74,6 +74,44 @@ The application uses posts as the primary form of user content:
 - Appear on the interactive timeline display
 - Maintain chronological organization
 
+## System Architecture
+
+### Core Systems
+
+#### Timeline System
+The Timeline System serves as the foundational visualization framework:
+- Provides coordinate-based visualization (position 0 as reference)
+- Handles navigation and different view modes (day, week, month, year)
+- Manages timeline markers and visual elements
+- Offers a robust platform for displaying time-based information
+
+#### Event System
+The Event System is an independent module that can integrate with various visualization systems:
+- **Core Functionality**:
+  - Event management (creation, editing, deletion)
+  - Event metadata handling
+  - Search, sort, and filter capabilities
+  - Standalone event listing and counter
+  - Preview cards for event details
+
+- **Integration Capabilities**:
+  - Currently synchronizes with Timeline System for time-based visualization
+  - Can be repurposed for other visualization contexts (e.g., Headlines on homepage)
+  - Maintains separation of concerns for flexibility
+
+- **Components**:
+  - EventCounter: Displays event count and navigation
+  - EventList: Shows detailed event entries
+  - EventForm: Handles event creation/editing
+  - EventCarousel: Navigation interface for events
+  - EventMarker: Visual representation on timeline
+
+This modular architecture ensures that:
+1. Systems can evolve independently
+2. New features can be added without tight coupling
+3. Components can be reused in different contexts
+4. Maintenance and debugging are more straightforward
+
 ## Timeline System
 
 The timeline component is the core feature of this application, built with modular architecture for maintainability and flexibility.

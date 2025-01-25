@@ -1017,6 +1017,22 @@ def create_timeline_v3():
         app.logger.error(f'Error creating timeline: {str(e)}')
         return jsonify({'error': 'Failed to create timeline'}), 500
 
+@app.route('/api/timeline-v3/<int:timeline_id>', methods=['GET'])
+@jwt_required()
+def get_timeline_v3(timeline_id):
+    try:
+        timeline = Timeline.query.get_or_404(timeline_id)
+        return jsonify({
+            'id': timeline.id,
+            'name': timeline.name,
+            'description': timeline.description,
+            'created_by': timeline.created_by,
+            'created_at': timeline.created_at.isoformat()
+        })
+    except Exception as e:
+        app.logger.error(f'Error fetching timeline: {str(e)}')
+        return jsonify({'error': 'Failed to fetch timeline'}), 500
+
 @app.route('/api/timeline-v3/<timeline_id>/events', methods=['GET'])
 def get_timeline_v3_events(timeline_id):
     try:

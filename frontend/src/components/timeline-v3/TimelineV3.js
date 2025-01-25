@@ -20,14 +20,39 @@ function TimelineV3() {
   const theme = useTheme();
   const [timelineId, setTimelineId] = useState(id);
   const [timelineName, setTimelineName] = useState('');
+  const [isLoading, setIsLoading] = useState(true);
 
+  // Fetch timeline details when component mounts or timelineId changes
   useEffect(() => {
+    const fetchTimelineDetails = async () => {
+      if (!timelineId) return;
+      
+      try {
+        setIsLoading(true);
+        const response = await axios.get(`/api/timeline-v3/${timelineId}`, {
+          headers: {
+            'Authorization': `Bearer ${localStorage.getItem('token')}`
+          }
+        });
+        setTimelineName(response.data.name);
+      } catch (error) {
+        console.error('Error fetching timeline details:', error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    // First try to get name from URL params (for newly created timelines)
     const params = new URLSearchParams(window.location.search);
-    const name = params.get('name');
-    if (name) {
-      setTimelineName(name);
+    const nameFromUrl = params.get('name');
+    if (nameFromUrl) {
+      setTimelineName(nameFromUrl);
+      setIsLoading(false);
+    } else {
+      // If no name in URL, fetch from backend
+      fetchTimelineDetails();
     }
-  }, []);
+  }, [timelineId]);
 
   const getCurrentDateTime = () => {
     return new Date();
@@ -173,7 +198,32 @@ function TimelineV3() {
   const [events, setEvents] = useState([]);
   const [isEventFormOpen, setIsEventFormOpen] = useState(false);
   const [submitError, setSubmitError] = useState(null);
-  const [timelineCreated, setTimelineCreated] = useState(false);
+  const [isLoadingEvents, setIsLoadingEvents] = useState(false);
+
+  // Fetch events whenever timelineId changes
+  useEffect(() => {
+    const fetchEvents = async () => {
+      if (!timelineId) return;
+      
+      try {
+        setIsLoadingEvents(true);
+        console.log('Fetching events for timeline:', timelineId);
+        const response = await axios.get(`/api/timeline-v3/${timelineId}/events`, {
+          headers: {
+            'Authorization': `Bearer ${localStorage.getItem('token')}`
+          }
+        });
+        console.log('Events response:', response.data);
+        setEvents(response.data);
+      } catch (error) {
+        console.error('Error fetching events:', error);
+      } finally {
+        setIsLoadingEvents(false);
+      }
+    };
+    
+    fetchEvents();
+  }, [timelineId]);
 
   // Create timeline when component mounts
   useEffect(() => {
@@ -192,7 +242,6 @@ function TimelineV3() {
           }
         });
         setTimelineId(response.data.id);
-        setTimelineCreated(true);
         console.log('Timeline created:', response.data);
       } catch (error) {
         console.error('Error creating timeline:', error);
@@ -203,28 +252,6 @@ function TimelineV3() {
       createTimeline();
     }
   }, [timelineId]);
-
-  // Fetch events when timeline loads
-  useEffect(() => {
-    const fetchEvents = async () => {
-      try {
-        console.log('Fetching events for timeline:', timelineId);
-        const response = await axios.get(`/api/timeline-v3/${timelineId}/events`, {
-          headers: {
-            'Authorization': `Bearer ${localStorage.getItem('token')}`
-          }
-        });
-        console.log('Events response:', response.data);
-        setEvents(response.data);
-      } catch (error) {
-        console.error('Error fetching events:', error);
-      }
-    };
-    
-    if (timelineId && timelineCreated) {
-      fetchEvents();
-    }
-  }, [timelineId, timelineCreated]);
 
   const handleEventSubmit = async (eventData) => {
     if (!timelineId) {
@@ -357,6 +384,46 @@ function TimelineV3() {
     }
   };
 
+  const [currentEventIndex, setCurrentEventIndex] = useState(0);
+  const [selectedEventId, setSelectedEventId] = useState(null);
+
+  // Reset current event index when switching views
+  useEffect(() => {
+    if (viewMode !== 'position') {
+      setCurrentEventIndex(0);
+      setSelectedEventId(null);
+    }
+  }, [viewMode]);
+
+  // Reset current event index if it's out of bounds after events change
+  useEffect(() => {
+    if (currentEventIndex >= events.length) {
+      setCurrentEventIndex(Math.max(0, events.length - 1));
+    }
+  }, [events.length, currentEventIndex]);
+
+  const handleDotClick = (event) => {
+    setSelectedEventId(event.id);
+  };
+
+  const handleEventSelect = (eventId) => {
+    setSelectedEventId(eventId);
+  };
+
+  const handleEventDelete = (eventId) => {
+    setEvents(events.filter(event => event.id !== eventId));
+  };
+
+  const handleEventEdit = (eventId, newEventData) => {
+    const updatedEvents = events.map(event => {
+      if (event.id === eventId) {
+        return { ...event, ...newEventData };
+      }
+      return event;
+    });
+    setEvents(updatedEvents);
+  };
+
   return (
     <Box sx={{ 
       display: 'flex',
@@ -373,8 +440,8 @@ function TimelineV3() {
         <Stack direction="row" alignItems="center" spacing={2} mb={2}>
           <Box sx={{ flex: 1 }}>
             <Stack direction="row" alignItems="center" spacing={2}>
-              <Typography variant="h4" component="div" sx={{ color: theme.palette.primary.main }}>
-                # {timelineName || 'Timeline V3'}
+              <Typography variant="h4" component="div" sx={{ color: theme.palette.primary.main, minWidth: '200px' }}>
+                {!isLoading && `# ${timelineName}`}
               </Typography>
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                 {getViewDescription()}
@@ -457,6 +524,17 @@ function TimelineV3() {
           }}
         >
           <TimelineBackground />
+          
+          {/* Event Counter with Carousel */}
+          <EventCounter 
+            count={events.length} 
+            events={events}
+            currentIndex={currentEventIndex}
+            onChangeIndex={setCurrentEventIndex}
+            onDotClick={handleDotClick}
+            viewMode={viewMode}
+          />
+
           <TimelineBar
             timelineOffset={timelineOffset}
             markerSpacing={100}
@@ -464,25 +542,19 @@ function TimelineV3() {
             maxMarker={Math.max(...markers)}
             theme={theme}
           />
-          
-          {/* Event Counter - only show in base coordinate view */}
-          {viewMode === 'position' && (
-            <EventCounter count={events.length} />
-          )}
 
-          {/* Event Markers */}
-          {events.map((event, index) => (
+          {/* Event Markers - only show in time-based views */}
+          {viewMode !== 'position' && events.map((event, index) => (
             <EventMarker
               key={event.id}
               event={event}
-              position={index}
               timelineOffset={timelineOffset}
               markerSpacing={100}
               viewMode={viewMode}
-              theme={theme}
+              index={index}
+              totalEvents={events.length}
             />
           ))}
-
           <TimeMarkers 
             timelineOffset={timelineOffset}
             markerSpacing={100}
@@ -538,7 +610,13 @@ function TimelineV3() {
 
       {/* Event List */}
       <Container maxWidth={false}>
-        <EventList events={events} />
+        <EventList 
+          events={events}
+          selectedEventId={selectedEventId}
+          onEventSelect={handleEventSelect}
+          onEventDelete={handleEventDelete}
+          onEventEdit={handleEventEdit}
+        />
       </Container>
 
       {/* Event Creation Form */}

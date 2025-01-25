@@ -11,22 +11,38 @@ import {
   Typography,
   CircularProgress,
   Alert,
-  Stack
+  Stack,
+  Tabs,
+  Tab,
+  FormControl,
+  InputLabel,
+  Select,
+  MenuItem,
+  Chip
 } from '@mui/material';
-import { Close as CloseIcon } from '@mui/icons-material';
+import { Close as CloseIcon, Image as ImageIcon, Link as LinkIcon } from '@mui/icons-material';
 import { DateTimePicker } from '@mui/x-date-pickers/DateTimePicker';
 import axios from 'axios';
 
 const EventForm = ({ open, onClose, timelineId, onEventCreated }) => {
+  const [activeTab, setActiveTab] = useState(0);
   const [formData, setFormData] = useState({
     title: '',
     description: '',
     event_date: new Date().toISOString(),
-    url: ''
+    url: '',
+    url_title: '',
+    url_description: '',
+    url_image: '',
+    media_url: '',
+    media_type: '',
+    tags: []
   });
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [urlLoading, setUrlLoading] = useState(false);
+  const [urlData, setUrlData] = useState(null);
 
   useEffect(() => {
     if (open) {
@@ -35,9 +51,17 @@ const EventForm = ({ open, onClose, timelineId, onEventCreated }) => {
         title: '',
         description: '',
         event_date: new Date().toISOString(),
-        url: ''
+        url: '',
+        url_title: '',
+        url_description: '',
+        url_image: '',
+        media_url: '',
+        media_type: '',
+        tags: []
       });
       setError('');
+      setActiveTab(0);
+      setUrlData(null);
     }
   }, [open]);
 
@@ -60,14 +84,59 @@ const EventForm = ({ open, onClose, timelineId, onEventCreated }) => {
     }
   };
 
+  const handleTabChange = (event, newValue) => {
+    setActiveTab(newValue);
+  };
+
+  const handleUrlBlur = async () => {
+    if (!formData.url) return;
+    
+    try {
+      setUrlLoading(true);
+      const response = await axios.get(`/api/fetch-url-metadata?url=${encodeURIComponent(formData.url)}`);
+      setUrlData(response.data);
+      
+      // Auto-fill URL metadata
+      setFormData(prev => ({
+        ...prev,
+        url_title: response.data.title || '',
+        url_description: response.data.description || '',
+        url_image: response.data.image || ''
+      }));
+    } catch (error) {
+      console.error('Error fetching URL metadata:', error);
+    } finally {
+      setUrlLoading(false);
+    }
+  };
+
+  const handleTagChange = (event) => {
+    setFormData(prev => ({
+      ...prev,
+      tags: event.target.value
+    }));
+  };
+
+  const validateForm = () => {
+    if (!formData.title.trim()) {
+      setError('Title is required');
+      return false;
+    }
+    if (!formData.event_date) {
+      setError('Date is required');
+      return false;
+    }
+    if (formData.url && !formData.url.startsWith('http')) {
+      setError('URL must start with http:// or https://');
+      return false;
+    }
+    return true;
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     
-    // Validation
-    if (!formData.title.trim()) {
-      setError('Title is required');
-      return;
-    }
+    if (!validateForm()) return;
 
     try {
       setLoading(true);
@@ -83,12 +152,10 @@ const EventForm = ({ open, onClose, timelineId, onEventCreated }) => {
         }
       );
 
-      // Call the callback with the new event
       if (onEventCreated) {
         onEventCreated(response.data);
       }
 
-      // Close the dialog
       onClose();
     } catch (error) {
       console.error('Error creating event:', error);
@@ -104,114 +171,117 @@ const EventForm = ({ open, onClose, timelineId, onEventCreated }) => {
   return (
     <Dialog 
       open={open} 
-      onClose={loading ? undefined : onClose}
-      maxWidth="sm"
+      onClose={onClose}
+      maxWidth="md"
       fullWidth
-      PaperProps={{
-        sx: {
-          borderRadius: 2,
-          overflow: 'hidden'
-        }
-      }}
     >
-      <DialogTitle 
-        sx={{ 
-          m: 0, 
-          p: 2, 
-          display: 'flex', 
-          alignItems: 'center', 
-          justifyContent: 'space-between',
-          bgcolor: 'background.paper',
-          borderBottom: 1,
-          borderColor: 'divider'
-        }}
-      >
-        <Typography variant="h6">Add New Event</Typography>
-        {!loading && (
-          <IconButton
-            aria-label="close"
-            onClick={onClose}
-            sx={{ color: 'text.secondary' }}
-          >
+      <DialogTitle>
+        <Box display="flex" alignItems="center">
+          <Typography variant="h6" component="div" sx={{ flexGrow: 1 }}>
+            Create New Event
+          </Typography>
+          <IconButton onClick={onClose} size="small">
             <CloseIcon />
           </IconButton>
-        )}
+        </Box>
       </DialogTitle>
 
-      <form onSubmit={handleSubmit}>
-        <DialogContent sx={{ pt: 2 }}>
-          <Stack spacing={3}>
-            {error && (
-              <Alert severity="error" sx={{ width: '100%' }}>
-                {error}
-              </Alert>
-            )}
+      <DialogContent dividers>
+        <Tabs value={activeTab} onChange={handleTabChange} sx={{ mb: 2 }}>
+          <Tab label="Basic Info" />
+          <Tab label="Links & Media" />
+          <Tab label="Tags" />
+        </Tabs>
 
+        {error && (
+          <Alert severity="error" sx={{ mb: 2 }}>
+            {error}
+          </Alert>
+        )}
+
+        {activeTab === 0 && (
+          <Stack spacing={2}>
             <TextField
               name="title"
               label="Event Title"
-              fullWidth
               value={formData.title}
               onChange={handleChange}
+              fullWidth
               required
-              disabled={loading}
-              autoFocus
             />
-
             <TextField
               name="description"
               label="Description"
-              fullWidth
-              multiline
-              rows={3}
               value={formData.description}
               onChange={handleChange}
-              disabled={loading}
+              multiline
+              rows={4}
+              fullWidth
             />
-
             <DateTimePicker
               label="Event Date & Time"
               value={new Date(formData.event_date)}
               onChange={handleDateChange}
-              disabled={loading}
-              slotProps={{
-                textField: {
-                  fullWidth: true,
-                  required: true
-                }
-              }}
-            />
-
-            <TextField
-              name="url"
-              label="Reference URL (optional)"
-              fullWidth
-              value={formData.url}
-              onChange={handleChange}
-              disabled={loading}
-              type="url"
-              helperText="Add a link to an article or resource related to this event"
+              renderInput={(params) => <TextField {...params} fullWidth />}
             />
           </Stack>
-        </DialogContent>
+        )}
 
-        <DialogActions sx={{ p: 2, borderTop: 1, borderColor: 'divider' }}>
-          <Button 
-            onClick={onClose} 
-            disabled={loading}
-          >
-            Cancel
-          </Button>
-          <Button 
-            type="submit"
-            variant="contained"
-            disabled={loading}
-            sx={{ minWidth: 100 }}
-          >
-            {loading ? <CircularProgress size={24} /> : 'Add Event'}
-          </Button>
-        </DialogActions>
-      </form>
+        {activeTab === 1 && (
+          <Stack spacing={2}>
+            <TextField
+              name="url"
+              label="URL"
+              value={formData.url}
+              onChange={handleChange}
+              onBlur={handleUrlBlur}
+              fullWidth
+              InputProps={{
+                endAdornment: urlLoading && <CircularProgress size={20} />
+              }}
+              helperText="Add a reference link to this event"
+            />
+            
+            {urlData && (
+              <Alert severity="info" sx={{ mb: 2 }}>
+                URL preview data loaded successfully
+              </Alert>
+            )}
+
+            <TextField
+              name="url_title"
+              label="URL Title (Optional)"
+              value={formData.url_title}
+              onChange={handleChange}
+              fullWidth
+              helperText="Custom title for the reference link"
+            />
+          </Stack>
+        )}
+
+        {activeTab === 2 && (
+          <Box sx={{ p: 3, textAlign: 'center' }}>
+            <Typography variant="h6" color="text.secondary" gutterBottom>
+              Coming Soon: Hashtag System
+            </Typography>
+            <Typography variant="body2" color="text.secondary">
+              A powerful hashtag system is planned for this section, allowing for dynamic categorization and improved event discovery.
+            </Typography>
+          </Box>
+        )}
+      </DialogContent>
+
+      <DialogActions sx={{ p: 2, gap: 1 }}>
+        <Button onClick={onClose}>Cancel</Button>
+        <Button
+          onClick={handleSubmit}
+          variant="contained"
+          disabled={loading}
+          startIcon={loading && <CircularProgress size={20} />}
+        >
+          Create Event
+        </Button>
+      </DialogActions>
     </Dialog>
   );
 };

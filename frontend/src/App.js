@@ -18,6 +18,7 @@ import {
   Dialog, 
   DialogTitle, 
   DialogContent, 
+  DialogContentText,
   DialogActions,
   TextField,
   Stack,
@@ -56,8 +57,10 @@ const Homepage = () => {
   const { user } = useAuth();
   const [loading, setLoading] = React.useState(false);
   const [dialogOpen, setDialogOpen] = React.useState(false);
+  const [deleteDialogOpen, setDeleteDialogOpen] = React.useState(false);
+  const [timelineToDelete, setTimelineToDelete] = React.useState(null);
   const [timelines, setTimelines] = React.useState([]);
-  const [loadingTimelines, setLoadingTimelines] = React.useState(false);
+  const [loadingTimelines, setLoadingTimelines] = React.useState(true);
   const [formData, setFormData] = React.useState({
     name: '',
     description: ''
@@ -141,6 +144,36 @@ const Homepage = () => {
     }
   };
 
+  const handleDeleteClick = (timeline) => {
+    setTimelineToDelete(timeline);
+    setDeleteDialogOpen(true);
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (!timelineToDelete) return;
+
+    try {
+      const response = await axios.delete(`/api/timelines/${timelineToDelete.id}`, {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        }
+      });
+      
+      // Remove the timeline from the list
+      setTimelines(timelines.filter(t => t.id !== timelineToDelete.id));
+      setDeleteDialogOpen(false);
+      setTimelineToDelete(null);
+    } catch (error) {
+      console.error('Error deleting timeline:', error);
+      alert(error.response?.data?.error || 'Error deleting timeline');
+    }
+  };
+
+  const handleDeleteCancel = () => {
+    setDeleteDialogOpen(false);
+    setTimelineToDelete(null);
+  };
+
   const formatDate = (dateString) => {
     const date = new Date(dateString);
     return date.toLocaleDateString('en-US', {
@@ -205,12 +238,22 @@ const Homepage = () => {
                         Created: {formatDate(timeline.created_at)}
                       </Typography>
                     </CardContent>
-                    <CardActions>
+                    <CardActions sx={{ justifyContent: 'space-between', px: 2, pb: 2 }}>
                       <Button 
                         size="small" 
+                        variant="contained"
+                        color="primary"
                         onClick={() => navigate(`/timeline-v3/${timeline.id}`)}
                       >
                         Open Timeline
+                      </Button>
+                      <Button 
+                        size="small"
+                        variant="contained"
+                        color="error"
+                        onClick={() => handleDeleteClick(timeline)}
+                      >
+                        Delete
                       </Button>
                     </CardActions>
                   </Card>
@@ -262,6 +305,23 @@ const Homepage = () => {
             disabled={loading}
           >
             {loading ? <CircularProgress size={24} /> : 'Create'}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Delete Confirmation Dialog */}
+      <Dialog open={deleteDialogOpen} onClose={handleDeleteCancel}>
+        <DialogTitle>Delete Timeline</DialogTitle>
+        <DialogContent>
+          <DialogContentText>
+            Are you sure you want to delete "{timelineToDelete?.name}"? This action cannot be undone.
+            All events will be moved to the general timeline.
+          </DialogContentText>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleDeleteCancel}>Cancel</Button>
+          <Button onClick={handleDeleteConfirm} color="error" variant="contained">
+            Delete
           </Button>
         </DialogActions>
       </Dialog>
