@@ -27,7 +27,12 @@ app.config.update(
 # Configure CORS
 CORS(app, resources={
     r"/*": {
-        "origins": [os.getenv('FRONTEND_URL', 'http://localhost:3000')],
+        "origins": [
+            'http://localhost:3000',
+            'http://localhost:3001',
+            'http://localhost:3002',
+            'http://localhost:3003'
+        ],
         "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
         "allow_headers": ["Content-Type", "Authorization"],
         "supports_credentials": True

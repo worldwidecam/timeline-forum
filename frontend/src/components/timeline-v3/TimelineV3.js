@@ -1,18 +1,19 @@
 import React, { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
-import { Box, Container, useTheme, Button, Fade, Stack, Typography } from '@mui/material';
+import { Box, Container, useTheme, Button, Fade, Stack, Typography, Fab, Tooltip } from '@mui/material';
 import { useAuth } from '../../contexts/AuthContext';
 import axios from 'axios';
 import TimelineBackground from './TimelineBackground';
 import TimelineBar from './TimelineBar';
 import TimeMarkers from './TimeMarkers';
 import HoverMarker from './HoverMarker';
-import EventForm from './events/EventForm';
-import TimelineEvent from './events/TimelineEvent';
 import EventMarker from './events/EventMarker';
 import EventCounter from './events/EventCounter';
 import EventList from './events/EventList';
+import EventDialog from './events/EventDialog';
 import AddIcon from '@mui/icons-material/Add';
+
+const API_BASE_URL = '/api';
 
 function TimelineV3() {
   const { id } = useParams();
@@ -29,7 +30,7 @@ function TimelineV3() {
       
       try {
         setIsLoading(true);
-        const response = await axios.get(`/api/timeline-v3/${timelineId}`, {
+        const response = await axios.get(`${API_BASE_URL}/timeline-v3/${timelineId}`, {
           headers: {
             'Authorization': `Bearer ${localStorage.getItem('token')}`
           }
@@ -199,6 +200,9 @@ function TimelineV3() {
   const [isEventFormOpen, setIsEventFormOpen] = useState(false);
   const [submitError, setSubmitError] = useState(null);
   const [isLoadingEvents, setIsLoadingEvents] = useState(false);
+  const [selectedEventId, setSelectedEventId] = useState(null);
+  const [editingEvent, setEditingEvent] = useState(null);
+  const [dialogOpen, setDialogOpen] = useState(false);
 
   // Fetch events whenever timelineId changes
   useEffect(() => {
@@ -208,7 +212,7 @@ function TimelineV3() {
       try {
         setIsLoadingEvents(true);
         console.log('Fetching events for timeline:', timelineId);
-        const response = await axios.get(`/api/timeline-v3/${timelineId}/events`, {
+        const response = await axios.get(`${API_BASE_URL}/timeline-v3/${timelineId}/events`, {
           headers: {
             'Authorization': `Bearer ${localStorage.getItem('token')}`
           }
@@ -233,7 +237,7 @@ function TimelineV3() {
         const params = new URLSearchParams(window.location.search);
         const timelineName = params.get('name') || 'Timeline V3';
         
-        const response = await axios.post('/api/timeline-v3', {
+        const response = await axios.post(`${API_BASE_URL}/timeline-v3`, {
           name: timelineName,
           description: `A new timeline created: ${timelineName}`
         }, {
@@ -271,7 +275,7 @@ function TimelineV3() {
         formData.append('file', eventData.media);
         
         console.log('Uploading media file:', eventData.media);
-        const uploadResponse = await axios.post('/api/upload', formData, {
+        const uploadResponse = await axios.post(`${API_BASE_URL}/upload`, formData, {
           headers: {
             'Authorization': `Bearer ${localStorage.getItem('token')}`,
             'Content-Type': 'multipart/form-data'
@@ -282,8 +286,8 @@ function TimelineV3() {
       }
 
       // Create the event
-      console.log('Sending event creation request to:', `/api/timeline-v3/${timelineId}/events`);
-      const response = await axios.post(`/api/timeline-v3/${timelineId}/events`, {
+      console.log('Sending event creation request to:', `${API_BASE_URL}/timeline-v3/${timelineId}/events`);
+      const response = await axios.post(`${API_BASE_URL}/timeline-v3/${timelineId}/events`, {
         title: eventData.title,
         description: eventData.description,
         event_date: eventData.event_date,
@@ -308,6 +312,42 @@ function TimelineV3() {
       setSubmitError(error.response?.data?.error || 'Failed to create event');
       throw error;
     }
+  };
+
+  const handleEventSelect = (event) => {
+    setSelectedEventId(event.id);
+  };
+
+  const handleEventEdit = (event) => {
+    setEditingEvent(event);
+    setDialogOpen(true);
+  };
+
+  const handleEventDelete = (event) => {
+    setEvents(events.filter(e => e.id !== event.id));
+    if (selectedEventId === event.id) {
+      setSelectedEventId(null);
+    }
+  };
+
+  const handleEventSave = async (eventData) => {
+    if (editingEvent) {
+      // Update existing event
+      setEvents(events.map(event => 
+        event.id === editingEvent.id 
+          ? { ...event, ...eventData }
+          : event
+      ));
+      setEditingEvent(null);
+    } else {
+      // Create new event
+      const newEvent = {
+        id: Date.now(), // temporary ID generation
+        ...eventData
+      };
+      setEvents([...events, newEvent]);
+    }
+    setDialogOpen(false);
   };
 
   // Update hover position when view mode changes
@@ -385,7 +425,6 @@ function TimelineV3() {
   };
 
   const [currentEventIndex, setCurrentEventIndex] = useState(0);
-  const [selectedEventId, setSelectedEventId] = useState(null);
 
   // Reset current event index when switching views
   useEffect(() => {
@@ -404,24 +443,6 @@ function TimelineV3() {
 
   const handleDotClick = (event) => {
     setSelectedEventId(event.id);
-  };
-
-  const handleEventSelect = (eventId) => {
-    setSelectedEventId(eventId);
-  };
-
-  const handleEventDelete = (eventId) => {
-    setEvents(events.filter(event => event.id !== eventId));
-  };
-
-  const handleEventEdit = (eventId, newEventData) => {
-    const updatedEvents = events.map(event => {
-      if (event.id === eventId) {
-        return { ...event, ...newEventData };
-      }
-      return event;
-    });
-    setEvents(updatedEvents);
   };
 
   return (
@@ -447,7 +468,10 @@ function TimelineV3() {
                 {getViewDescription()}
               </Box>
               <Button
-                onClick={() => setIsEventFormOpen(true)}
+                onClick={() => {
+                  setEditingEvent(null);
+                  setDialogOpen(true);
+                }}
                 variant="contained"
                 startIcon={<AddIcon />}
                 sx={{
@@ -614,21 +638,93 @@ function TimelineV3() {
           events={events}
           selectedEventId={selectedEventId}
           onEventSelect={handleEventSelect}
-          onEventDelete={handleEventDelete}
           onEventEdit={handleEventEdit}
+          onEventDelete={handleEventDelete}
         />
       </Container>
 
-      {/* Event Creation Form */}
-      <EventForm
-        open={isEventFormOpen}
-        onClose={() => setIsEventFormOpen(false)}
-        timelineId={timelineId}
-        onEventCreated={(newEvent) => {
-          setEvents(prev => [...prev, newEvent]);
-          setIsEventFormOpen(false);
+      {/* Event Dialog */}
+      <EventDialog
+        open={dialogOpen}
+        onClose={() => {
+          setDialogOpen(false);
+          setEditingEvent(null);
         }}
+        onSave={async (eventData) => {
+          try {
+            if (editingEvent) {
+              // Update existing event
+              const response = await axios.put(`/api/timeline-v3/${timelineId}/events/${editingEvent.id}`, {
+                ...eventData,
+                timeline_id: timelineId
+              }, {
+                headers: {
+                  'Authorization': `Bearer ${localStorage.getItem('token')}`
+                }
+              });
+              setEvents(events.map(event => 
+                event.id === editingEvent.id 
+                  ? response.data
+                  : event
+              ));
+              setEditingEvent(null);
+            } else {
+              // Handle media upload first if present
+              let mediaUrl = null;
+              if (eventData.mediaFile) {
+                const formData = new FormData();
+                formData.append('file', eventData.mediaFile);
+                const uploadResponse = await axios.post('/api/upload', formData, {
+                  headers: {
+                    'Authorization': `Bearer ${localStorage.getItem('token')}`,
+                    'Content-Type': 'multipart/form-data'
+                  }
+                });
+                mediaUrl = uploadResponse.data.url;
+              }
+
+              // Create new event
+              const response = await axios.post(`/api/timeline-v3/${timelineId}/events`, {
+                ...eventData,
+                media_url: mediaUrl,
+                timeline_id: timelineId
+              }, {
+                headers: {
+                  'Authorization': `Bearer ${localStorage.getItem('token')}`
+                }
+              });
+              setEvents(prev => [...prev, response.data]);
+            }
+            setDialogOpen(false);
+          } catch (error) {
+            console.error('Error saving event:', error);
+            setSubmitError(error.response?.data?.message || 'Error saving event');
+          }
+        }}
+        initialEvent={editingEvent}
       />
+
+      {/* Floating Action Button */}
+      <Tooltip title="Create New Event">
+        <Fab
+          color="primary"
+          onClick={() => {
+            setEditingEvent(null);
+            setDialogOpen(true);
+          }}
+          sx={{
+            position: 'fixed',
+            right: 32,
+            bottom: 32,
+            bgcolor: theme.palette.primary.main,
+            '&:hover': {
+              bgcolor: theme.palette.primary.dark,
+            }
+          }}
+        >
+          <AddIcon />
+        </Fab>
+      </Tooltip>
     </Box>
   );
 }

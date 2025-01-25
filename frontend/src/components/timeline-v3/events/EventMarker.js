@@ -3,6 +3,8 @@ import { Box, Paper, Popper, Fade, Typography, useTheme, IconButton } from '@mui
 import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
 import ChevronRightIcon from '@mui/icons-material/ChevronRight';
 import TimelineEvent from './TimelineEvent';
+import { EVENT_TYPE_COLORS, EVENT_TYPES } from './EventTypes';
+import { EventHoverCard } from './EventHoverCard';
 
 const EventMarker = ({ 
   event, 
@@ -18,6 +20,8 @@ const EventMarker = ({
   const theme = useTheme();
   const [anchorEl, setAnchorEl] = useState(null);
   const [isHovered, setIsHovered] = useState(false);
+  const [showHover, setShowHover] = useState(false);
+  const [hoverPosition, setHoverPosition] = useState({ x: 0, y: 0 });
 
   const calculatePosition = () => {
     // For time-based views, calculate position based on event_date
@@ -73,6 +77,25 @@ const EventMarker = ({
     setIsHovered(false);
   };
 
+  const getColor = () => {
+    const typeColors = EVENT_TYPE_COLORS[event.type] || EVENT_TYPE_COLORS[EVENT_TYPES.REMARK];
+    return theme.palette.mode === 'dark' ? typeColors.dark : typeColors.light;
+  };
+
+  const getHoverColor = () => {
+    const typeColors = EVENT_TYPE_COLORS[event.type] || EVENT_TYPE_COLORS[EVENT_TYPES.REMARK];
+    return theme.palette.mode === 'dark' ? typeColors.hover.dark : typeColors.hover.light;
+  };
+
+  const handleMouseEnterMarker = (e) => {
+    const rect = e.currentTarget.getBoundingClientRect();
+    setHoverPosition({
+      x: rect.right + 16,
+      y: rect.top - (rect.height / 2)
+    });
+    setShowHover(true);
+  };
+
   const position = calculatePosition();
 
   // In base view, only render if this is the current event
@@ -97,25 +120,55 @@ const EventMarker = ({
           <IconButton 
             size="small"
             onClick={() => onChangeIndex(currentIndex > 0 ? currentIndex - 1 : totalEvents - 1)}
-            sx={{ color: theme.palette.primary.main }}
+            sx={{ 
+              color: theme.palette.primary.main,
+              transition: 'all 0.2s ease-in-out',
+              '&:hover': {
+                backgroundColor: theme.palette.mode === 'dark' 
+                  ? 'rgba(33, 150, 243, 0.15)'
+                  : 'rgba(33, 150, 243, 0.08)',
+              }
+            }}
           >
             <ChevronLeftIcon />
           </IconButton>
 
           <Box
-            onMouseEnter={handleMouseEnter}
-            onMouseLeave={handleMouseLeave}
+            onMouseEnter={handleMouseEnterMarker}
+            onMouseLeave={() => setShowHover(false)}
             sx={{
-              width: '12px',
-              height: '12px',
-              borderRadius: '50%',
-              backgroundColor: theme.palette.primary.main,
+              position: 'relative',
+              width: '14px',
+              height: '14px',
               cursor: 'pointer',
-              transition: 'all 0.2s',
-              '&:hover': {
+              '&::before': {
+                content: '""',
+                position: 'absolute',
+                inset: '-4px',
+                background: `radial-gradient(circle, ${getColor()}20 0%, transparent 70%)`,
+                borderRadius: '50%',
+                opacity: 0,
+                transition: 'opacity 0.3s ease-in-out',
+              },
+              '&:hover::before': {
+                opacity: 1,
+              },
+              '&::after': {
+                content: '""',
+                position: 'absolute',
+                inset: 0,
+                background: getColor(),
+                borderRadius: '50%',
+                transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                boxShadow: `0 0 10px ${getColor()}40`,
+              },
+              '&:hover::after': {
                 transform: 'scale(1.2)',
-                backgroundColor: theme.palette.primary.dark,
-                boxShadow: `0 0 0 4px ${theme.palette.primary.main}33`
+                boxShadow: `
+                  0 0 0 2px ${theme.palette.background.paper},
+                  0 0 0 4px ${getColor()}40,
+                  0 0 12px ${getColor()}60
+                `,
               }
             }}
           />
@@ -123,30 +176,61 @@ const EventMarker = ({
           <IconButton 
             size="small"
             onClick={() => onChangeIndex(currentIndex < totalEvents - 1 ? currentIndex + 1 : 0)}
-            sx={{ color: theme.palette.primary.main }}
+            sx={{ 
+              color: theme.palette.primary.main,
+              transition: 'all 0.2s ease-in-out',
+              '&:hover': {
+                backgroundColor: theme.palette.mode === 'dark' 
+                  ? 'rgba(33, 150, 243, 0.15)'
+                  : 'rgba(33, 150, 243, 0.08)',
+              }
+            }}
           >
             <ChevronRightIcon />
           </IconButton>
         </Box>
       ) : (
         <Box
-          onMouseEnter={handleMouseEnter}
-          onMouseLeave={handleMouseLeave}
+          onMouseEnter={handleMouseEnterMarker}
+          onMouseLeave={() => setShowHover(false)}
           sx={{
             position: 'absolute',
             left: `${position.x}px`,
             bottom: `${position.y}px`,
             transform: 'translateX(-50%)',
-            width: '12px',
-            height: '12px',
-            borderRadius: '50%',
-            backgroundColor: theme.palette.primary.main,
+            width: '14px',
+            height: '14px',
             cursor: 'pointer',
-            transition: 'all 0.2s',
-            '&:hover': {
-              transform: 'translateX(-50%) scale(1.2)',
-              backgroundColor: theme.palette.primary.dark,
-              boxShadow: `0 0 0 4px ${theme.palette.primary.main}33`
+            '&::before': {
+              content: '""',
+              position: 'absolute',
+              inset: '-4px',
+              background: `radial-gradient(circle, ${getColor()}20 0%, transparent 70%)`,
+              borderRadius: '50%',
+              opacity: 0,
+              transition: 'opacity 0.3s ease-in-out',
+              transform: 'translateX(50%)',
+            },
+            '&:hover::before': {
+              opacity: 1,
+            },
+            '&::after': {
+              content: '""',
+              position: 'absolute',
+              inset: 0,
+              background: getColor(),
+              borderRadius: '50%',
+              transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+              boxShadow: `0 0 10px ${getColor()}40`,
+              transform: 'translateX(50%)',
+            },
+            '&:hover::after': {
+              transform: 'translateX(50%) scale(1.2)',
+              boxShadow: `
+                0 0 0 2px ${theme.palette.background.paper},
+                0 0 0 4px ${getColor()}40,
+                0 0 12px ${getColor()}60
+              `,
             }
           }}
         />
@@ -176,6 +260,13 @@ const EventMarker = ({
           </Fade>
         )}
       </Popper>
+
+      {showHover && (
+        <EventHoverCard 
+          event={event}
+          position={hoverPosition}
+        />
+      )}
     </>
   );
 };
