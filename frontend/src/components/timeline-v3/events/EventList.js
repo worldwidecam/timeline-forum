@@ -8,6 +8,7 @@ import {
   TextField,
   InputAdornment,
   Paper,
+  Link,
 } from '@mui/material';
 import {
   Edit as EditIcon,
@@ -17,6 +18,7 @@ import {
   PermMedia as MediaIcon,
   Search as SearchIcon,
   ThumbUp as LikeIcon,
+  Link as LinkIcon,
 } from '@mui/icons-material';
 import { motion, AnimatePresence } from 'framer-motion';
 import { format } from 'date-fns';
@@ -45,17 +47,17 @@ const EVENT_TYPE_COLORS = {
 
 const EventCard = ({ event, color, onEdit, onDelete, onClick }) => {
   const theme = useTheme();
-  
+
   const getEventTypeIcon = (type) => {
     switch (type) {
       case EVENT_TYPES.REMARK:
-        return <RemarkIcon />;
+        return <RemarkIcon sx={{ fontSize: 24 }} />;
       case EVENT_TYPES.NEWS:
-        return <NewsIcon />;
+        return <NewsIcon sx={{ fontSize: 24 }} />;
       case EVENT_TYPES.MEDIA:
-        return <MediaIcon />;
+        return <MediaIcon sx={{ fontSize: 24 }} />;
       default:
-        return <RemarkIcon />;
+        return <RemarkIcon sx={{ fontSize: 24 }} />;
     }
   };
 
@@ -88,139 +90,176 @@ const EventCard = ({ event, color, onEdit, onDelete, onClick }) => {
             : '0 20px 40px rgba(0,0,0,0.1)',
         }}
       >
-        {/* Content Container */}
-        <div className="relative p-6">
-          {/* Event Type Badge */}
-          <div
-            className="absolute -top-3 left-6 px-3 py-1 rounded-full flex items-center gap-2 text-white text-sm font-medium"
-            style={{ 
-              backgroundColor: color,
-              boxShadow: '0 4px 12px rgba(0,0,0,0.1)'
-            }}
-          >
-            {getEventTypeIcon(event.type)}
-            <span className="capitalize">{event.type}</span>
-          </div>
+        {/* Event Type Badge */}
+        <div
+          className="absolute top-0 left-0 p-3 rounded-tl-xl rounded-br-2xl flex items-center justify-center text-white"
+          style={{ 
+            backgroundColor: color,
+            width: '48px',
+            height: '48px',
+          }}
+        >
+          {getEventTypeIcon(event.type)}
+        </div>
 
+        {/* Content Container */}
+        <div className="relative p-6 pl-16">
           {/* Main Content */}
           <div className="mt-4">
-            <Typography 
-              variant="h6" 
-              className={`
-                font-semibold mb-2
-                ${event.type === EVENT_TYPES.NEWS ? 'font-serif' : 'font-sans'}
-              `}
-            >
-              {event.title}
-            </Typography>
+            {event.type === EVENT_TYPES.NEWS ? (
+              <div>
+                {/* News Title */}
+                <Typography 
+                  variant="h6" 
+                  className="font-serif font-semibold mb-2"
+                >
+                  {event.title}
+                </Typography>
 
-            {/* Preview Content */}
-            {event.type === EVENT_TYPES.NEWS && event.url_image && (
-              <div className="relative h-48 mb-4 rounded-lg overflow-hidden">
-                <motion.img
-                  src={event.url_image}
-                  alt={event.title}
-                  className="w-full h-full object-cover"
-                  whileHover={{ scale: 1.05 }}
-                  transition={{ duration: 0.4 }}
-                />
-              </div>
-            )}
-
-            {event.type === EVENT_TYPES.MEDIA && event.media_url && (
-              <div className="relative h-48 mb-4 rounded-lg overflow-hidden bg-black/5">
-                {event.media_type === 'video' ? (
-                  <video
-                    src={event.media_url}
-                    className="w-full h-full object-cover"
-                  />
-                ) : event.media_type === 'audio' ? (
-                  <div className="flex items-center justify-center h-full">
-                    <motion.div
-                      animate={{
-                        scale: [1, 1.2, 1],
-                      }}
-                      transition={{
-                        duration: 1.5,
-                        repeat: Infinity,
-                      }}
+                {/* URL Preview Card */}
+                {event.url && (
+                  <a
+                    href={event.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="block no-underline mb-4"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <Box
+                      className={`
+                        rounded-lg overflow-hidden border
+                        ${theme.palette.mode === 'dark' ? 'border-white/10 hover:border-white/20' : 'border-black/10 hover:border-black/20'}
+                        transition-all duration-200
+                        hover:scale-[1.02]
+                      `}
                     >
-                      <MediaIcon sx={{ fontSize: 48, opacity: 0.5 }} />
-                    </motion.div>
-                  </div>
-                ) : (
-                  <img
-                    src={event.media_url}
-                    alt={event.title}
-                    className="w-full h-full object-cover"
-                  />
+                      {event.url_image && (
+                        <div className="relative h-48 bg-black/5">
+                          <img
+                            src={event.url_image}
+                            alt={event.url_title || event.title}
+                            className="w-full h-full object-cover"
+                          />
+                        </div>
+                      )}
+                      <div className="p-4">
+                        <Typography 
+                          variant="subtitle1" 
+                          className="font-medium mb-1 line-clamp-2"
+                          sx={{ color: theme.palette.text.primary }}
+                        >
+                          {event.url_title || event.title}
+                        </Typography>
+                        {event.url_description && (
+                          <Typography 
+                            variant="body2" 
+                            className="line-clamp-2 mb-2"
+                            sx={{ color: theme.palette.text.secondary }}
+                          >
+                            {event.url_description}
+                          </Typography>
+                        )}
+                        <Stack 
+                          direction="row" 
+                          spacing={1} 
+                          alignItems="center"
+                          sx={{ color: theme.palette.text.secondary }}
+                        >
+                          <LinkIcon fontSize="small" />
+                          <Typography variant="caption">
+                            {event.url_source || new URL(event.url).hostname}
+                          </Typography>
+                        </Stack>
+                      </div>
+                    </Box>
+                  </a>
+                )}
+
+                {/* Additional Description */}
+                {event.description && (
+                  <Typography 
+                    variant="body2" 
+                    color="text.secondary"
+                    className="line-clamp-2"
+                  >
+                    {event.description}
+                  </Typography>
                 )}
               </div>
+            ) : (
+              <>
+                <Typography 
+                  variant="h6" 
+                  className="font-semibold mb-2"
+                >
+                  {event.title}
+                </Typography>
+
+                <Typography 
+                  variant="body2" 
+                  color="text.secondary"
+                  className="line-clamp-2 mb-4"
+                >
+                  {event.description}
+                </Typography>
+              </>
             )}
-
-            <Typography 
-              variant="body2" 
-              color="text.secondary"
-              className="line-clamp-2 mb-4"
-            >
-              {event.description}
-            </Typography>
-
-            {/* Footer */}
-            <div className="flex items-center justify-between mt-4 pt-4 border-t border-neutral-200 dark:border-neutral-800">
-              <div className="flex items-center gap-4 text-neutral-600 dark:text-neutral-400">
-                <div className="flex items-center gap-1">
-                  <LikeIcon fontSize="small" />
-                  <span className="text-sm">24</span>
-                </div>
-                <div className="flex items-center gap-1">
-                  <RemarkIcon fontSize="small" />
-                  <span className="text-sm">12</span>
-                </div>
-              </div>
-
-              <Typography variant="caption" color="text.secondary">
-                {format(new Date(event.event_date), 'MMM d, yyyy')}
-              </Typography>
-            </div>
           </div>
 
-          {/* Action Buttons */}
-          <motion.div
-            initial={{ opacity: 0 }}
-            whileHover={{ opacity: 1 }}
-            className="absolute top-2 right-2 flex gap-1"
-          >
-            <IconButton
-              size="small"
-              onClick={(e) => {
-                e.stopPropagation();
-                onEdit(event);
-              }}
-              className={`
-                ${theme.palette.mode === 'dark' ? 'bg-white/10' : 'bg-black/5'}
-                hover:bg-primary-500 hover:text-white
-                transition-colors
-              `}
-            >
-              <EditIcon fontSize="small" />
-            </IconButton>
-            <IconButton
-              size="small"
-              onClick={(e) => {
-                e.stopPropagation();
-                onDelete(event);
-              }}
-              className={`
-                ${theme.palette.mode === 'dark' ? 'bg-white/10' : 'bg-black/5'}
-                hover:bg-red-500 hover:text-white
-                transition-colors
-              `}
-            >
-              <DeleteIcon fontSize="small" />
-            </IconButton>
-          </motion.div>
+          {/* Footer */}
+          <div className="flex items-center justify-between mt-4 pt-4 border-t border-neutral-200 dark:border-neutral-800">
+            <div className="flex items-center gap-4 text-neutral-600 dark:text-neutral-400">
+              <div className="flex items-center gap-1">
+                <LikeIcon fontSize="small" />
+                <span className="text-sm">24</span>
+              </div>
+              <div className="flex items-center gap-1">
+                <RemarkIcon fontSize="small" />
+                <span className="text-sm">12</span>
+              </div>
+            </div>
+
+            <Typography variant="caption" color="text.secondary">
+              {format(new Date(event.event_date), 'MMM d, yyyy')}
+            </Typography>
+          </div>
         </div>
+
+        {/* Action Buttons */}
+        <motion.div
+          initial={{ opacity: 0 }}
+          whileHover={{ opacity: 1 }}
+          className="absolute top-2 right-2 flex gap-1"
+        >
+          <IconButton
+            size="small"
+            onClick={(e) => {
+              e.stopPropagation();
+              onEdit(event);
+            }}
+            className={`
+              ${theme.palette.mode === 'dark' ? 'bg-white/10' : 'bg-black/5'}
+              hover:bg-primary-500 hover:text-white
+              transition-colors
+            `}
+          >
+            <EditIcon fontSize="small" />
+          </IconButton>
+          <IconButton
+            size="small"
+            onClick={(e) => {
+              e.stopPropagation();
+              onDelete(event);
+            }}
+            className={`
+              ${theme.palette.mode === 'dark' ? 'bg-white/10' : 'bg-black/5'}
+              hover:bg-red-500 hover:text-white
+              transition-colors
+            `}
+          >
+            <DeleteIcon fontSize="small" />
+          </IconButton>
+        </motion.div>
       </motion.div>
     </motion.div>
   );
@@ -277,26 +316,36 @@ const EventList = ({ events, onEventEdit, onEventDelete }) => {
             className="flex-1"
           />
           <Stack direction="row" spacing={1}>
-            {Object.values(EVENT_TYPES).map((type) => (
-              <motion.button
-                key={type}
-                onClick={() => setSelectedType(selectedType === type ? null : type)}
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-                className={`
-                  px-4 py-2 rounded-full text-sm font-medium
-                  transition-colors duration-200
-                  ${selectedType === type
-                    ? 'bg-primary-500 text-white'
-                    : theme.palette.mode === 'dark'
-                      ? 'bg-white/10 text-white/70 hover:bg-white/20'
-                      : 'bg-black/5 text-black/70 hover:bg-black/10'
-                  }
-                `}
-              >
-                {type}
-              </motion.button>
-            ))}
+            {Object.values(EVENT_TYPES).map((type) => {
+              const typeColor = EVENT_TYPE_COLORS[type];
+              const Icon = type === EVENT_TYPES.REMARK ? RemarkIcon :
+                          type === EVENT_TYPES.NEWS ? NewsIcon : MediaIcon;
+              
+              return (
+                <motion.button
+                  key={type}
+                  onClick={() => setSelectedType(selectedType === type ? null : type)}
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                  className={`
+                    px-4 py-2 rounded-full text-sm font-medium
+                    transition-colors duration-200
+                    flex items-center gap-2
+                  `}
+                  style={{
+                    backgroundColor: selectedType === type 
+                      ? (theme.palette.mode === 'dark' ? typeColor.dark : typeColor.light)
+                      : theme.palette.mode === 'dark' ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.05)',
+                    color: selectedType === type 
+                      ? '#fff'
+                      : theme.palette.mode === 'dark' ? 'rgba(255, 255, 255, 0.8)' : 'rgba(0, 0, 0, 0.8)',
+                  }}
+                >
+                  <Icon fontSize="small" />
+                  <span className="capitalize">{type}</span>
+                </motion.button>
+              );
+            })}
           </Stack>
         </div>
       </div>

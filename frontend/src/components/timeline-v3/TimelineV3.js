@@ -291,7 +291,12 @@ function TimelineV3() {
         title: eventData.title,
         description: eventData.description,
         event_date: eventData.event_date,
+        type: eventData.type,
         url: eventData.url || '',
+        url_title: eventData.url_title || '',
+        url_description: eventData.url_description || '',
+        url_image: eventData.url_image || '',
+        url_source: eventData.url_source || '',
         media_url: mediaUrl || '',
         media_type: eventData.media ? eventData.media.type.split('/')[0] : '',
       }, {

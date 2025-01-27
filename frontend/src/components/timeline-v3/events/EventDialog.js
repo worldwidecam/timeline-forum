@@ -28,6 +28,7 @@ import {
   Add as AddIcon,
   CloudUpload as UploadIcon,
 } from '@mui/icons-material';
+import axios from 'axios';
 import { EVENT_TYPES, EVENT_TYPE_COLORS } from './EventTypes';
 
 const EventDialog = ({ open, onClose, onSave, initialEvent = null }) => {
@@ -37,6 +38,8 @@ const EventDialog = ({ open, onClose, onSave, initialEvent = null }) => {
   const [description, setDescription] = useState('');
   const [eventDate, setEventDate] = useState(new Date());
   const [url, setUrl] = useState('');
+  const [urlPreview, setUrlPreview] = useState(null);
+  const [isLoadingPreview, setIsLoadingPreview] = useState(false);
   const [mediaFile, setMediaFile] = useState(null);
   const [mediaPreview, setMediaPreview] = useState('');
   const [tags, setTags] = useState([]);
@@ -58,6 +61,28 @@ const EventDialog = ({ open, onClose, onSave, initialEvent = null }) => {
     }
   }, [initialEvent]);
 
+  useEffect(() => {
+    const fetchUrlPreview = async () => {
+      if (!url || eventType !== EVENT_TYPES.NEWS) return;
+      
+      try {
+        setIsLoadingPreview(true);
+        const response = await axios.post('/api/url-preview', { url }, {
+          headers: {
+            'Authorization': `Bearer ${localStorage.getItem('token')}`
+          }
+        });
+        setUrlPreview(response.data);
+      } catch (error) {
+        console.error('Error fetching URL preview:', error);
+      } finally {
+        setIsLoadingPreview(false);
+      }
+    };
+
+    fetchUrlPreview();
+  }, [url, eventType]);
+
   const resetForm = () => {
     setEventType(EVENT_TYPES.REMARK);
     setTitle('');
@@ -68,6 +93,7 @@ const EventDialog = ({ open, onClose, onSave, initialEvent = null }) => {
     setMediaPreview('');
     setTags([]);
     setCurrentTag('');
+    setUrlPreview(null);
   };
 
   const handleTypeChange = (event, newType) => {
@@ -108,6 +134,12 @@ const EventDialog = ({ open, onClose, onSave, initialEvent = null }) => {
       tags,
       ...(url && { url }),
       ...(mediaFile && { mediaFile }),
+      ...(urlPreview && {
+        url_title: urlPreview.title,
+        url_description: urlPreview.description,
+        url_image: urlPreview.image,
+        url_source: urlPreview.source,
+      }),
     };
     onSave(eventData);
     resetForm();
@@ -122,20 +154,60 @@ const EventDialog = ({ open, onClose, onSave, initialEvent = null }) => {
     switch (eventType) {
       case EVENT_TYPES.NEWS:
         return (
-          <TextField
-            fullWidth
-            label="Article URL"
-            value={url}
-            onChange={(e) => setUrl(e.target.value)}
-            InputProps={{
-              startAdornment: (
-                <InputAdornment position="start">
-                  <LinkIcon />
-                </InputAdornment>
-              ),
-            }}
-            sx={{ mt: 2 }}
-          />
+          <Box sx={{ mt: 2 }}>
+            <TextField
+              fullWidth
+              label="Article URL"
+              value={url}
+              onChange={(e) => setUrl(e.target.value)}
+              InputProps={{
+                startAdornment: (
+                  <InputAdornment position="start">
+                    <LinkIcon />
+                  </InputAdornment>
+                ),
+              }}
+              sx={{ mb: 2 }}
+            />
+            {isLoadingPreview ? (
+              <Typography variant="body2" color="text.secondary" sx={{ mt: 2 }}>
+                Loading preview...
+              </Typography>
+            ) : urlPreview && (
+              <Box 
+                sx={{ 
+                  border: 1, 
+                  borderColor: 'divider',
+                  borderRadius: 1,
+                  overflow: 'hidden',
+                }}
+              >
+                {urlPreview.image && (
+                  <Box 
+                    component="img"
+                    src={urlPreview.image}
+                    alt={urlPreview.title}
+                    sx={{
+                      width: '100%',
+                      height: 200,
+                      objectFit: 'cover',
+                    }}
+                  />
+                )}
+                <Box sx={{ p: 2 }}>
+                  <Typography variant="subtitle1" gutterBottom>
+                    {urlPreview.title}
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary" gutterBottom>
+                    {urlPreview.description}
+                  </Typography>
+                  <Typography variant="caption" color="text.secondary">
+                    {urlPreview.source}
+                  </Typography>
+                </Box>
+              </Box>
+            )}
+          </Box>
         );
 
       case EVENT_TYPES.MEDIA:
