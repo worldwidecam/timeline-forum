@@ -179,6 +179,7 @@ class Event(db.Model):
     title = db.Column(db.String(200), nullable=False)
     description = db.Column(db.Text, nullable=True, default='')
     event_date = db.Column(db.DateTime, nullable=False)
+    type = db.Column(db.String(50), nullable=False, default='remark')  # Added type column
     
     # URL-related fields
     url = db.Column(db.String(500), nullable=True)
@@ -1084,6 +1085,7 @@ def create_timeline_v3_event(timeline_id):
         required_fields = {
             'title': str,
             'event_date': str,
+            'type': str,  # Added type as required field
         }
         
         for field, field_type in required_fields.items():
@@ -1109,6 +1111,7 @@ def create_timeline_v3_event(timeline_id):
             title=data['title'],
             description=data.get('description', ''),
             event_date=event_date,
+            type=data['type'],  # Added type field
             timeline_id=timeline_id,
             created_by=1  # Temporary default user ID
         )
@@ -1136,6 +1139,7 @@ def create_timeline_v3_event(timeline_id):
                 'title': new_event.title,
                 'description': new_event.description,
                 'event_date': new_event.event_date.isoformat(),
+                'type': new_event.type,  # Added type to response
                 'url': new_event.url,
                 'url_title': new_event.url_title,
                 'url_description': new_event.url_description,

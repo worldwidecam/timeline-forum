@@ -328,10 +328,20 @@ function TimelineV3() {
     setDialogOpen(true);
   };
 
-  const handleEventDelete = (event) => {
-    setEvents(events.filter(e => e.id !== event.id));
-    if (selectedEventId === event.id) {
-      setSelectedEventId(null);
+  const handleEventDelete = async (event) => {
+    try {
+      await axios.delete(`${API_BASE_URL}/timeline-v3/${timelineId}/events/${event.id}`, {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        }
+      });
+      setEvents(events.filter(e => e.id !== event.id));
+      if (selectedEventId === event.id) {
+        setSelectedEventId(null);
+      }
+    } catch (error) {
+      console.error('Error deleting event:', error);
+      // Keep the event in the UI if deletion fails
     }
   };
 

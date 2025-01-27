@@ -18,11 +18,21 @@ import {
   InputLabel,
   Select,
   MenuItem,
-  Chip
+  Chip,
+  ToggleButton,
+  ToggleButtonGroup,
 } from '@mui/material';
-import { Close as CloseIcon, Image as ImageIcon, Link as LinkIcon } from '@mui/icons-material';
+import { 
+  Close as CloseIcon, 
+  Image as ImageIcon, 
+  Link as LinkIcon,
+  Comment as RemarkIcon,
+  Newspaper as NewsIcon,
+  Movie as MediaIcon,
+} from '@mui/icons-material';
 import { DateTimePicker } from '@mui/x-date-pickers/DateTimePicker';
 import axios from 'axios';
+import { EVENT_TYPES, EVENT_TYPE_METADATA } from './EventTypes';
 
 const EventForm = ({ open, onClose, timelineId, onEventCreated }) => {
   const [activeTab, setActiveTab] = useState(0);
@@ -30,6 +40,7 @@ const EventForm = ({ open, onClose, timelineId, onEventCreated }) => {
     title: '',
     description: '',
     event_date: new Date().toISOString(),
+    type: EVENT_TYPES.REMARK, // Default to remark
     url: '',
     url_title: '',
     url_description: '',
@@ -51,6 +62,7 @@ const EventForm = ({ open, onClose, timelineId, onEventCreated }) => {
         title: '',
         description: '',
         event_date: new Date().toISOString(),
+        type: EVENT_TYPES.REMARK,
         url: '',
         url_title: '',
         url_description: '',
@@ -72,6 +84,15 @@ const EventForm = ({ open, onClose, timelineId, onEventCreated }) => {
       [name]: value
     }));
     setError('');
+  };
+
+  const handleTypeChange = (e, newType) => {
+    if (newType !== null) {
+      setFormData(prev => ({
+        ...prev,
+        type: newType
+      }));
+    }
   };
 
   const handleDateChange = (newDate) => {
@@ -142,6 +163,8 @@ const EventForm = ({ open, onClose, timelineId, onEventCreated }) => {
       setLoading(true);
       setError('');
 
+      console.log('Creating event with type:', formData.type); // Debug log
+
       const response = await axios.post(
         `/api/timeline-v3/${timelineId}/events`,
         formData,
@@ -165,6 +188,19 @@ const EventForm = ({ open, onClose, timelineId, onEventCreated }) => {
       );
     } finally {
       setLoading(false);
+    }
+  };
+
+  const getTypeIcon = (type) => {
+    switch (type) {
+      case EVENT_TYPES.REMARK:
+        return <RemarkIcon />;
+      case EVENT_TYPES.NEWS:
+        return <NewsIcon />;
+      case EVENT_TYPES.MEDIA:
+        return <MediaIcon />;
+      default:
+        return null;
     }
   };
 
@@ -201,6 +237,40 @@ const EventForm = ({ open, onClose, timelineId, onEventCreated }) => {
 
         {activeTab === 0 && (
           <Stack spacing={2}>
+            {/* Event Type Selection */}
+            <Box sx={{ mb: 2 }}>
+              <Typography variant="subtitle2" sx={{ mb: 1 }}>
+                Event Type
+              </Typography>
+              <ToggleButtonGroup
+                value={formData.type}
+                exclusive
+                onChange={handleTypeChange}
+                aria-label="event type"
+                fullWidth
+              >
+                {Object.values(EVENT_TYPES).map((type) => (
+                  <ToggleButton 
+                    key={type} 
+                    value={type}
+                    aria-label={type}
+                    sx={{
+                      textTransform: 'capitalize',
+                      py: 1,
+                    }}
+                  >
+                    {getTypeIcon(type)}
+                    <Box component="span" sx={{ ml: 1 }}>
+                      {EVENT_TYPE_METADATA[type].label}
+                    </Box>
+                  </ToggleButton>
+                ))}
+              </ToggleButtonGroup>
+              <Typography variant="caption" color="text.secondary" sx={{ mt: 0.5, display: 'block' }}>
+                {EVENT_TYPE_METADATA[formData.type].description}
+              </Typography>
+            </Box>
+
             <TextField
               name="title"
               label="Event Title"
@@ -250,32 +320,72 @@ const EventForm = ({ open, onClose, timelineId, onEventCreated }) => {
 
             <TextField
               name="url_title"
-              label="URL Title (Optional)"
+              label="URL Title"
               value={formData.url_title}
               onChange={handleChange}
               fullWidth
-              helperText="Custom title for the reference link"
+              disabled={!formData.url}
+            />
+
+            <TextField
+              name="url_description"
+              label="URL Description"
+              value={formData.url_description}
+              onChange={handleChange}
+              multiline
+              rows={2}
+              fullWidth
+              disabled={!formData.url}
+            />
+
+            <TextField
+              name="url_image"
+              label="Image URL"
+              value={formData.url_image}
+              onChange={handleChange}
+              fullWidth
+              disabled={!formData.url}
+              InputProps={{
+                endAdornment: formData.url_image && (
+                  <IconButton size="small">
+                    <ImageIcon />
+                  </IconButton>
+                )
+              }}
             />
           </Stack>
         )}
 
         {activeTab === 2 && (
-          <Box sx={{ p: 3, textAlign: 'center' }}>
-            <Typography variant="h6" color="text.secondary" gutterBottom>
-              Coming Soon: Hashtag System
-            </Typography>
-            <Typography variant="body2" color="text.secondary">
-              A powerful hashtag system is planned for this section, allowing for dynamic categorization and improved event discovery.
-            </Typography>
-          </Box>
+          <FormControl fullWidth>
+            <InputLabel>Tags</InputLabel>
+            <Select
+              multiple
+              value={formData.tags}
+              onChange={handleTagChange}
+              renderValue={(selected) => (
+                <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
+                  {selected.map((value) => (
+                    <Chip key={value} label={value} />
+                  ))}
+                </Box>
+              )}
+            >
+              <MenuItem value="important">Important</MenuItem>
+              <MenuItem value="personal">Personal</MenuItem>
+              <MenuItem value="work">Work</MenuItem>
+              <MenuItem value="news">News</MenuItem>
+              <MenuItem value="media">Media</MenuItem>
+            </Select>
+          </FormControl>
         )}
       </DialogContent>
 
-      <DialogActions sx={{ p: 2, gap: 1 }}>
+      <DialogActions>
         <Button onClick={onClose}>Cancel</Button>
-        <Button
+        <Button 
           onClick={handleSubmit}
-          variant="contained"
+          variant="contained" 
           disabled={loading}
           startIcon={loading && <CircularProgress size={20} />}
         >
