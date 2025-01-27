@@ -3,6 +3,7 @@ import { Box, IconButton, useTheme, Paper, Fade, Popper } from '@mui/material';
 import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
 import ChevronRightIcon from '@mui/icons-material/ChevronRight';
 import TimelineEvent from './TimelineEvent';
+import { EVENT_TYPE_COLORS } from './EventTypes';
 
 const EventCarousel = ({
   events,
@@ -15,6 +16,19 @@ const EventCarousel = ({
   const [anchorEl, setAnchorEl] = useState(null);
   const [isHovered, setIsHovered] = useState(false);
   const [popperPlacement, setPopperPlacement] = useState('bottom');
+
+  // Get the color based on event type and theme mode
+  const getEventTypeColor = () => {
+    if (!currentEvent?.type) return theme.palette.primary.main;
+    const colors = EVENT_TYPE_COLORS[currentEvent.type];
+    return theme.palette.mode === 'dark' ? colors.dark : colors.light;
+  };
+
+  const getEventTypeHoverColor = () => {
+    if (!currentEvent?.type) return theme.palette.primary.dark;
+    const colors = EVENT_TYPE_COLORS[currentEvent.type].hover;
+    return theme.palette.mode === 'dark' ? colors.dark : colors.light;
+  };
 
   const handleMouseEnter = useCallback((event) => {
     const rect = event.currentTarget.getBoundingClientRect();
@@ -43,6 +57,9 @@ const EventCarousel = ({
     }
   };
 
+  const eventColor = getEventTypeColor();
+  const eventHoverColor = getEventTypeHoverColor();
+
   return (
     <Box
       sx={{
@@ -56,7 +73,7 @@ const EventCarousel = ({
         size="small"
         onClick={() => onChangeIndex(currentIndex > 0 ? currentIndex - 1 : events.length - 1)}
         sx={{ 
-          color: theme.palette.primary.main,
+          color: eventColor,
           padding: '4px'
         }}
       >
@@ -71,13 +88,13 @@ const EventCarousel = ({
           width: '12px',
           height: '12px',
           borderRadius: '50%',
-          backgroundColor: theme.palette.primary.main,
+          backgroundColor: eventColor,
           cursor: 'pointer',
           transition: 'all 0.2s',
           '&:hover': {
             transform: 'scale(1.2)',
-            backgroundColor: theme.palette.primary.dark,
-            boxShadow: `0 0 0 4px ${theme.palette.primary.main}33`
+            backgroundColor: eventHoverColor,
+            boxShadow: `0 0 0 4px ${eventColor}33`
           }
         }}
       />
@@ -86,7 +103,7 @@ const EventCarousel = ({
         size="small"
         onClick={() => onChangeIndex(currentIndex < events.length - 1 ? currentIndex + 1 : 0)}
         sx={{ 
-          color: theme.palette.primary.main,
+          color: eventColor,
           padding: '4px'
         }}
       >
@@ -99,37 +116,20 @@ const EventCarousel = ({
         placement={popperPlacement}
         transition
         sx={{ zIndex: 1000 }}
-        modifiers={[
-          {
-            name: 'preventOverflow',
-            enabled: true,
-            options: {
-              altAxis: true,
-              boundary: window
-            }
-          },
-          {
-            name: 'flip',
-            enabled: true,
-            options: {
-              fallbackPlacements: ['top', 'bottom', 'right', 'left']
-            }
-          }
-        ]}
       >
         {({ TransitionProps }) => (
           <Fade {...TransitionProps} timeout={200}>
-            <Paper
-              sx={{
-                p: 2,
+            <Paper 
+              elevation={4}
+              sx={{ 
+                p: 1,
                 bgcolor: 'background.paper',
-                boxShadow: 3,
-                borderRadius: 2,
-                maxWidth: 320,
-                [popperPlacement === 'top' ? 'mb' : 'mt']: 1
+                maxWidth: '300px',
+                border: '1px solid',
+                borderColor: 'divider'
               }}
             >
-              <TimelineEvent event={currentEvent} compact />
+              <TimelineEvent event={currentEvent} />
             </Paper>
           </Fade>
         )}
