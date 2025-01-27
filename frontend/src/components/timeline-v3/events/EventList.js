@@ -1,17 +1,10 @@
 import React, { useState } from 'react';
 import {
   Box,
-  Card,
-  CardContent,
   Typography,
   IconButton,
   Stack,
-  Chip,
   useTheme,
-  CardMedia,
-  CardActionArea,
-  Link,
-  Tooltip,
   TextField,
   InputAdornment,
   Paper,
@@ -22,10 +15,12 @@ import {
   Comment as RemarkIcon,
   Newspaper as NewsIcon,
   PermMedia as MediaIcon,
-  Link as LinkIcon,
   Search as SearchIcon,
+  ThumbUp as LikeIcon,
 } from '@mui/icons-material';
+import { motion, AnimatePresence } from 'framer-motion';
 import { format } from 'date-fns';
+import EventModal from './EventModal';
 
 const EVENT_TYPES = {
   REMARK: 'remark',
@@ -48,11 +43,9 @@ const EVENT_TYPE_COLORS = {
   }
 };
 
-const EventList = ({ events, selectedEventId, onEventSelect, onEventEdit, onEventDelete }) => {
+const EventCard = ({ event, color, onEdit, onDelete, onClick }) => {
   const theme = useTheme();
-  const [searchQuery, setSearchQuery] = useState('');
-  const [selectedType, setSelectedType] = useState(null);
-
+  
   const getEventTypeIcon = (type) => {
     switch (type) {
       case EVENT_TYPES.REMARK:
@@ -66,6 +59,179 @@ const EventList = ({ events, selectedEventId, onEventSelect, onEventEdit, onEven
     }
   };
 
+  return (
+    <motion.div
+      layout
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, y: -20 }}
+      whileHover={{ y: -4 }}
+      whileTap={{ scale: 0.98 }}
+      onClick={onClick}
+      className="relative w-full cursor-pointer"
+      style={{ 
+        perspective: '1000px',
+        transformStyle: 'preserve-3d',
+      }}
+    >
+      <motion.div
+        className={`
+          relative overflow-hidden rounded-xl
+          ${theme.palette.mode === 'dark' ? 'bg-black/40' : 'bg-white/80'}
+          backdrop-blur-md border
+          ${theme.palette.mode === 'dark' ? 'border-white/5' : 'border-black/5'}
+          shadow-lg
+        `}
+        whileHover={{
+          boxShadow: theme.palette.mode === 'dark'
+            ? '0 20px 40px rgba(0,0,0,0.3)'
+            : '0 20px 40px rgba(0,0,0,0.1)',
+        }}
+      >
+        {/* Content Container */}
+        <div className="relative p-6">
+          {/* Event Type Badge */}
+          <div
+            className="absolute -top-3 left-6 px-3 py-1 rounded-full flex items-center gap-2 text-white text-sm font-medium"
+            style={{ 
+              backgroundColor: color,
+              boxShadow: '0 4px 12px rgba(0,0,0,0.1)'
+            }}
+          >
+            {getEventTypeIcon(event.type)}
+            <span className="capitalize">{event.type}</span>
+          </div>
+
+          {/* Main Content */}
+          <div className="mt-4">
+            <Typography 
+              variant="h6" 
+              className={`
+                font-semibold mb-2
+                ${event.type === EVENT_TYPES.NEWS ? 'font-serif' : 'font-sans'}
+              `}
+            >
+              {event.title}
+            </Typography>
+
+            {/* Preview Content */}
+            {event.type === EVENT_TYPES.NEWS && event.url_image && (
+              <div className="relative h-48 mb-4 rounded-lg overflow-hidden">
+                <motion.img
+                  src={event.url_image}
+                  alt={event.title}
+                  className="w-full h-full object-cover"
+                  whileHover={{ scale: 1.05 }}
+                  transition={{ duration: 0.4 }}
+                />
+              </div>
+            )}
+
+            {event.type === EVENT_TYPES.MEDIA && event.media_url && (
+              <div className="relative h-48 mb-4 rounded-lg overflow-hidden bg-black/5">
+                {event.media_type === 'video' ? (
+                  <video
+                    src={event.media_url}
+                    className="w-full h-full object-cover"
+                  />
+                ) : event.media_type === 'audio' ? (
+                  <div className="flex items-center justify-center h-full">
+                    <motion.div
+                      animate={{
+                        scale: [1, 1.2, 1],
+                      }}
+                      transition={{
+                        duration: 1.5,
+                        repeat: Infinity,
+                      }}
+                    >
+                      <MediaIcon sx={{ fontSize: 48, opacity: 0.5 }} />
+                    </motion.div>
+                  </div>
+                ) : (
+                  <img
+                    src={event.media_url}
+                    alt={event.title}
+                    className="w-full h-full object-cover"
+                  />
+                )}
+              </div>
+            )}
+
+            <Typography 
+              variant="body2" 
+              color="text.secondary"
+              className="line-clamp-2 mb-4"
+            >
+              {event.description}
+            </Typography>
+
+            {/* Footer */}
+            <div className="flex items-center justify-between mt-4 pt-4 border-t border-neutral-200 dark:border-neutral-800">
+              <div className="flex items-center gap-4 text-neutral-600 dark:text-neutral-400">
+                <div className="flex items-center gap-1">
+                  <LikeIcon fontSize="small" />
+                  <span className="text-sm">24</span>
+                </div>
+                <div className="flex items-center gap-1">
+                  <RemarkIcon fontSize="small" />
+                  <span className="text-sm">12</span>
+                </div>
+              </div>
+
+              <Typography variant="caption" color="text.secondary">
+                {format(new Date(event.event_date), 'MMM d, yyyy')}
+              </Typography>
+            </div>
+          </div>
+
+          {/* Action Buttons */}
+          <motion.div
+            initial={{ opacity: 0 }}
+            whileHover={{ opacity: 1 }}
+            className="absolute top-2 right-2 flex gap-1"
+          >
+            <IconButton
+              size="small"
+              onClick={(e) => {
+                e.stopPropagation();
+                onEdit(event);
+              }}
+              className={`
+                ${theme.palette.mode === 'dark' ? 'bg-white/10' : 'bg-black/5'}
+                hover:bg-primary-500 hover:text-white
+                transition-colors
+              `}
+            >
+              <EditIcon fontSize="small" />
+            </IconButton>
+            <IconButton
+              size="small"
+              onClick={(e) => {
+                e.stopPropagation();
+                onDelete(event);
+              }}
+              className={`
+                ${theme.palette.mode === 'dark' ? 'bg-white/10' : 'bg-black/5'}
+                hover:bg-red-500 hover:text-white
+                transition-colors
+              `}
+            >
+              <DeleteIcon fontSize="small" />
+            </IconButton>
+          </motion.div>
+        </div>
+      </motion.div>
+    </motion.div>
+  );
+};
+
+const EventList = ({ events, onEventEdit, onEventDelete }) => {
+  const theme = useTheme();
+  const [searchQuery, setSearchQuery] = useState('');
+  const [selectedType, setSelectedType] = useState(null);
+  const [selectedEvent, setSelectedEvent] = useState(null);
+
   const getEventColor = (type) => {
     const colors = EVENT_TYPE_COLORS[type] || EVENT_TYPE_COLORS[EVENT_TYPES.REMARK];
     return theme.palette.mode === 'dark' ? colors.dark : colors.light;
@@ -78,250 +244,23 @@ const EventList = ({ events, selectedEventId, onEventSelect, onEventEdit, onEven
     return matchesSearch && matchesType;
   });
 
-  const renderEventContent = (event) => {
-    const color = getEventColor(event.type);
-
-    switch (event.type) {
-      case EVENT_TYPES.NEWS:
-        return (
-          <CardContent sx={{ position: 'relative', zIndex: 1 }}>
-            <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 2, mb: 2 }}>
-              <Typography 
-                variant="h6" 
-                component="div" 
-                sx={{ 
-                  flexGrow: 1,
-                  fontWeight: 500,
-                  color: color,
-                }}
-              >
-                {event.title}
-              </Typography>
-              {event.author && (
-                <Typography 
-                  variant="subtitle2" 
-                  color="text.secondary"
-                  sx={{ 
-                    fontStyle: 'italic',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 0.5,
-                  }}
-                >
-                  by <span style={{ fontWeight: 500, color: color }}>{event.author}</span>
-                </Typography>
-              )}
-            </Box>
-
-            {event.url && (
-              <Link 
-                href={event.url}
-                target="_blank"
-                rel="noopener noreferrer"
-                underline="none"
-                sx={{ display: 'block', mb: 2 }}
-              >
-                <Card variant="outlined" sx={{ bgcolor: 'background.paper' }}>
-                  {event.url_image && (
-                    <CardMedia
-                      component="img"
-                      height="140"
-                      image={event.url_image}
-                      alt={event.url_title || event.title}
-                    />
-                  )}
-                  <CardContent>
-                    <Typography variant="subtitle1" color="text.primary" gutterBottom>
-                      {event.url_title || event.title}
-                    </Typography>
-                    <Typography variant="body2" color="text.secondary">
-                      {event.url_description || event.description}
-                    </Typography>
-                    <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                      <LinkIcon fontSize="small" />
-                      {event.url_source || new URL(event.url).hostname}
-                    </Typography>
-                  </CardContent>
-                </Card>
-              </Link>
-            )}
-
-            <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-              {event.description}
-            </Typography>
-
-            {event.tags && event.tags.length > 0 && (
-              <Stack direction="row" spacing={1} flexWrap="wrap" gap={1}>
-                {event.tags.map((tag) => (
-                  <Chip
-                    key={tag}
-                    label={tag}
-                    size="small"
-                    sx={{
-                      bgcolor: `${color}20`,
-                      color: color,
-                      '&:hover': { bgcolor: `${color}30` }
-                    }}
-                  />
-                ))}
-              </Stack>
-            )}
-          </CardContent>
-        );
-
-      case EVENT_TYPES.MEDIA:
-        return (
-          <CardContent sx={{ position: 'relative', zIndex: 1 }}>
-            <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 2, mb: 2 }}>
-              <Typography 
-                variant="h6" 
-                component="div" 
-                sx={{ 
-                  flexGrow: 1,
-                  fontWeight: 500,
-                  color: color,
-                }}
-              >
-                {event.title}
-              </Typography>
-              {event.author && (
-                <Typography 
-                  variant="subtitle2" 
-                  color="text.secondary"
-                  sx={{ 
-                    fontStyle: 'italic',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 0.5,
-                  }}
-                >
-                  by <span style={{ fontWeight: 500, color: color }}>{event.author}</span>
-                </Typography>
-              )}
-            </Box>
-
-            {event.media_url && (
-              <Box sx={{ mb: 2, borderRadius: 2, overflow: 'hidden' }}>
-                {event.media_type === 'video' ? (
-                  <video
-                    src={event.media_url}
-                    controls
-                    style={{ width: '100%', maxHeight: 400, objectFit: 'contain' }}
-                  />
-                ) : event.media_type === 'audio' ? (
-                  <audio
-                    src={event.media_url}
-                    controls
-                    style={{ width: '100%' }}
-                  />
-                ) : (
-                  <img
-                    src={event.media_url}
-                    alt={event.title}
-                    style={{ width: '100%', maxHeight: 400, objectFit: 'contain' }}
-                  />
-                )}
-              </Box>
-            )}
-
-            <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-              {event.description}
-            </Typography>
-
-            {event.tags && event.tags.length > 0 && (
-              <Stack direction="row" spacing={1} flexWrap="wrap" gap={1}>
-                {event.tags.map((tag) => (
-                  <Chip
-                    key={tag}
-                    label={tag}
-                    size="small"
-                    sx={{
-                      bgcolor: `${color}20`,
-                      color: color,
-                      '&:hover': { bgcolor: `${color}30` }
-                    }}
-                  />
-                ))}
-              </Stack>
-            )}
-          </CardContent>
-        );
-
-      case EVENT_TYPES.REMARK:
-      default:
-        return (
-          <CardContent sx={{ position: 'relative', zIndex: 1 }}>
-            <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 2, mb: 2 }}>
-              <Typography 
-                variant="h6" 
-                component="div" 
-                sx={{ 
-                  flexGrow: 1,
-                  fontWeight: 500,
-                  color: color,
-                }}
-              >
-                {event.title}
-              </Typography>
-              {event.author && (
-                <Typography 
-                  variant="subtitle2" 
-                  color="text.secondary"
-                  sx={{ 
-                    fontStyle: 'italic',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 0.5,
-                  }}
-                >
-                  by <span style={{ fontWeight: 500, color: color }}>{event.author}</span>
-                </Typography>
-              )}
-            </Box>
-
-            <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-              {event.description}
-            </Typography>
-
-            {event.tags && event.tags.length > 0 && (
-              <Stack direction="row" spacing={1} flexWrap="wrap" gap={1}>
-                {event.tags.map((tag) => (
-                  <Chip
-                    key={tag}
-                    label={tag}
-                    size="small"
-                    sx={{
-                      bgcolor: `${color}20`,
-                      color: color,
-                      '&:hover': { bgcolor: `${color}30` }
-                    }}
-                  />
-                ))}
-              </Stack>
-            )}
-          </CardContent>
-        );
-    }
-  };
-
   return (
     <Paper 
-      elevation={3} 
-      sx={{ 
-        p: 3,
-        mt: 3,
-        borderRadius: 2,
-        bgcolor: theme.palette.mode === 'dark' ? 'background.paper' : 'background.default'
-      }}
+      elevation={0}
+      className={`
+        p-6 mt-6 rounded-2xl
+        ${theme.palette.mode === 'dark' ? 'bg-black/20' : 'bg-white/60'}
+        backdrop-blur-sm
+      `}
     >
       {/* Header */}
-      <Box sx={{ mb: 3 }}>
-        <Typography variant="h5" gutterBottom sx={{ color: theme.palette.primary.main }}>
+      <div className="mb-6">
+        <Typography variant="h5" className="font-semibold mb-4">
           Event List
         </Typography>
         
         {/* Search and Filters */}
-        <Stack direction="row" spacing={2} sx={{ mb: 2 }}>
+        <div className="flex gap-4 flex-wrap">
           <TextField
             fullWidth
             variant="outlined"
@@ -335,142 +274,58 @@ const EventList = ({ events, selectedEventId, onEventSelect, onEventEdit, onEven
                 </InputAdornment>
               ),
             }}
-            sx={{ flex: 1 }}
+            className="flex-1"
           />
           <Stack direction="row" spacing={1}>
             {Object.values(EVENT_TYPES).map((type) => (
-              <Chip
+              <motion.button
                 key={type}
-                label={type}
-                icon={getEventTypeIcon(type)}
                 onClick={() => setSelectedType(selectedType === type ? null : type)}
-                color={selectedType === type ? "primary" : "default"}
-                sx={{
-                  '&:hover': {
-                    bgcolor: `${getEventColor(type)}20`,
-                  },
-                }}
-              />
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                className={`
+                  px-4 py-2 rounded-full text-sm font-medium
+                  transition-colors duration-200
+                  ${selectedType === type
+                    ? 'bg-primary-500 text-white'
+                    : theme.palette.mode === 'dark'
+                      ? 'bg-white/10 text-white/70 hover:bg-white/20'
+                      : 'bg-black/5 text-black/70 hover:bg-black/10'
+                  }
+                `}
+              >
+                {type}
+              </motion.button>
             ))}
           </Stack>
-        </Stack>
-      </Box>
+        </div>
+      </div>
 
       {/* Event Cards */}
-      <Stack spacing={2}>
-        {filteredEvents.map((event) => {
-          const color = getEventColor(event.type);
-          const isSelected = selectedEventId === event.id;
-
-          return (
-            <Card
+      <AnimatePresence>
+        <motion.div
+          className="grid gap-6"
+          layout
+        >
+          {filteredEvents.map((event) => (
+            <EventCard
               key={event.id}
-              sx={{
-                position: 'relative',
-                borderRadius: 2,
-                bgcolor: theme.palette.mode === 'dark' ? 'rgba(0, 0, 0, 0.4)' : 'rgba(255, 255, 255, 0.8)',
-                backdropFilter: 'blur(10px)',
-                transition: 'all 0.3s ease',
-                transform: isSelected ? 'scale(1.02)' : 'scale(1)',
-                '&:hover': {
-                  transform: 'scale(1.01)',
-                  boxShadow: `0 0 0 1px ${color}`,
-                },
-                ...(isSelected && {
-                  boxShadow: `0 0 0 2px ${color}`,
-                }),
-              }}
-            >
-              <CardActionArea 
-                onClick={() => onEventSelect(event)}
-                sx={{ 
-                  position: 'relative',
-                  '&:hover': {
-                    bgcolor: 'transparent',
-                  },
-                }}
-              >
-                {/* Event Type Indicator */}
-                <Box
-                  sx={{
-                    position: 'absolute',
-                    top: 16,
-                    left: 0,
-                    height: 24,
-                    bgcolor: color,
-                    borderTopRightRadius: 12,
-                    borderBottomRightRadius: 12,
-                    px: 1,
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 0.5,
-                    zIndex: 2,
-                  }}
-                >
-                  <Box sx={{ color: '#fff', display: 'flex', alignItems: 'center' }}>
-                    {getEventTypeIcon(event.type)}
-                  </Box>
-                  <Typography variant="caption" sx={{ color: '#fff', fontWeight: 500 }}>
-                    {format(new Date(event.event_date), 'MMM d, yyyy h:mm a')}
-                  </Typography>
-                </Box>
+              event={event}
+              color={getEventColor(event.type)}
+              onEdit={onEventEdit}
+              onDelete={onEventDelete}
+              onClick={() => setSelectedEvent(event)}
+            />
+          ))}
+        </motion.div>
+      </AnimatePresence>
 
-                {renderEventContent(event)}
-              </CardActionArea>
-
-              {/* Action Buttons */}
-              <Box
-                sx={{
-                  position: 'absolute',
-                  top: 16,
-                  right: 16,
-                  zIndex: 2,
-                  display: 'flex',
-                  gap: 1,
-                }}
-              >
-                <Tooltip title="Edit Event">
-                  <IconButton
-                    size="small"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onEventEdit(event);
-                    }}
-                    sx={{
-                      bgcolor: theme.palette.mode === 'dark' ? 'rgba(0, 0, 0, 0.6)' : 'rgba(255, 255, 255, 0.8)',
-                      color: color,
-                      '&:hover': {
-                        bgcolor: theme.palette.mode === 'dark' ? 'rgba(0, 0, 0, 0.8)' : 'rgba(255, 255, 255, 0.9)',
-                      },
-                    }}
-                  >
-                    <EditIcon fontSize="small" />
-                  </IconButton>
-                </Tooltip>
-                <Tooltip title="Delete Event">
-                  <IconButton
-                    size="small"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onEventDelete(event);
-                    }}
-                    sx={{
-                      bgcolor: theme.palette.mode === 'dark' ? 'rgba(0, 0, 0, 0.6)' : 'rgba(255, 255, 255, 0.8)',
-                      color: theme.palette.error.main,
-                      '&:hover': {
-                        bgcolor: theme.palette.error.main,
-                        color: '#fff',
-                      },
-                    }}
-                  >
-                    <DeleteIcon fontSize="small" />
-                  </IconButton>
-                </Tooltip>
-              </Box>
-            </Card>
-          );
-        })}
-      </Stack>
+      {/* Event Modal */}
+      <EventModal
+        event={selectedEvent}
+        open={!!selectedEvent}
+        onClose={() => setSelectedEvent(null)}
+      />
     </Paper>
   );
 };
