@@ -1050,6 +1050,7 @@ def get_timeline_v3_events(timeline_id):
             'title': event.title,
             'description': event.description,
             'event_date': event.event_date.isoformat(),
+            'type': event.type,  # Added type field
             'url': event.url,
             'url_title': event.url_title,
             'url_description': event.url_description,
