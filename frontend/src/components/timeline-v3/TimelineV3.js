@@ -194,15 +194,25 @@ function TimelineV3() {
     return params.get('view') || 'day';
   });
   const [hoverPosition, setHoverPosition] = useState(getExactTimePosition());
+  const [currentEventIndex, setCurrentEventIndex] = useState(0);
+  const [selectedEventId, setSelectedEventId] = useState(null);
 
   // Add new state for events and event form
   const [events, setEvents] = useState([]);
   const [isEventFormOpen, setIsEventFormOpen] = useState(false);
   const [submitError, setSubmitError] = useState(null);
   const [isLoadingEvents, setIsLoadingEvents] = useState(false);
-  const [selectedEventId, setSelectedEventId] = useState(null);
   const [editingEvent, setEditingEvent] = useState(null);
   const [dialogOpen, setDialogOpen] = useState(false);
+
+  const handleEventSelect = (event) => {
+    setSelectedEventId(event.id);
+  };
+
+  const handleDotClick = (event) => {
+    console.log('Dot clicked for event:', event); // Debug log
+    setSelectedEventId(event.id);
+  };
 
   // Fetch events whenever timelineId changes
   useEffect(() => {
@@ -317,10 +327,6 @@ function TimelineV3() {
       setSubmitError(error.response?.data?.error || 'Failed to create event');
       throw error;
     }
-  };
-
-  const handleEventSelect = (event) => {
-    setSelectedEventId(event.id);
   };
 
   const handleEventEdit = (event) => {
@@ -439,8 +445,6 @@ function TimelineV3() {
     }
   };
 
-  const [currentEventIndex, setCurrentEventIndex] = useState(0);
-
   // Reset current event index when switching views
   useEffect(() => {
     if (viewMode !== 'position') {
@@ -455,10 +459,6 @@ function TimelineV3() {
       setCurrentEventIndex(Math.max(0, events.length - 1));
     }
   }, [events.length, currentEventIndex]);
-
-  const handleDotClick = (event) => {
-    setSelectedEventId(event.id);
-  };
 
   return (
     <Box sx={{ 
@@ -563,17 +563,6 @@ function TimelineV3() {
           }}
         >
           <TimelineBackground />
-          
-          {/* Event Counter with Carousel */}
-          <EventCounter 
-            count={events.length} 
-            events={events}
-            currentIndex={currentEventIndex}
-            onChangeIndex={setCurrentEventIndex}
-            onDotClick={handleDotClick}
-            viewMode={viewMode}
-          />
-
           <TimelineBar
             timelineOffset={timelineOffset}
             markerSpacing={100}
@@ -581,7 +570,16 @@ function TimelineV3() {
             maxMarker={Math.max(...markers)}
             theme={theme}
           />
-
+          {viewMode === 'position' && (
+            <EventCounter
+              count={events.length}
+              events={events}
+              currentIndex={currentEventIndex}
+              onChangeIndex={setCurrentEventIndex}
+              onDotClick={handleDotClick}
+              viewMode={viewMode}
+            />
+          )}
           {/* Event Markers - only show in time-based views */}
           {viewMode !== 'position' && events.map((event, index) => (
             <EventMarker
@@ -648,15 +646,14 @@ function TimelineV3() {
       </Container>
 
       {/* Event List */}
-      <Container maxWidth={false}>
+      <Box sx={{ mt: 4 }}>
         <EventList 
           events={events}
-          selectedEventId={selectedEventId}
-          onEventSelect={handleEventSelect}
           onEventEdit={handleEventEdit}
           onEventDelete={handleEventDelete}
+          selectedEventId={selectedEventId}
         />
-      </Container>
+      </Box>
 
       {/* Event Dialog */}
       <EventDialog

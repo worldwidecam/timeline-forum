@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   Typography,
   TextField,
@@ -21,17 +21,19 @@ import {
   Delete as DeleteIcon,
 } from '@mui/icons-material';
 import { motion, AnimatePresence } from 'framer-motion';
-import { EVENT_TYPES } from './EventTypes';
+import { EVENT_TYPES, EVENT_TYPE_COLORS } from './EventTypes';
 import RemarkCard from './cards/RemarkCard';
 import NewsCard from './cards/NewsCard';
 import MediaCard from './cards/MediaCard';
 
-const EventList = ({ events, onEventEdit, onEventDelete }) => {
+const EventList = ({ events, onEventEdit, onEventDelete, selectedEventId }) => {
   const theme = useTheme();
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedType, setSelectedType] = useState(null);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [eventToDelete, setEventToDelete] = useState(null);
+  const [previousSelectedId, setPreviousSelectedId] = useState(null);
+  const eventRefs = useRef({});
 
   const handleDeleteClick = (event) => {
     setEventToDelete(event);
@@ -51,15 +53,29 @@ const EventList = ({ events, onEventEdit, onEventDelete }) => {
     setEventToDelete(null);
   };
 
-  const filteredEvents = events.filter(event => {
-    const matchesSearch = event.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                         event.description.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesType = !selectedType || event.type === selectedType;
-    return matchesSearch && matchesType;
-  });
+  // Handle selection changes and scrolling
+  useEffect(() => {
+    if (selectedEventId !== previousSelectedId) {
+      // Set a timeout to allow the fade-out animation of the previous selection
+      const timeoutId = setTimeout(() => {
+        if (selectedEventId && eventRefs.current[selectedEventId]) {
+          eventRefs.current[selectedEventId].scrollIntoView({
+            behavior: 'smooth',
+            block: 'nearest'
+          });
+        }
+      }, 200);
+
+      setPreviousSelectedId(selectedEventId);
+      return () => clearTimeout(timeoutId);
+    }
+  }, [selectedEventId, previousSelectedId]);
 
   const renderEventCard = (event) => {
-    console.log('Rendering event:', event.type); // Debug log
+    const isSelected = event.id === selectedEventId;
+    const wasSelected = event.id === previousSelectedId && event.id !== selectedEventId;
+    console.log('Rendering event:', event.type, 'Selected:', isSelected); // Debug log
+    
     const commonProps = {
       key: event.id,
       event,
@@ -67,15 +83,60 @@ const EventList = ({ events, onEventEdit, onEventDelete }) => {
       onDelete: handleDeleteClick,
     };
 
-    switch (event.type?.toLowerCase()) {
-      case EVENT_TYPES.NEWS:
-        return <NewsCard {...commonProps} />;
-      case EVENT_TYPES.MEDIA:
-        return <MediaCard {...commonProps} />;
-      default:
-        return <RemarkCard {...commonProps} />;
-    }
+    const card = (() => {
+      switch (event.type?.toLowerCase()) {
+        case EVENT_TYPES.NEWS:
+          return <NewsCard {...commonProps} />;
+        case EVENT_TYPES.MEDIA:
+          return <MediaCard {...commonProps} />;
+        default:
+          return <RemarkCard {...commonProps} />;
+      }
+    })();
+
+    // Get the appropriate color based on event type
+    const getEventColor = () => {
+      if (!event.type) return theme.palette.primary.main;
+      const colors = EVENT_TYPE_COLORS[event.type];
+      return theme.palette.mode === 'dark' ? colors.dark : colors.light;
+    };
+
+    return (
+      <motion.div
+        animate={isSelected ? {
+          scale: [1, 1.02, 1],
+          boxShadow: [
+            "0px 0px 0px 0px rgba(0,0,0,0)",
+            `0px 0px 0px 3px ${getEventColor()}`,
+            `0px 0px 0px 2px ${getEventColor()}`
+          ]
+        } : {
+          scale: 1,
+          boxShadow: "0px 0px 0px 0px rgba(0,0,0,0)"
+        }}
+        transition={{
+          duration: 0.5,
+          ease: "easeInOut",
+          times: [0, 0.6, 1]
+        }}
+        style={{
+          borderRadius: '8px',
+          marginBottom: '16px',
+          opacity: wasSelected ? 0.7 : 1,
+          transition: 'opacity 0.3s ease-out'
+        }}
+      >
+        {card}
+      </motion.div>
+    );
   };
+
+  const filteredEvents = events.filter(event => {
+    const matchesSearch = event.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                         event.description.toLowerCase().includes(searchQuery.toLowerCase());
+    const matchesType = !selectedType || event.type === selectedType;
+    return matchesSearch && matchesType;
+  });
 
   return (
     <div className="w-full max-w-3xl mx-auto p-4">
@@ -139,6 +200,7 @@ const EventList = ({ events, onEventEdit, onEventDelete }) => {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -20 }}
+            ref={el => eventRefs.current[event.id] = el}
           >
             {renderEventCard(event)}
           </motion.div>
