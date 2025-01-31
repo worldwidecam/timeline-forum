@@ -26,14 +26,13 @@ import RemarkCard from './cards/RemarkCard';
 import NewsCard from './cards/NewsCard';
 import MediaCard from './cards/MediaCard';
 
-const EventList = ({ events, onEventEdit, onEventDelete, selectedEventId }) => {
+const EventList = ({ events, onEventEdit, onEventDelete, selectedEventId, onEventSelect }) => {
   const theme = useTheme();
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedType, setSelectedType] = useState(null);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [eventToDelete, setEventToDelete] = useState(null);
   const [previousSelectedId, setPreviousSelectedId] = useState(null);
-  const [clickedEventId, setClickedEventId] = useState(null);
   const eventRefs = useRef({});
 
   const handleDeleteClick = (event) => {
@@ -52,6 +51,20 @@ const EventList = ({ events, onEventEdit, onEventDelete, selectedEventId }) => {
   const handleDeleteCancel = () => {
     setDeleteDialogOpen(false);
     setEventToDelete(null);
+  };
+
+  const scrollToEvent = (eventId) => {
+    const eventElement = eventRefs.current[eventId];
+    console.log('Scrolling to event:', eventId, 'Element:', eventElement); // Debug log
+    if (eventElement) {
+      eventElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    } else {
+      console.error('Event element not found:', eventId); // Debug log
+    }
+  };
+
+  const handleEventDotClick = (eventId) => {
+    scrollToEvent(eventId);
   };
 
   // Handle selection changes and scrolling
@@ -88,7 +101,6 @@ const EventList = ({ events, onEventEdit, onEventDelete, selectedEventId }) => {
   const renderEventCard = (event) => {
     const isSelected = event.id === selectedEventId;
     const wasSelected = event.id === previousSelectedId && event.id !== selectedEventId;
-    const isClicked = event.id === clickedEventId;
     console.log('Rendering event:', event.type, 'Selected:', isSelected); // Debug log
 
     const commonProps = {
@@ -118,18 +130,18 @@ const EventList = ({ events, onEventEdit, onEventDelete, selectedEventId }) => {
 
     return (
       <motion.div
-        animate={isSelected || isClicked ? {
+        animate={isSelected ? {
           scale: [1, 1.02, 1],
           boxShadow: [
             "0px 0px 0px 0px rgba(0,0,0,0)",
-            `0px 0px 0px 3px ${getEventColor()}`,
+            `0px 0px 8px 2px ${getEventColor()}`,
             `0px 0px 0px 2px ${getEventColor()}`
           ],
-          border: `2px solid ${isSelected || isClicked ? getEventColor() : 'transparent'}`
+          border: `2px solid ${getEventColor()}`
         } : {
           scale: 1,
           boxShadow: "0px 0px 0px 0px rgba(0,0,0,0)",
-          border: 'none'
+          border: "2px solid transparent"
         }}
         transition={{
           duration: 0.5,
@@ -144,11 +156,8 @@ const EventList = ({ events, onEventEdit, onEventDelete, selectedEventId }) => {
         }}
         onClick={() => {
           console.log('Clicked event ID:', event.id);
-          // Only set clickedEventId if it's a different card
-          if (clickedEventId !== event.id) {
-            setClickedEventId(event.id);
-          }
           if (selectedEventId !== event.id) {
+            onEventSelect(event);
             const cardElement = eventRefs.current[event.id];
             if (cardElement) {
               const { top, height } = cardElement.getBoundingClientRect();
@@ -176,7 +185,7 @@ const EventList = ({ events, onEventEdit, onEventDelete, selectedEventId }) => {
   });
 
   return (
-    <div className="w-full max-w-3xl mx-auto p-4">
+    <div className="max-h-[600px] overflow-y-scroll scrollbar-thin scrollbar-thumb-gray-400 scrollbar-track-gray-100 dark:scrollbar-thumb-gray-600 dark:scrollbar-track-gray-800 px-4">
       {/* Search and Filter */}
       <div className="mb-6">
         <TextField
@@ -237,7 +246,10 @@ const EventList = ({ events, onEventEdit, onEventDelete, selectedEventId }) => {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -20 }}
-            ref={el => eventRefs.current[event.id] = el}
+            ref={el => {
+              eventRefs.current[event.id] = el;
+              console.log('Assigned ref for event:', event.id, 'Element:', el); // Debug log
+            }}
           >
             {renderEventCard(event)}
           </motion.div>

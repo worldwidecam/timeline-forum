@@ -652,6 +652,7 @@ function TimelineV3() {
           onEventEdit={handleEventEdit}
           onEventDelete={handleEventDelete}
           selectedEventId={selectedEventId}
+          onEventSelect={handleEventSelect}
         />
       </Box>
 
