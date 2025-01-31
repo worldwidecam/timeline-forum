@@ -33,6 +33,7 @@ const EventList = ({ events, onEventEdit, onEventDelete, selectedEventId }) => {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [eventToDelete, setEventToDelete] = useState(null);
   const [previousSelectedId, setPreviousSelectedId] = useState(null);
+  const [clickedEventId, setClickedEventId] = useState(null);
   const eventRefs = useRef({});
 
   const handleDeleteClick = (event) => {
@@ -71,11 +72,25 @@ const EventList = ({ events, onEventEdit, onEventDelete, selectedEventId }) => {
     }
   }, [selectedEventId, previousSelectedId]);
 
+  // Centering the focused card
+  useEffect(() => {
+    if (selectedEventId && eventRefs.current[selectedEventId]) {
+      const cardElement = eventRefs.current[selectedEventId];
+      const { top, height } = cardElement.getBoundingClientRect();
+      const centerOffset = (window.innerHeight / 2) - (height / 2);
+      window.scrollTo({
+        top: top + window.scrollY - centerOffset,
+        behavior: 'smooth'
+      });
+    }
+  }, [selectedEventId]);
+
   const renderEventCard = (event) => {
     const isSelected = event.id === selectedEventId;
     const wasSelected = event.id === previousSelectedId && event.id !== selectedEventId;
+    const isClicked = event.id === clickedEventId;
     console.log('Rendering event:', event.type, 'Selected:', isSelected); // Debug log
-    
+
     const commonProps = {
       key: event.id,
       event,
@@ -103,16 +118,18 @@ const EventList = ({ events, onEventEdit, onEventDelete, selectedEventId }) => {
 
     return (
       <motion.div
-        animate={isSelected ? {
+        animate={isSelected || isClicked ? {
           scale: [1, 1.02, 1],
           boxShadow: [
             "0px 0px 0px 0px rgba(0,0,0,0)",
             `0px 0px 0px 3px ${getEventColor()}`,
             `0px 0px 0px 2px ${getEventColor()}`
-          ]
+          ],
+          border: `2px solid ${isSelected || isClicked ? getEventColor() : 'transparent'}`
         } : {
           scale: 1,
-          boxShadow: "0px 0px 0px 0px rgba(0,0,0,0)"
+          boxShadow: "0px 0px 0px 0px rgba(0,0,0,0)",
+          border: 'none'
         }}
         transition={{
           duration: 0.5,
@@ -124,6 +141,26 @@ const EventList = ({ events, onEventEdit, onEventDelete, selectedEventId }) => {
           marginBottom: '16px',
           opacity: wasSelected ? 0.7 : 1,
           transition: 'opacity 0.3s ease-out'
+        }}
+        onClick={() => {
+          console.log('Clicked event ID:', event.id);
+          // Only set clickedEventId if it's a different card
+          if (clickedEventId !== event.id) {
+            setClickedEventId(event.id);
+          }
+          if (selectedEventId !== event.id) {
+            const cardElement = eventRefs.current[event.id];
+            if (cardElement) {
+              const { top, height } = cardElement.getBoundingClientRect();
+              const centerOffset = (window.innerHeight / 2) - (height / 2);
+              window.scrollTo({
+                top: top + window.scrollY - centerOffset,
+                behavior: 'smooth'
+              });
+            } else {
+              console.warn('No reference found for event ID:', event.id);
+            }
+          }
         }}
       >
         {card}
