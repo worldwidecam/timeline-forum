@@ -1,3 +1,59 @@
+# Timeline Forum (V3)
+
+## AI Context Primer
+
+### Core Architectural Tenets  
+**1. Coordinate-Based Timeline** (`TimelineV3.js`)  
+- Zero-point reference system  
+- Bidirectional infinite growth  
+- Marker generation algorithm (`generateTimeMarkers`)  
+
+**2. Event/Post Unification** (`EventList.js:36`)  
+- Shared data structure between events/posts  
+- Hashtag-based timeline association  
+- Identical rendering components  
+
+**3. Navigation System** (`TimelineControls.js`)  
+- Scroll position preservation  
+- URL parameter synchronization  
+- Hover marker persistence  
+
+### Critical Implementation Patterns
+
+```javascript
+// Timeline width calculation (responsive hook)
+const { width } = useWindowSize(); // From frontend/src/hooks/
+```
+
+```javascript
+// Event dot click handler (TimelineView.js:380-415)
+eventDotContainer.onClick = () => {
+  // Maintains z-index hierarchy during portal rendering
+};
+```
+
+### Component Reference Table
+| Component          | Key Functionality          | Location                                  |
+|--------------------|----------------------------|-------------------------------------------|
+| Timeline Core      | Coordinate calculations    | `frontend/src/components/timeline-v3/`   |
+| Event List         | Unified display render     | `EventList.js:36` (current focus)         |
+| Time Markers       | Dynamic generation         | `TimelineV3.js:142`                      |
+
+### Current Focus Area: Day View
+1. **Completion Requirements**  
+- Finalize hour marker spacing algorithm  
+- Implement smooth timezone transitions  
+- Connect to real-time event feed  
+
+2. **Key Dependencies**  
+- `useWindowSize` hook  
+- Timeline scroll position context  
+- Event dot portal rendering
+
+### Original Documentation
+<details>
+<summary>Legacy README Content</summary>
+
 # Timeline Forum
 
 An interactive web application for creating and visualizing timelines with events. Events are displayed on a horizontal timeline with year markers and can be expanded for more details.

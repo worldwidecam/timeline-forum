@@ -12,6 +12,7 @@ import {
   DialogContent,
   DialogActions,
   Button,
+  Box
 } from '@mui/material';
 import {
   Search as SearchIcon,
@@ -185,76 +186,98 @@ const EventList = ({ events, onEventEdit, onEventDelete, selectedEventId, onEven
   });
 
   return (
-    <div className="max-h-[600px] overflow-y-scroll scrollbar-thin scrollbar-thumb-gray-400 scrollbar-track-gray-100 dark:scrollbar-thumb-gray-600 dark:scrollbar-track-gray-800 px-4">
-      {/* Search and Filter */}
-      <div className="mb-6">
-        <TextField
-          fullWidth
-          variant="outlined"
-          placeholder="Search events..."
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          InputProps={{
-            startAdornment: (
-              <InputAdornment position="start">
-                <SearchIcon />
-              </InputAdornment>
-            ),
-          }}
-        />
+    <div className="event-list-container">
+      {/* Sticky Header */}
+      <div 
+        style={{
+          position: 'sticky',
+          top: 0,
+          zIndex: 1200,
+          backgroundColor: theme.palette.background.default,
+          paddingBottom: theme.spacing(1),
+          boxShadow: theme.shadows[2]
+        }}
+      >
+        <Box className="search-filter-bar" sx={{ px: 2, pt: 2 }}>
+          {/* Search and Filter */}
+          <div className="mb-6">
+            <TextField
+              fullWidth
+              variant="outlined"
+              placeholder="Search events..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              InputProps={{
+                startAdornment: (
+                  <InputAdornment position="start">
+                    <SearchIcon />
+                  </InputAdornment>
+                ),
+              }}
+            />
 
-        {/* Type Filters */}
-        <Stack direction="row" spacing={2} className="mt-4">
-          <motion.div
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.95 }}
-            onClick={() => setSelectedType(null)}
-          >
-            <Paper
-              className={`px-4 py-2 cursor-pointer ${
-                !selectedType ? 'bg-blue-500 text-white' : ''
-              }`}
-            >
-              All
-            </Paper>
-          </motion.div>
-          {Object.values(EVENT_TYPES).map((type) => (
-            <motion.div
-              key={type}
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
-              onClick={() => setSelectedType(type)}
-            >
-              <Paper
-                className={`px-4 py-2 cursor-pointer ${
-                  selectedType === type ? 'bg-blue-500 text-white' : ''
-                }`}
+            {/* Type Filters */}
+            <Stack direction="row" spacing={2} className="mt-4">
+              <motion.div
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                onClick={() => setSelectedType(null)}
               >
-                {type.charAt(0).toUpperCase() + type.slice(1)}
-              </Paper>
-            </motion.div>
-          ))}
-        </Stack>
+                <Paper
+                  className={`px-4 py-2 cursor-pointer ${
+                    !selectedType ? 'bg-blue-500 text-white' : ''
+                  }`}
+                >
+                  All
+                </Paper>
+              </motion.div>
+              {Object.values(EVENT_TYPES).map((type) => (
+                <motion.div
+                  key={type}
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                  onClick={() => setSelectedType(type)}
+                >
+                  <Paper
+                    className={`px-4 py-2 cursor-pointer ${
+                      selectedType === type ? 'bg-blue-500 text-white' : ''
+                    }`}
+                  >
+                    {type.charAt(0).toUpperCase() + type.slice(1)}
+                  </Paper>
+                </motion.div>
+              ))}
+            </Stack>
+          </div>
+        </Box>
       </div>
 
-      {/* Event List */}
-      <AnimatePresence mode="popLayout">
-        {filteredEvents.map((event) => (
-          <motion.div
-            key={event.id}
-            layout
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -20 }}
-            ref={el => {
-              eventRefs.current[event.id] = el;
-              console.log('Assigned ref for event:', event.id, 'Element:', el); // Debug log
-            }}
-          >
-            {renderEventCard(event)}
-          </motion.div>
-        ))}
-      </AnimatePresence>
+      {/* Scrollable Content */}
+      <div 
+        style={{
+          overflowY: 'auto',
+          height: `calc(100vh - ${64}px)`, 
+          padding: theme.spacing(1, 2, 0, 2)
+        }}
+      >
+        <AnimatePresence mode="popLayout">
+          {filteredEvents.map((event) => (
+            <motion.div
+              key={event.id}
+              layout
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -20 }}
+              ref={el => {
+                eventRefs.current[event.id] = el;
+                console.log('Assigned ref for event:', event.id, 'Element:', el); // Debug log
+              }}
+            >
+              {renderEventCard(event)}
+            </motion.div>
+          ))}
+        </AnimatePresence>
+      </div>
 
       {/* Delete Confirmation Dialog */}
       <Dialog
