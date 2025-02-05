@@ -36,11 +36,19 @@ const EventList = ({ events, onEventEdit, onEventDelete, selectedEventId, onEven
   const theme = useTheme();
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedType, setSelectedType] = useState(null);
-  const [sortOrder, setSortOrder] = useState('newest'); // 'newest' or 'oldest'
+  const [sortOrder, setSortOrder] = useState(() => {
+    // Load saved preference or default to 'newest'
+    return localStorage.getItem('timeline_sort_preference') || 'newest';
+  });
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [eventToDelete, setEventToDelete] = useState(null);
   const [previousSelectedId, setPreviousSelectedId] = useState(null);
   const eventRefs = useRef({});
+
+  // Save sort preference whenever it changes
+  useEffect(() => {
+    localStorage.setItem('timeline_sort_preference', sortOrder);
+  }, [sortOrder]);
 
   const handleDeleteClick = (event) => {
     setEventToDelete(event);
