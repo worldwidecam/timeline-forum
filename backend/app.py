@@ -22,6 +22,9 @@ app.config.update(
     SQLALCHEMY_TRACK_MODIFICATIONS=False,
     JWT_SECRET_KEY=os.getenv('JWT_SECRET_KEY', 'your-secret-key'),  # Change this in production
     JWT_ACCESS_TOKEN_EXPIRES=24*60*60,  # Token expires in 24 hours
+    JWT_TOKEN_LOCATION=['headers', 'cookies'],  # Check both headers and cookies for JWT
+    JWT_COOKIE_SECURE=False,  # Set to True in production with HTTPS
+    JWT_COOKIE_CSRF_PROTECT=False,  # Set to True in production
     MAX_CONTENT_LENGTH=16 * 1024 * 1024  # 16MB max file size
 )
 
@@ -36,7 +39,8 @@ CORS(app, resources={
         ],
         "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
         "allow_headers": ["Content-Type", "Authorization"],
-        "supports_credentials": True
+        "supports_credentials": True,
+        "expose_headers": ["Content-Type", "Authorization"]
     }
 })
 
@@ -753,15 +757,25 @@ def login():
     if not user or not user.check_password(data['password']):
         return jsonify({'error': 'Invalid email or password'}), 401
     
-    # Create access token with string identity
-    access_token = create_access_token(identity=str(user.id))
-    
-    return jsonify({
+    access_token = create_access_token(identity=user.id)
+    response = jsonify({
         'id': user.id,
         'username': user.username,
         'email': user.email,
         'token': access_token
     })
+    
+    # Set JWT token in cookie
+    response.set_cookie(
+        'access_token_cookie',
+        access_token,
+        httponly=True,
+        max_age=24*60*60,  # 24 hours
+        samesite='Lax',
+        secure=False  # Set to True in production with HTTPS
+    )
+    
+    return response
 
 @app.route('/api/profile/update', methods=['POST'])
 @jwt_required()

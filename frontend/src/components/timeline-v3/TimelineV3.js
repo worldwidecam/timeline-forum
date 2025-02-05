@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
 import { Box, Container, useTheme, Button, Fade, Stack, Typography, Fab, Tooltip } from '@mui/material';
 import { useAuth } from '../../contexts/AuthContext';
 import axios from 'axios';
@@ -17,6 +17,7 @@ const API_BASE_URL = '/api';
 
 function TimelineV3() {
   const { id } = useParams();
+  const navigate = useNavigate();
   const { user } = useAuth();
   const theme = useTheme();
   const [timelineId, setTimelineId] = useState(id);
@@ -204,6 +205,9 @@ function TimelineV3() {
   const [isLoadingEvents, setIsLoadingEvents] = useState(false);
   const [editingEvent, setEditingEvent] = useState(null);
   const [dialogOpen, setDialogOpen] = useState(false);
+
+  const [isRecentering, setIsRecentering] = useState(false);
+  const [isFullyFaded, setIsFullyFaded] = useState(false);
 
   const handleEventSelect = (event) => {
     setSelectedEventId(event.id);
@@ -410,18 +414,29 @@ function TimelineV3() {
   };
 
   const handleRecenter = () => {
-    // Trigger fade out
-    const transitionElement = document.querySelector('.MuiFade-root');
-    if (transitionElement) {
-      transitionElement.style.opacity = '0';
-    }
+    setIsRecentering(true);
 
-    // Wait for fade out before redirecting
+    // Wait for fade out to complete
     setTimeout(() => {
-      const url = new URL(window.location.href);
-      url.searchParams.set('view', viewMode);
-      window.location.href = url.toString();
-    }, 300); // Half of the total transition time
+      setIsFullyFaded(true);
+      
+      // Reset timeline offset and markers
+      setTimelineOffset(0);
+      setMarkers(getInitialMarkers());
+      
+      // Update URL without page reload
+      const searchParams = new URLSearchParams(window.location.search);
+      searchParams.set('view', viewMode);
+      navigate(`/timeline-v3/${timelineId}?${searchParams.toString()}`, { replace: true });
+
+      // Start fade in animation after a short delay
+      setTimeout(() => {
+        setIsFullyFaded(false);
+        setTimeout(() => {
+          setIsRecentering(false);
+        }, 50);
+      }, 100);
+    }, 400); // Match the transition duration
   };
 
   // Marker styles
@@ -440,6 +455,18 @@ function TimelineV3() {
         backgroundColor: theme.palette.text.secondary
       }
     }
+  };
+
+  const timelineTransitionStyles = {
+    transition: 'all 0.4s cubic-bezier(0.4, 0, 0.2, 1)',
+    opacity: isRecentering ? 0 : 1,
+    transform: `
+      translate3d(0, 0, 0)
+      scale(${isRecentering ? '0.98' : '1'})
+      ${isFullyFaded ? 'translateY(-10px)' : 'translateY(0)'}
+    `,
+    pointerEvents: isRecentering ? 'none' : 'auto',
+    willChange: 'transform, opacity'
   };
 
   return (
@@ -541,7 +568,8 @@ function TimelineV3() {
             borderRadius: 2,
             boxShadow: 1,
             position: 'relative',
-            overflow: 'hidden'
+            overflow: 'hidden',
+            ...timelineTransitionStyles
           }}
         >
           <TimelineBackground />
@@ -551,6 +579,7 @@ function TimelineV3() {
             minMarker={Math.min(...markers)}
             maxMarker={Math.max(...markers)}
             theme={theme}
+            style={timelineTransitionStyles}
           />
           {viewMode === 'position' && (
             <EventCounter
@@ -560,6 +589,7 @@ function TimelineV3() {
               onChangeIndex={setCurrentEventIndex}
               onDotClick={handleDotClick}
               viewMode={viewMode}
+              style={timelineTransitionStyles}
             />
           )}
           {/* Event Markers - only show in time-based views */}
@@ -572,6 +602,7 @@ function TimelineV3() {
               viewMode={viewMode}
               index={index}
               totalEvents={events.length}
+              style={timelineTransitionStyles}
             />
           ))}
           <TimeMarkers 
@@ -581,6 +612,7 @@ function TimelineV3() {
             markers={markers}
             viewMode={viewMode}
             theme={theme}
+            style={timelineTransitionStyles}
           />
           <HoverMarker 
             position={hoverPosition} 
@@ -589,6 +621,7 @@ function TimelineV3() {
             viewMode={viewMode}
             markers={markers}
             theme={theme}
+            style={timelineTransitionStyles}
           />
           <Button
             onClick={handleLeft}

@@ -3,6 +3,47 @@ import axios from 'axios';
 
 // Configure axios defaults
 axios.defaults.baseURL = 'http://localhost:5000';
+axios.defaults.withCredentials = true;  // Important for cookies
+
+// Add request interceptor
+axios.interceptors.request.use(
+  (config) => {
+    const token = localStorage.getItem('token');
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
+    }
+    return config;
+  },
+  (error) => {
+    return Promise.reject(error);
+  }
+);
+
+// Add response interceptor
+axios.interceptors.response.use(
+  (response) => response,
+  async (error) => {
+    const originalRequest = error.config;
+    
+    // If the error is 401 and we haven't retried yet
+    if (error.response?.status === 401 && !originalRequest._retry) {
+      originalRequest._retry = true;
+      
+      try {
+        // Try to refresh the token or reauthenticate
+        const token = localStorage.getItem('token');
+        if (token) {
+          // Attempt the original request again
+          originalRequest.headers.Authorization = `Bearer ${token}`;
+          return axios(originalRequest);
+        }
+      } catch (err) {
+        console.error('Error refreshing auth:', err);
+      }
+    }
+    return Promise.reject(error);
+  }
+);
 
 const AuthContext = createContext(null);
 
@@ -21,9 +62,7 @@ export const AuthProvider = ({ children }) => {
 
   const fetchCurrentUser = async () => {
     try {
-      const response = await axios.get('/api/user/current', {
-        headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
-      });
+      const response = await axios.get('/api/user/current');
       setUser(response.data);
     } catch (error) {
       // Only remove token if it's an authentication error
@@ -68,11 +107,6 @@ export const AuthProvider = ({ children }) => {
       ...prevUser,
       ...userData
     }));
-    
-    // Update the stored user data
-    const storedData = JSON.parse(localStorage.getItem('userData') || '{}');
-    const updatedData = { ...storedData, ...userData };
-    localStorage.setItem('userData', JSON.stringify(updatedData));
   };
 
   const value = {

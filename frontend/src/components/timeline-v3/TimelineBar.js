@@ -6,7 +6,8 @@ const TimelineBar = ({
   markerSpacing = 100,
   minMarker,
   maxMarker,
-  theme
+  theme,
+  style
 }) => {
   // Width spans from min to max marker
   const barWidth = (maxMarker - minMarker) * markerSpacing;
@@ -21,7 +22,8 @@ const TimelineBar = ({
       backgroundColor: theme.palette.primary.main,
       transform: `translateX(${timelineOffset}px)`,
       transition: 'transform 0.1s ease-out',
-      width: barWidth
+      width: barWidth,
+      ...style
     }} />
   );
 };
