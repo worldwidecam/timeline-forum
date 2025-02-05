@@ -309,6 +309,7 @@ function TimelineV3() {
         url_source: eventData.url_source || '',
         media_url: mediaUrl || '',
         media_type: eventData.media ? eventData.media.type.split('/')[0] : '',
+        tags: eventData.tags || []
       }, {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`
@@ -349,26 +350,6 @@ function TimelineV3() {
       console.error('Error deleting event:', error);
       // Keep the event in the UI if deletion fails
     }
-  };
-
-  const handleEventSave = async (eventData) => {
-    if (editingEvent) {
-      // Update existing event
-      setEvents(events.map(event => 
-        event.id === editingEvent.id 
-          ? { ...event, ...eventData }
-          : event
-      ));
-      setEditingEvent(null);
-    } else {
-      // Create new event
-      const newEvent = {
-        id: Date.now(), // temporary ID generation
-        ...eventData
-      };
-      setEvents([...events, newEvent]);
-    }
-    setDialogOpen(false);
   };
 
   // Update hover position when view mode changes
@@ -663,57 +644,7 @@ function TimelineV3() {
           setDialogOpen(false);
           setEditingEvent(null);
         }}
-        onSave={async (eventData) => {
-          try {
-            if (editingEvent) {
-              // Update existing event
-              const response = await axios.put(`/api/timeline-v3/${timelineId}/events/${editingEvent.id}`, {
-                ...eventData,
-                timeline_id: timelineId
-              }, {
-                headers: {
-                  'Authorization': `Bearer ${localStorage.getItem('token')}`
-                }
-              });
-              setEvents(events.map(event => 
-                event.id === editingEvent.id 
-                  ? response.data
-                  : event
-              ));
-              setEditingEvent(null);
-            } else {
-              // Handle media upload first if present
-              let mediaUrl = null;
-              if (eventData.mediaFile) {
-                const formData = new FormData();
-                formData.append('file', eventData.mediaFile);
-                const uploadResponse = await axios.post('/api/upload', formData, {
-                  headers: {
-                    'Authorization': `Bearer ${localStorage.getItem('token')}`,
-                    'Content-Type': 'multipart/form-data'
-                  }
-                });
-                mediaUrl = uploadResponse.data.url;
-              }
-
-              // Create new event
-              const response = await axios.post(`/api/timeline-v3/${timelineId}/events`, {
-                ...eventData,
-                media_url: mediaUrl,
-                timeline_id: timelineId
-              }, {
-                headers: {
-                  'Authorization': `Bearer ${localStorage.getItem('token')}`
-                }
-              });
-              setEvents(prev => [...prev, response.data]);
-            }
-            setDialogOpen(false);
-          } catch (error) {
-            console.error('Error saving event:', error);
-            setSubmitError(error.response?.data?.message || 'Error saving event');
-          }
-        }}
+        onSave={handleEventSubmit}
         initialEvent={editingEvent}
       />
 

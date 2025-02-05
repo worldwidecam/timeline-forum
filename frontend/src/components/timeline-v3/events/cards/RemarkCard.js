@@ -14,6 +14,7 @@ import {
 import { motion } from 'framer-motion';
 import { format, parseISO } from 'date-fns';
 import { EVENT_TYPES, EVENT_TYPE_COLORS } from '../EventTypes';
+import TagList from './TagList';
 
 const RemarkCard = ({ event, onEdit, onDelete }) => {
   const theme = useTheme();
@@ -117,6 +118,9 @@ const RemarkCard = ({ event, onEdit, onDelete }) => {
           <div className="mt-4 flex items-center justify-between text-sm opacity-50">
             <span>{formatDate(event.event_date || event.date)}</span>
           </div>
+
+          {/* Tags */}
+          <TagList tags={event.tags} />
         </div>
       </motion.div>
     </motion.div>

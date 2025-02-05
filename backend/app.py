@@ -8,6 +8,7 @@ from werkzeug.utils import secure_filename
 import os
 import logging
 import time
+# Removed the incorrect import statement
 
 # Configure logging
 logging.basicConfig(level=logging.DEBUG)
@@ -157,22 +158,22 @@ class Post(db.Model):
     created_at = db.Column(db.DateTime, default=datetime.now())
     upvotes = db.Column(db.Integer, default=0)
     comments = db.relationship('Comment', backref='post', lazy=True)
-    promoted_to_event = db.Column(db.Boolean, default=False)
-    promotion_score = db.Column(db.Float, default=0.0)
-    source_count = db.Column(db.Integer, default=0)
-    promotion_votes = db.Column(db.Integer, default=0)
-    last_score_update = db.Column(db.DateTime, default=datetime.now())
 
-    def update_promotion_score(self):
-        base_score = self.upvotes
-        comment_bonus = len(self.comments) * 0.5
-        source_bonus = self.source_count * 2
-        content_bonus = min(len(self.content) / 500, 2)
-        promotion_bonus = self.promotion_votes * 1.5
+class Tag(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(100), unique=True, nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    timeline_id = db.Column(db.Integer, db.ForeignKey('timeline.id'), nullable=True)
 
-        self.promotion_score = base_score + comment_bonus + source_bonus + content_bonus + promotion_bonus
-        self.last_score_update = datetime.now()
-        return self.promotion_score
+    def __repr__(self):
+        return f'<Tag {self.name}>'
+
+# Event-Tag Association Table
+event_tags = db.Table('event_tags',
+    db.Column('event_id', db.Integer, db.ForeignKey('event.id')),
+    db.Column('tag_id', db.Integer, db.ForeignKey('tag.id')),
+    db.Column('created_at', db.DateTime, default=datetime.utcnow)
+)
 
 class Event(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -198,6 +199,9 @@ class Event(db.Model):
     # Metadata
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    # Tags relationship
+    tags = db.relationship('Tag', secondary=event_tags, backref=db.backref('events', lazy='dynamic'))
     
     def __repr__(self):
         return f'<Event {self.title}>'
@@ -572,7 +576,6 @@ def get_all_posts():
                 'event_date': post.event_date.isoformat(),
                 'created_at': post.created_at.isoformat(),
                 'upvotes': post.upvotes,
-                'promotion_score': post.promotion_score,
                 'url': post.url,
                 'url_title': post.url_title,
                 'url_description': post.url_description,
@@ -1050,7 +1053,7 @@ def get_timeline_v3_events(timeline_id):
             'title': event.title,
             'description': event.description,
             'event_date': event.event_date.isoformat(),
-            'type': event.type,  # Added type field
+            'type': event.type,
             'url': event.url,
             'url_title': event.url_title,
             'url_description': event.url_description,
@@ -1058,7 +1061,8 @@ def get_timeline_v3_events(timeline_id):
             'media_url': event.media_url,
             'media_type': event.media_type,
             'created_by': event.created_by,
-            'created_at': event.created_at.isoformat()
+            'created_at': event.created_at.isoformat(),
+            'tags': [{'id': tag.id, 'name': tag.name} for tag in event.tags]
         } for event in events])
     except Exception as e:
         app.logger.error(f'Error getting events: {str(e)}')
@@ -1086,7 +1090,7 @@ def create_timeline_v3_event(timeline_id):
         required_fields = {
             'title': str,
             'event_date': str,
-            'type': str,  # Added type as required field
+            'type': str,
         }
         
         for field, field_type in required_fields.items():
@@ -1112,7 +1116,7 @@ def create_timeline_v3_event(timeline_id):
             title=data['title'],
             description=data.get('description', ''),
             event_date=event_date,
-            type=data['type'],  # Added type field
+            type=data['type'],
             timeline_id=timeline_id,
             created_by=1  # Temporary default user ID
         )
@@ -1128,6 +1132,35 @@ def create_timeline_v3_event(timeline_id):
         if 'media_url' in data and data['media_url']:
             new_event.media_url = data['media_url']
             new_event.media_type = data.get('media_type', '')
+            
+        # Handle tags
+        if 'tags' in data and data['tags']:
+            for tag_name in data['tags']:
+                # Clean tag name
+                tag_name = tag_name.strip().lower()
+                if not tag_name:
+                    continue
+                    
+                # Find or create tag
+                tag = Tag.query.filter_by(name=tag_name).first()
+                if not tag:
+                    # Create new tag
+                    tag = Tag(name=tag_name)
+                    db.session.add(tag)
+                    
+                    # Create a new timeline for this tag if it doesn't exist
+                    tag_timeline = Timeline.query.filter_by(name=f"#{tag_name}").first()
+                    if not tag_timeline:
+                        tag_timeline = Timeline(
+                            name=f"#{tag_name}",
+                            description=f"Timeline for #{tag_name}",
+                            created_by=1  # Temporary default user ID
+                        )
+                        db.session.add(tag_timeline)
+                        db.session.flush()  # Get the timeline ID
+                        tag.timeline_id = tag_timeline.id
+                
+                new_event.tags.append(tag)
         
         app.logger.info('Attempting to save event to database')
         try:
@@ -1135,12 +1168,15 @@ def create_timeline_v3_event(timeline_id):
             db.session.commit()
             app.logger.info('Event saved successfully')
             
+            # Prepare tags for response
+            tag_list = [{'id': tag.id, 'name': tag.name} for tag in new_event.tags]
+            
             return jsonify({
                 'id': new_event.id,
                 'title': new_event.title,
                 'description': new_event.description,
                 'event_date': new_event.event_date.isoformat(),
-                'type': new_event.type,  # Added type to response
+                'type': new_event.type,
                 'url': new_event.url,
                 'url_title': new_event.url_title,
                 'url_description': new_event.url_description,
@@ -1148,7 +1184,8 @@ def create_timeline_v3_event(timeline_id):
                 'media_url': new_event.media_url,
                 'media_type': new_event.media_type,
                 'created_by': new_event.created_by,
-                'created_at': new_event.created_at.isoformat()
+                'created_at': new_event.created_at.isoformat(),
+                'tags': tag_list
             }), 201
             
         except Exception as db_error:
