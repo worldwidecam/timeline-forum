@@ -582,6 +582,14 @@ function TimelineV3() {
             viewMode={viewMode}
             theme={theme}
           />
+          <HoverMarker 
+            position={hoverPosition} 
+            timelineOffset={timelineOffset}
+            markerSpacing={100}
+            viewMode={viewMode}
+            markers={markers}
+            theme={theme}
+          />
           <Button
             onClick={handleLeft}
             sx={{
