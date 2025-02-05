@@ -1,35 +1,59 @@
 import React, { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
-import { Box, Container, useTheme, Button, Fade, Stack, Typography } from '@mui/material';
+import { Box, Container, useTheme, Button, Fade, Stack, Typography, Fab, Tooltip } from '@mui/material';
 import { useAuth } from '../../contexts/AuthContext';
+import axios from 'axios';
 import TimelineBackground from './TimelineBackground';
 import TimelineBar from './TimelineBar';
 import TimeMarkers from './TimeMarkers';
 import HoverMarker from './HoverMarker';
-import TimelinePost from './TimelinePost';
-import TimelineIcon from '../TimelineIcon';
-import axios from 'axios';
+import EventMarker from './events/EventMarker';
+import EventCounter from './events/EventCounter';
+import EventList from './events/EventList';
+import EventDialog from './events/EventDialog';
+import AddIcon from '@mui/icons-material/Add';
+
+const API_BASE_URL = '/api';
 
 function TimelineV3() {
   const { id } = useParams();
   const { user } = useAuth();
   const theme = useTheme();
-  const [timelineTitle, setTimelineTitle] = useState('Timeline V3');
+  const [timelineId, setTimelineId] = useState(id);
+  const [timelineName, setTimelineName] = useState('');
+  const [isLoading, setIsLoading] = useState(true);
 
+  // Fetch timeline details when component mounts or timelineId changes
   useEffect(() => {
-    const fetchTimelineTitle = async () => {
+    const fetchTimelineDetails = async () => {
+      if (!timelineId) return;
+      
       try {
-        const response = await axios.get(`http://localhost:5000/api/timeline/${id}`);
-        setTimelineTitle(response.data.name);
+        setIsLoading(true);
+        const response = await axios.get(`${API_BASE_URL}/timeline-v3/${timelineId}`, {
+          headers: {
+            'Authorization': `Bearer ${localStorage.getItem('token')}`
+          }
+        });
+        setTimelineName(response.data.name);
       } catch (error) {
-        console.error('Error fetching timeline:', error);
+        console.error('Error fetching timeline details:', error);
+      } finally {
+        setIsLoading(false);
       }
     };
 
-    if (id) {
-      fetchTimelineTitle();
+    // First try to get name from URL params (for newly created timelines)
+    const params = new URLSearchParams(window.location.search);
+    const nameFromUrl = params.get('name');
+    if (nameFromUrl) {
+      setTimelineName(nameFromUrl);
+      setIsLoading(false);
+    } else {
+      // If no name in URL, fetch from backend
+      fetchTimelineDetails();
     }
-  }, [id]);
+  }, [timelineId]);
 
   const getCurrentDateTime = () => {
     return new Date();
@@ -62,25 +86,32 @@ function TimelineV3() {
     return (currentDay - 1) / totalDays; // Returns a value between 0 and 1
   };
 
+  const getYearProgress = () => {
+    const now = getCurrentDateTime();
+    const startOfYear = new Date(now.getFullYear(), 0, 1);
+    const diff = now - startOfYear;
+    const oneYear = 1000 * 60 * 60 * 24 * 365; // milliseconds in a year
+    return diff / oneYear; // Returns a value between 0 and 1
+  };
+
   const getExactTimePosition = () => {
     const now = getCurrentDateTime();
-    const currentHour = now.getHours();
-    const currentMinute = now.getMinutes();
     
-    if (viewMode === 'week') {
-      return getDayProgress();
+    if (viewMode === 'year') {
+      return getYearProgress();
     }
-
+    
     if (viewMode === 'month') {
       return getMonthProgress();
     }
     
-    // Calculate position relative to current hour
-    // This will be between 0 and 1, where:
-    // 0 = exactly at current hour
-    // 0.5 = 30 minutes past current hour
-    // 1 = next hour
-    return currentMinute / 60;
+    if (viewMode === 'week') {
+      return getDayProgress();
+    }
+    
+    // Day view - Calculate position relative to current hour
+    const currentMinute = now.getMinutes();
+    return currentMinute / 60; // Returns a value between 0 and 1
   };
 
   const getFormattedDate = () => {
@@ -163,8 +194,164 @@ function TimelineV3() {
     return params.get('view') || 'day';
   });
   const [hoverPosition, setHoverPosition] = useState(getExactTimePosition());
-  const [posts, setPosts] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [currentEventIndex, setCurrentEventIndex] = useState(0);
+  const [selectedEventId, setSelectedEventId] = useState(null);
+
+  // Add new state for events and event form
+  const [events, setEvents] = useState([]);
+  const [isEventFormOpen, setIsEventFormOpen] = useState(false);
+  const [submitError, setSubmitError] = useState(null);
+  const [isLoadingEvents, setIsLoadingEvents] = useState(false);
+  const [editingEvent, setEditingEvent] = useState(null);
+  const [dialogOpen, setDialogOpen] = useState(false);
+
+  const handleEventSelect = (event) => {
+    setSelectedEventId(event.id);
+  };
+
+  const handleDotClick = (event) => {
+    console.log('Dot clicked for event:', event); // Debug log
+    setSelectedEventId(event.id);
+  };
+
+  // Fetch events whenever timelineId changes
+  useEffect(() => {
+    const fetchEvents = async () => {
+      if (!timelineId) return;
+      
+      try {
+        setIsLoadingEvents(true);
+        console.log('Fetching events for timeline:', timelineId);
+        const response = await axios.get(`${API_BASE_URL}/timeline-v3/${timelineId}/events`, {
+          headers: {
+            'Authorization': `Bearer ${localStorage.getItem('token')}`
+          }
+        });
+        console.log('Events response:', response.data);
+        setEvents(response.data);
+      } catch (error) {
+        console.error('Error fetching events:', error);
+      } finally {
+        setIsLoadingEvents(false);
+      }
+    };
+    
+    fetchEvents();
+  }, [timelineId]);
+
+  // Create timeline when component mounts
+  useEffect(() => {
+    const createTimeline = async () => {
+      try {
+        // Get timeline name from URL parameters
+        const params = new URLSearchParams(window.location.search);
+        const timelineName = params.get('name') || 'Timeline V3';
+        
+        const response = await axios.post(`${API_BASE_URL}/timeline-v3`, {
+          name: timelineName,
+          description: `A new timeline created: ${timelineName}`
+        }, {
+          headers: {
+            'Authorization': `Bearer ${localStorage.getItem('token')}`
+          }
+        });
+        setTimelineId(response.data.id);
+        console.log('Timeline created:', response.data);
+      } catch (error) {
+        console.error('Error creating timeline:', error);
+      }
+    };
+    
+    if (!timelineId) {
+      createTimeline();
+    }
+  }, [timelineId]);
+
+  const handleEventSubmit = async (eventData) => {
+    if (!timelineId) {
+      throw new Error('Timeline ID is required');
+    }
+
+    try {
+      setSubmitError(null);
+      console.log('Creating event with data:', eventData);
+      console.log('Timeline ID:', timelineId);
+      console.log('Auth token:', localStorage.getItem('token'));
+      
+      // If there's a media file, upload it first
+      let mediaUrl = null;
+      if (eventData.media) {
+        const formData = new FormData();
+        formData.append('file', eventData.media);
+        
+        console.log('Uploading media file:', eventData.media);
+        const uploadResponse = await axios.post(`${API_BASE_URL}/upload`, formData, {
+          headers: {
+            'Authorization': `Bearer ${localStorage.getItem('token')}`,
+            'Content-Type': 'multipart/form-data'
+          }
+        });
+        console.log('Media upload response:', uploadResponse.data);
+        mediaUrl = uploadResponse.data.url;
+      }
+
+      // Create the event
+      console.log('Sending event creation request to:', `${API_BASE_URL}/timeline-v3/${timelineId}/events`);
+      const response = await axios.post(`${API_BASE_URL}/timeline-v3/${timelineId}/events`, {
+        title: eventData.title,
+        description: eventData.description,
+        event_date: eventData.event_date,
+        type: eventData.type,
+        url: eventData.url || '',
+        url_title: eventData.url_title || '',
+        url_description: eventData.url_description || '',
+        url_image: eventData.url_image || '',
+        url_source: eventData.url_source || '',
+        media_url: mediaUrl || '',
+        media_type: eventData.media ? eventData.media.type.split('/')[0] : '',
+        tags: eventData.tags || []
+      }, {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        }
+      });
+      console.log('Event creation response:', response.data);
+
+      // Add the new event to state and close form
+      const newEvent = response.data;
+      setEvents(prev => [...prev, newEvent]);
+      setDialogOpen(false);
+      setEditingEvent(null);
+    } catch (error) {
+      console.error('Error creating event:', error);
+      console.error('Error response:', error.response);
+      console.error('Error request:', error.request);
+      setSubmitError(error.response?.data?.error || 'Failed to create event');
+      throw error;
+    }
+  };
+
+  const handleEventEdit = (event) => {
+    setEditingEvent(event);
+    setDialogOpen(true);
+  };
+
+  const handleEventDelete = async (event) => {
+    try {
+      await axios.delete(`${API_BASE_URL}/timeline-v3/${timelineId}/events/${event.id}`, {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        }
+      });
+      setEvents(events.filter(e => e.id !== event.id));
+      if (selectedEventId === event.id) {
+        setSelectedEventId(null);
+      }
+    } catch (error) {
+      console.error('Error deleting event:', error);
+      // Keep the event in the UI if deletion fails
+    }
+  };
 
   // Update hover position when view mode changes
   useEffect(() => {
@@ -194,24 +381,20 @@ function TimelineV3() {
     return () => window.removeEventListener('resize', handleResize);
   }, [timelineOffset]);
 
+  // Reset current event index when switching views
   useEffect(() => {
-    const fetchPosts = async () => {
-      try {
-        const response = await axios.get(`http://localhost:5000/api/timeline/${id}/posts`);
-        // Filter posts that should be displayed on timeline (display_type === 'timeline')
-        const timelinePosts = response.data.filter(post => post.display_type === 'timeline');
-        setPosts(timelinePosts);
-      } catch (error) {
-        console.error('Error fetching posts:', error);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    if (id) {
-      fetchPosts();
+    if (viewMode !== 'position') {
+      setCurrentEventIndex(0);
+      setSelectedEventId(null);
     }
-  }, [id]);
+  }, [viewMode]);
+
+  // Reset current event index if it's out of bounds after events change
+  useEffect(() => {
+    if (currentEventIndex >= events.length) {
+      setCurrentEventIndex(Math.max(0, events.length - 1));
+    }
+  }, [events.length, currentEventIndex]);
 
   // Navigation functions
   const handleLeft = () => {
@@ -275,31 +458,30 @@ function TimelineV3() {
         <Stack direction="row" alignItems="center" spacing={2} mb={2}>
           <Box sx={{ flex: 1 }}>
             <Stack direction="row" alignItems="center" spacing={2}>
-              <Typography variant="h4" component="div" sx={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <TimelineIcon timelineName={timelineTitle} />
-                <span style={{ 
-                  backgroundColor: theme.palette.mode === 'dark' 
-                    ? 'rgba(0, 0, 0, 0.8)' 
-                    : theme.palette.primary.dark,
-                  color: '#fff9f0',
-                  textShadow: `
-                    -2px -2px 0 #000,  
-                     2px -2px 0 #000,
-                    -2px  2px 0 #000,
-                     2px  2px 0 #000
-                  `,
-                  fontWeight: 'bold',
-                  padding: '2px 12px',
-                  borderRadius: '6px',
-                  boxShadow: '0 2px 4px rgba(0,0,0,0.2)',
-                  lineHeight: '1.2'
-                }}>
-                  {timelineTitle}
-                </span>
+              <Typography variant="h4" component="div" sx={{ color: theme.palette.primary.main, minWidth: '200px' }}>
+                {!isLoading && `# ${timelineName}`}
               </Typography>
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                 {getViewDescription()}
               </Box>
+              <Button
+                onClick={() => {
+                  setEditingEvent(null);
+                  setDialogOpen(true);
+                }}
+                variant="contained"
+                startIcon={<AddIcon />}
+                sx={{
+                  bgcolor: theme.palette.success.main,
+                  color: 'white',
+                  '&:hover': {
+                    bgcolor: theme.palette.success.dark,
+                  },
+                  boxShadow: 2
+                }}
+              >
+                Add Event
+              </Button>
               <Fade in={timelineOffset !== 0}>
                 <Button
                   onClick={handleRecenter}
@@ -318,6 +500,7 @@ function TimelineV3() {
               </Fade>
             </Stack>
           </Box>
+
           <Stack direction="row" spacing={1}>
             <Button
               variant={viewMode === 'day' ? "contained" : "outlined"}
@@ -369,28 +552,34 @@ function TimelineV3() {
             maxMarker={Math.max(...markers)}
             theme={theme}
           />
+          {viewMode === 'position' && (
+            <EventCounter
+              count={events.length}
+              events={events}
+              currentIndex={currentEventIndex}
+              onChangeIndex={setCurrentEventIndex}
+              onDotClick={handleDotClick}
+              viewMode={viewMode}
+            />
+          )}
+          {/* Event Markers - only show in time-based views */}
+          {viewMode !== 'position' && events.map((event, index) => (
+            <EventMarker
+              key={event.id}
+              event={event}
+              timelineOffset={timelineOffset}
+              markerSpacing={100}
+              viewMode={viewMode}
+              index={index}
+              totalEvents={events.length}
+            />
+          ))}
           <TimeMarkers 
             timelineOffset={timelineOffset}
             markerSpacing={100}
             markerStyles={markerStyles}
             markers={markers}
             viewMode={viewMode}
-            theme={theme}
-          />
-          {posts.map(post => (
-            <TimelinePost
-              key={post.id}
-              post={post}
-              position={hoverPosition}
-              viewMode={viewMode}
-            />
-          ))}
-          <HoverMarker 
-            position={hoverPosition} 
-            timelineOffset={timelineOffset}
-            markerSpacing={100}
-            viewMode={viewMode}
-            markers={markers}
             theme={theme}
           />
           <Button
@@ -429,6 +618,50 @@ function TimelineV3() {
           </Button>
         </Box>
       </Container>
+
+      {/* Event List */}
+      <Box sx={{ mt: 4 }}>
+        <EventList 
+          events={events}
+          onEventEdit={handleEventEdit}
+          onEventDelete={handleEventDelete}
+          selectedEventId={selectedEventId}
+          onEventSelect={handleEventSelect}
+        />
+      </Box>
+
+      {/* Event Dialog */}
+      <EventDialog
+        open={dialogOpen}
+        onClose={() => {
+          setDialogOpen(false);
+          setEditingEvent(null);
+        }}
+        onSave={handleEventSubmit}
+        initialEvent={editingEvent}
+      />
+
+      {/* Floating Action Button */}
+      <Tooltip title="Create New Event">
+        <Fab
+          color="primary"
+          onClick={() => {
+            setEditingEvent(null);
+            setDialogOpen(true);
+          }}
+          sx={{
+            position: 'fixed',
+            right: 32,
+            bottom: 32,
+            bgcolor: theme.palette.primary.main,
+            '&:hover': {
+              bgcolor: theme.palette.primary.dark,
+            }
+          }}
+        >
+          <AddIcon />
+        </Fab>
+      </Tooltip>
     </Box>
   );
 }

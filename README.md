@@ -1,301 +1,131 @@
+# Timeline Forum (V3)
+
+## AI Context Primer
+
+### Core Architectural Tenets  
+**1. Coordinate-Based Timeline** (`TimelineV3.js`)  
+- Zero-point reference system  
+- Bidirectional infinite growth  
+- Marker generation algorithm (`generateTimeMarkers`)  
+
+**2. Event/Post Unification** (`EventList.js:36`)  
+- Shared data structure between events/posts  
+- Hashtag-based timeline association  
+- Identical rendering components  
+
+**3. Navigation System** (`TimelineControls.js`)  
+- Scroll position preservation  
+- URL parameter synchronization  
+- Hover marker persistence  
+
+### Critical Implementation Patterns
+
+```javascript
+// Timeline width calculation (responsive hook)
+const { width } = useWindowSize(); // From frontend/src/hooks/
+```
+
+```javascript
+// Event dot click handler (TimelineView.js:380-415)
+eventDotContainer.onClick = () => {
+  // Maintains z-index hierarchy during portal rendering
+};
+```
+
+### Component Reference Table
+| Component          | Key Functionality          | Location                                  |
+|--------------------|----------------------------|-------------------------------------------|
+| Timeline Core      | Coordinate calculations    | `frontend/src/components/timeline-v3/`   |
+| Event List         | Unified display render     | `EventList.js:36` (current focus)         |
+| Time Markers       | Dynamic generation         | `TimelineV3.js:142`                      |
+
+### Current Focus Area: Day View
+1. **Completion Requirements**  
+- Finalize hour marker spacing algorithm  
+- Implement smooth timezone transitions  
+- Connect to real-time event feed  
+
+2. **Key Dependencies**  
+- `useWindowSize` hook  
+- Timeline scroll position context  
+- Event dot portal rendering
+
+### Original Documentation
+<details>
+<summary>Legacy README Content</summary>
+
 # Timeline Forum
 
-An interactive web application for creating and visualizing timelines with events. Events are displayed on a horizontal timeline with year markers and can be expanded for more details.
+A modern web application for creating and sharing timelines with interactive event cards.
 
 ## Features
 
-### User Features
-- User authentication (login/register)
-- Customizable user profiles
-  - Profile picture upload
-  - Bio
-  - Profile music player (MP3, WAV, OGG support)
-- Dark/Light mode toggle
+### Timeline V3
+- Interactive timeline with event cards
+- Event types: Remarks, News, and Media
+- Event filtering by type with modern, animated buttons
+- Event sorting (newest/oldest) with preference memory
+- Smart event referencing system:
+  - Events can appear in multiple timelines through hashtags
+  - All instances of an event share the same data
+  - Changes and interactions are synchronized across timelines
+- Modern UI with animations and transitions
+- Responsive search functionality
+- Smooth scrolling to selected events
 
-### Timeline Features
-- Create and view timelines
-- Add events to timelines
-- Rich text formatting
-- Image uploads for events
-- Timeline sharing
-- Dynamic width timeline that adapts to screen size
-- Multiple view modes (currently implementing day view, with week/month/year views planned)
+## Technical Implementation
 
-### Timeline System
+### Backend (Flask + SQLAlchemy)
+- RESTful API endpoints for timeline and event management
+- Efficient event referencing system using junction tables
+- PostgreSQL database with proper relationships
+- Tag-based timeline creation
 
-The timeline component is the core feature of this application, built with modular architecture for maintainability and flexibility.
+### Frontend (React + Material-UI)
+- Component-based architecture
+- Framer Motion for smooth animations
+- Material-UI for consistent, modern styling
+- Local storage for user preferences
+- Efficient event rendering and filtering
 
-#### Core Concept
-- **Coordinate-Based System**: Instead of using start/end times, the timeline is built around a coordinate system
-- **Reference Point Zero**: All positions are calculated relative to position 0 (the reference point)
-- **Bidirectional Growth**: Timeline can infinitely extend in both directions from the reference point
-- **Simplified Logic**: Clean, mathematical approach to timeline navigation and marker placement
+## Todo List
 
-#### Day View Implementation
-1. **Dynamic Timeline Width**
-   - Calculates marker count based on screen width
-   - Ensures equal number of markers on each side of zero
-   - Maintains smooth scrolling when window is resized
-   - Creates illusion of infinite scrolling
+### High Priority
+1. Event Card Enhancements
+   - Create maximized view overlay for events
+   - Show referenced timelines in expanded view
+   - Add likes, comments, and voting system
+   - Display full event description in expanded view
 
-2. **Hover Marker Features**
-   - Accurate positioning based on current time (hours:minutes)
-   - Moves smoothly with timeline scrolling
-   - Compact vertical indicator
-   - Updates position every minute
-   - Shows current time in AM/PM format
-   - Semi-transparent background for better visibility
+2. Timeline Improvements
+   - Implement timeline navigation system
+   - Add timeline descriptions and metadata
+   - Create "Try Timeline V3 Beta" example page
 
-3. **Navigation System**
-   - Smooth left/right scrolling
-   - Maintains hover marker position during scrolling
-   - "Back to Present" button with fade transition
-   - Preserves view mode in URL parameters
+3. User Experience
+   - Add loading states with modern animations
+   - Implement success/error toasts for user actions
+   - Enhance search functionality with tag-based search
 
-4. **Visual Information**
-   - "Day View" label with current date
-   - Hashtag-based timeline identification
-   - Clear hour markers (4AM, 5AM, etc.)
-   - Smooth transitions and animations
+### Future Considerations
+1. User Features
+   - Event drafts on user profile
+   - Event templates
+   - User preference management
 
-### Post System
+2. Data Management
+   - Batch operations for events
+   - Duplicate event detection
+   - Event version history
 
-The application uses posts as the primary form of user content:
+3. Timeline Visualization
+   - Enhanced timeline navigation
+   - Timeline sharing and collaboration
+   - Timeline statistics and analytics
 
-### Posts
-- Function as the primary form of user content
-- Include titles, descriptions, dates, and URL attachments
-- Associated with specific timelines using hashtags (alphanumeric characters only)
-- Support user interactions (likes, comments)
+## Getting Started
 
-### Events
-- Represent significant timeline moments
-- Share identical visual and data structure with posts
-- Appear on the interactive timeline display
-- Maintain chronological organization
-
-## Timeline System
-
-The timeline component is the core feature of this application, built with modular architecture for maintainability and flexibility.
-
-### Timeline V3 (Beta)
-The latest iteration of our timeline system introduces a fundamental architectural improvement:
-
-#### Core Concept
-- **Coordinate-Based System**: Instead of using start/end times, the timeline is built around a coordinate system
-- **Reference Point Zero**: All positions are calculated relative to position 0 (the reference point)
-- **Bidirectional Growth**: Timeline can infinitely extend in both directions from the reference point
-- **Simplified Logic**: Clean, mathematical approach to timeline navigation and marker placement
-
-#### View Modes
-
-##### Day View
-1. **Markers**
-   - Hour-based markers (4AM, 5AM, etc.)
-   - Special styling for midnight markers (12 AM)
-   - Day names displayed with midnight markers
-
-2. **Hover Marker**
-   - Shows current time in AM/PM format
-   - Position updates every minute
-   - Moves between hours based on minutes (e.g., 12:30 = halfway between 12 and 1)
-   - Semi-transparent background for better visibility
-
-##### Week View
-1. **Markers**
-   - Day-based markers showing weekday names
-   - Compact format for regular days (e.g., "Monday")
-   - Special format for Sundays showing date (e.g., "Jan 18")
-
-2. **Hover Marker**
-   - Shows current day and date
-   - Position reflects time of day between days
-   - Example: At 12 noon, marker is halfway (0.5) between today and tomorrow
-   - Updates position based on current time
-
-#### Navigation System
-- Smooth left/right scrolling with elevated z-index buttons
-- Maintains hover marker position during scrolling
-- "Back to Present" button with fade transition
-- Preserves view mode in URL parameters
-
-#### Visual Elements
-- Animated hover marker with pulsing effect
-- Floating animations for better user experience
-- Adaptive styling for dark/light modes
-- Improved visibility of time markers
-
-3. **Hover Marker Features**
-   - Accurate positioning based on current time (hours:minutes)
-   - Moves smoothly with timeline scrolling
-   - Compact vertical indicator
-   - Updates position every minute
-   - Shows current time in AM/PM format
-   - Semi-transparent background for better visibility
-
-4. **Navigation System**
-   - Smooth left/right scrolling
-   - Maintains hover marker position during scrolling
-   - "Back to Present" button with fade transition
-   - Preserves view mode in URL parameters
-
-4. **Visual Information**
-   - "Day View" label with current date
-   - Hashtag-based timeline identification
-   - Clear hour markers (4AM, 5AM, etc.)
-   - Smooth transitions and animations
-
-### Post System
-
-The application uses posts as the primary form of user content:
-
-### Posts
-- Function as the primary form of user content
-- Include titles, descriptions, dates, and URL attachments
-- Associated with specific timelines using hashtags (alphanumeric characters only)
-- Support user interactions (likes, comments)
-
-### Events
-- Represent significant timeline moments
-- Share identical visual and data structure with posts
-- Appear on the interactive timeline display
-- Maintain chronological organization
-
-## Timeline System
-
-The timeline component is the core feature of this application, built with modular architecture for maintainability and flexibility.
-
-### Timeline V3 (Beta)
-The latest iteration of our timeline system introduces a fundamental architectural improvement:
-
-#### Core Concept
-- **Coordinate-Based System**: Instead of using start/end times, the timeline is built around a coordinate system
-- **Reference Point Zero**: All positions are calculated relative to position 0 (the reference point)
-- **Bidirectional Growth**: Timeline can infinitely extend in both directions from the reference point
-- **Simplified Logic**: Clean, mathematical approach to timeline navigation and marker placement
-
-#### View Modes
-
-##### Day View
-1. **Markers**
-   - Hour-based markers (4AM, 5AM, etc.)
-   - Special styling for midnight markers (12 AM)
-   - Day names displayed with midnight markers
-
-2. **Hover Marker**
-   - Shows current time in AM/PM format
-   - Position updates every minute
-   - Moves between hours based on minutes (e.g., 12:30 = halfway between 12 and 1)
-   - Semi-transparent background for better visibility
-
-##### Week View
-1. **Markers**
-   - Day-based markers showing weekday names
-   - Compact format for regular days (e.g., "Monday")
-   - Special format for Sundays showing date (e.g., "Jan 18")
-
-2. **Hover Marker**
-   - Shows current day and date
-   - Position reflects time of day between days
-   - Example: At 12 noon, marker is halfway (0.5) between today and tomorrow
-   - Updates position based on current time
-
-#### Navigation System
-- Smooth left/right scrolling with elevated z-index buttons
-- Maintains hover marker position during scrolling
-- "Back to Present" button with fade transition
-- Preserves view mode in URL parameters
-
-#### Visual Elements
-- Animated hover marker with pulsing effect
-- Floating animations for better user experience
-- Adaptive styling for dark/light modes
-- Improved visibility of time markers
-
-### Event System
-Events are independent entities that overlay on the timeline:
-- Events position themselves based on their timestamp
-- No impact on timeline marker positioning or spacing
-- Multiple events can exist at the same time point
-- Events render as overlay markers on the timeline
-
-### Current Implementation
-- Modular component architecture
-- Smooth bi-directional scrolling
-- Fixed navigation controls
-- Pre-generated time markers
-- Centered current time display
-- Consistent marker spacing
-
-### Planned Improvements
-1. **Event Integration**
-   - Overlay event markers on timeline
-   - Event creation at specific time points
-   - Event clustering for simultaneous events
-   - Event detail display on interaction
-
-2. **Scale Implementation**
-   - Scale switching with appropriate marker generation
-   - Scale-specific marker spacing and labeling
-   - Smooth transitions between scales
-
-3. **Visual Enhancements**
-   - Theme customization
-   - Scale-appropriate styling
-   - Event marker styling
-   - Timeline decoration options
-
-### Current Implementation Status (as of Jan 14, 2025)
-
-#### Timeline Navigation
-- Day view is fully functional with smooth scrolling
-- Week view implementation in progress
-  - Basic functionality working
-  - Smooth scrolling implemented
-  - Present marker visibility fixed
-  - Return to Present working correctly
-
-#### Known Issues
-1. Week View
-   - Timeline end boundaries too easily reachable (~15 clicks)
-   - Need to maintain infinite scrolling feel
-
-#### Next Steps
-1. Fix Week View Issues
-   - Adjust timeline extension amounts to prevent reaching boundaries
-   - Ensure consistent marker spacing and positioning
-
-2. Continue Timeline Scale Implementation
-   - Complete week view fixes
-   - Implement month view
-   - Implement year view
-
-3. Testing and Optimization
-   - Add comprehensive tests for timeline navigation
-   - Optimize marker generation and positioning
-   - Improve performance for long scrolling sessions
-
-#### Recent Changes
-- Fixed present marker visibility in week view
-- Improved smooth scrolling in both directions
-- Adjusted week view initialization range
-- Fixed Return to Present functionality
-
-## Recent Updates
-
-### January 2025
-- Introduced Timeline V3 Beta with improved time display
-- Added animated hover marker with exact time
-- Enhanced midnight marker styling
-- Improved timeline navigation
-- Added beta access button in timeline list
-
-### Planned Improvements
-1. **Timeline V3 Enhancements**
-   - Additional view modes (week, month, year)
-   - Event integration
-   - Timeline sharing features
-   - Performance optimizations
+[Installation and setup instructions to be added]
 
 ## Project Philosophy and Direction
 

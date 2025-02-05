@@ -8,6 +8,7 @@ from werkzeug.utils import secure_filename
 import os
 import logging
 import time
+# Removed the incorrect import statement
 
 # Configure logging
 logging.basicConfig(level=logging.DEBUG)
@@ -27,7 +28,12 @@ app.config.update(
 # Configure CORS
 CORS(app, resources={
     r"/*": {
-        "origins": [os.getenv('FRONTEND_URL', 'http://localhost:3000')],
+        "origins": [
+            'http://localhost:3000',
+            'http://localhost:3001',
+            'http://localhost:3002',
+            'http://localhost:3003'
+        ],
         "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
         "allow_headers": ["Content-Type", "Authorization"],
         "supports_credentials": True
@@ -156,8 +162,6 @@ class Post(db.Model):
     promotion_score = db.Column(db.Float, default=0.0)
     source_count = db.Column(db.Integer, default=0)
     promotion_votes = db.Column(db.Integer, default=0)
-    last_score_update = db.Column(db.DateTime, default=datetime.now())
-    display_type = db.Column(db.String(20), nullable=False, default='feed')  # 'feed' or 'timeline'
 
     def update_promotion_score(self):
         """
@@ -168,24 +172,68 @@ class Post(db.Model):
         spacing in the timeline. This will provide a more integrated and visually consistent
         experience between posts and their timeline representations.
         """
-        # Calculate time factor (newer posts get higher scores)
-        time_diff = datetime.now() - self.created_at
-        time_factor = 1 / (1 + time_diff.days)
+        # Calculate base score from votes and sources
+        base_score = (self.promotion_votes * 0.7) + (self.source_count * 0.3)
         
-        # Calculate vote factor
-        vote_factor = self.promotion_votes / 10 if self.promotion_votes > 0 else 0
+        # Apply time decay factor (posts older than 7 days get penalized)
+        days_old = (datetime.now() - self.created_at).days
+        time_factor = 1.0 if days_old <= 7 else (1.0 - (0.1 * (days_old - 7)))
+        time_factor = max(0.1, time_factor)  # Don't let it go below 0.1
         
-        # Calculate source factor
-        source_factor = self.source_count / 5 if self.source_count > 0 else 0
+        # Calculate final score
+        self.promotion_score = base_score * time_factor
         
-        # Combine factors
-        self.promotion_score = (time_factor + vote_factor + source_factor) / 3
-        self.last_score_update = datetime.now()
+        # Determine if post should be promoted based on score threshold
+        # This threshold might need tuning based on usage patterns
+        PROMOTION_THRESHOLD = 5.0
+        self.promoted_to_event = self.promotion_score >= PROMOTION_THRESHOLD
         
-        # Check if post should be promoted
-        if self.promotion_score >= 0.7 and not self.promoted_to_event:
-            self.promoted_to_event = True
-            self.display_type = 'timeline'
+        return self.promotion_score
+
+class Tag(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(100), unique=True, nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    timeline_id = db.Column(db.Integer, db.ForeignKey('timeline.id'), nullable=True)
+
+    def __repr__(self):
+        return f'<Tag {self.name}>'
+
+# Event-Tag Association Table
+event_tags = db.Table('event_tags',
+    db.Column('event_id', db.Integer, db.ForeignKey('event.id')),
+    db.Column('tag_id', db.Integer, db.ForeignKey('tag.id')),
+    db.Column('created_at', db.DateTime, default=datetime.utcnow)
+)
+
+# Event-Timeline Reference Table (for events referenced in multiple timelines)
+event_timeline_refs = db.Table('event_timeline_refs',
+    db.Column('event_id', db.Integer, db.ForeignKey('event.id')),
+    db.Column('timeline_id', db.Integer, db.ForeignKey('timeline.id')),
+    db.Column('created_at', db.DateTime, default=datetime.utcnow)
+)
+
+class Event(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    title = db.Column(db.String(200), nullable=False)
+    description = db.Column(db.Text, nullable=True, default='')
+    event_date = db.Column(db.DateTime, nullable=False)
+    type = db.Column(db.String(50), nullable=False, default='remark')
+    url = db.Column(db.String(500), nullable=True)
+    url_title = db.Column(db.String(500), nullable=True)
+    url_description = db.Column(db.Text, nullable=True)
+    url_image = db.Column(db.String(500), nullable=True)
+    media_url = db.Column(db.String(500), nullable=True)
+    media_type = db.Column(db.String(50), nullable=True)
+    timeline_id = db.Column(db.Integer, db.ForeignKey('timeline.id'), nullable=False)
+    created_by = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    tags = db.relationship('Tag', secondary=event_tags, backref=db.backref('events', lazy='dynamic'))
+    referenced_in = db.relationship('Timeline', secondary=event_timeline_refs, backref=db.backref('referenced_events', lazy='dynamic'))
+
+    def __repr__(self):
+        return f'<Event {self.title}>'
 
 class Comment(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -391,7 +439,6 @@ def get_all_posts():
                 'event_date': post.event_date.isoformat(),
                 'created_at': post.created_at.isoformat(),
                 'upvotes': post.upvotes,
-                'promotion_score': post.promotion_score,
                 'url': post.url,
                 'url_title': post.url_title,
                 'url_description': post.url_description,
@@ -439,7 +486,7 @@ def check_timeline_promotions(timeline_id):
                 # Create a new event from the post
                 new_post = Post(
                     title=post.title,
-                    content=post.content,
+                    description=post.content,
                     event_date=post.event_date,
                     url=post.url,
                     url_title=post.url_title,
@@ -795,6 +842,241 @@ def expired_token_callback(jwt_header, jwt_data):
         'error': 'Token has expired',
         'message': 'Please log in again'
     }), 401
+
+# Timeline V3 Routes
+@app.route('/api/timeline-v3', methods=['GET'])
+def get_timelines_v3():
+    try:
+        timelines = Timeline.query.order_by(Timeline.created_at.desc()).all()
+        return jsonify([{
+            'id': timeline.id,
+            'name': timeline.name,
+            'description': timeline.description,
+            'created_at': timeline.created_at.isoformat()
+        } for timeline in timelines])
+        
+    except Exception as e:
+        app.logger.error(f'Error fetching timelines: {str(e)}')
+        return jsonify({'error': 'Failed to fetch timelines'}), 500
+
+@app.route('/api/timeline-v3', methods=['POST'])
+def create_timeline_v3():
+    try:
+        data = request.get_json()
+        
+        if not data or not data.get('name'):
+            return jsonify({'error': 'Name is required'}), 400
+            
+        new_timeline = Timeline(
+            name=data['name'],
+            description=data.get('description', ''),
+            created_by=1  # Temporary default user ID
+        )
+        
+        db.session.add(new_timeline)
+        db.session.commit()
+        
+        return jsonify({
+            'id': new_timeline.id,
+            'name': new_timeline.name,
+            'description': new_timeline.description,
+            'created_by': new_timeline.created_by,
+            'created_at': new_timeline.created_at.isoformat()
+        }), 201
+        
+    except Exception as e:
+        db.session.rollback()
+        app.logger.error(f'Error creating timeline: {str(e)}')
+        return jsonify({'error': 'Failed to create timeline'}), 500
+
+@app.route('/api/timeline-v3/<int:timeline_id>', methods=['GET'])
+@jwt_required()
+def get_timeline_v3(timeline_id):
+    try:
+        timeline = Timeline.query.get_or_404(timeline_id)
+        return jsonify({
+            'id': timeline.id,
+            'name': timeline.name,
+            'description': timeline.description,
+            'created_by': timeline.created_by,
+            'created_at': timeline.created_at.isoformat()
+        })
+    except Exception as e:
+        app.logger.error(f'Error fetching timeline: {str(e)}')
+        return jsonify({'error': 'Failed to fetch timeline'}), 500
+
+@app.route('/api/timeline-v3/<timeline_id>/events', methods=['GET'])
+def get_timeline_v3_events(timeline_id):
+    try:
+        app.logger.info(f'Getting events for timeline {timeline_id}')
+        # Get events that are directly in this timeline
+        direct_events = Event.query.filter_by(timeline_id=timeline_id).all()
+        
+        # Get the timeline
+        timeline = Timeline.query.get(timeline_id)
+        if not timeline:
+            return jsonify({'error': 'Timeline not found'}), 404
+            
+        # Get events that reference this timeline
+        referenced_events = timeline.referenced_events.all()
+        
+        # Combine both sets of events
+        events = list(set(direct_events + referenced_events))
+        
+        # Sort events by date
+        events.sort(key=lambda x: x.event_date)
+        
+        return jsonify([{
+            'id': event.id,
+            'title': event.title,
+            'description': event.description,
+            'event_date': event.event_date.isoformat(),
+            'type': event.type,
+            'url': event.url,
+            'url_title': event.url_title,
+            'url_description': event.url_description,
+            'url_image': event.url_image,
+            'media_url': event.media_url,
+            'media_type': event.media_type,
+            'created_by': event.created_by,
+            'created_at': event.created_at.isoformat(),
+            'tags': [{'id': tag.id, 'name': tag.name} for tag in event.tags]
+        } for event in events])
+    except Exception as e:
+        app.logger.error(f'Error getting events: {str(e)}')
+        return jsonify({'error': 'Failed to get events'}), 500
+
+@app.route('/api/timeline-v3/<timeline_id>/events', methods=['POST'])
+def create_timeline_v3_event(timeline_id):
+    try:
+        app.logger.info(f'Creating event for timeline {timeline_id}')
+        # First, check if timeline exists
+        timeline = Timeline.query.get(timeline_id)
+        if not timeline:
+            app.logger.error(f'Timeline {timeline_id} not found')
+            return jsonify({'error': 'Timeline not found'}), 404
+            
+        # Get and validate the data
+        data = request.get_json()
+        if not data:
+            app.logger.error('No data provided in request')
+            return jsonify({'error': 'No data provided'}), 400
+            
+        app.logger.info(f'Received event data: {data}')
+        
+        # Required fields validation
+        required_fields = {
+            'title': str,
+            'event_date': str,
+            'type': str,
+        }
+        
+        for field, field_type in required_fields.items():
+            value = data.get(field)
+            if not value:
+                app.logger.error(f'Missing required field: {field}')
+                return jsonify({'error': f'Missing required field: {field}'}), 400
+            if not isinstance(value, field_type):
+                app.logger.error(f'Invalid type for field {field}')
+                return jsonify({'error': f'Invalid type for field {field}. Expected {field_type.__name__}'}), 400
+        
+        try:
+            # Parse the date, support both with and without timezone
+            date_str = data['event_date'].replace('Z', '+00:00')
+            event_date = datetime.fromisoformat(date_str)
+            app.logger.info(f'Parsed event date: {event_date}')
+        except ValueError as e:
+            app.logger.error(f'Date parsing error: {str(e)}')
+            return jsonify({'error': 'Invalid date format. Please use ISO format (YYYY-MM-DDTHH:MM:SS)'}), 400
+        
+        # Create the event with required fields
+        new_event = Event(
+            title=data['title'],
+            description=data.get('description', ''),
+            event_date=event_date,
+            type=data['type'],
+            timeline_id=timeline_id,
+            created_by=1  # Temporary default user ID
+        )
+        
+        # Handle optional URL data
+        if 'url' in data and data['url']:
+            new_event.url = data['url']
+            new_event.url_title = data.get('url_title', '')
+            new_event.url_description = data.get('url_description', '')
+            new_event.url_image = data.get('url_image', '')
+        
+        # Handle optional media data
+        if 'media_url' in data and data['media_url']:
+            new_event.media_url = data['media_url']
+            new_event.media_type = data.get('media_type', '')
+            
+        # Handle tags
+        if 'tags' in data and data['tags']:
+            for tag_name in data['tags']:
+                # Clean tag name
+                tag_name = tag_name.strip().lower()
+                if not tag_name:
+                    continue
+                    
+                # Find or create tag
+                tag = Tag.query.filter_by(name=tag_name).first()
+                if not tag:
+                    # Create new tag
+                    tag = Tag(name=tag_name)
+                    db.session.add(tag)
+                    
+                    # Create a new timeline for this tag if it doesn't exist
+                    tag_timeline = Timeline.query.filter_by(name=f"#{tag_name}").first()
+                    if not tag_timeline:
+                        tag_timeline = Timeline(
+                            name=f"#{tag_name}",
+                            description=f"Timeline for #{tag_name}",
+                            created_by=1  # Temporary default user ID
+                        )
+                        db.session.add(tag_timeline)
+                        db.session.flush()  # Get the timeline ID
+                        tag.timeline_id = tag_timeline.id
+
+                        # Add this event as a reference in the new timeline
+                        new_event.referenced_in.append(tag_timeline)
+                
+                new_event.tags.append(tag)
+        
+        app.logger.info('Attempting to save event to database')
+        try:
+            db.session.add(new_event)
+            db.session.commit()
+            app.logger.info('Event saved successfully')
+            
+            # Prepare tags for response
+            tag_list = [{'id': tag.id, 'name': tag.name} for tag in new_event.tags]
+            
+            return jsonify({
+                'id': new_event.id,
+                'title': new_event.title,
+                'description': new_event.description,
+                'event_date': new_event.event_date.isoformat(),
+                'type': new_event.type,
+                'url': new_event.url,
+                'url_title': new_event.url_title,
+                'url_description': new_event.url_description,
+                'url_image': new_event.url_image,
+                'media_url': new_event.media_url,
+                'media_type': new_event.media_type,
+                'created_by': new_event.created_by,
+                'created_at': new_event.created_at.isoformat(),
+                'tags': tag_list
+            }), 201
+            
+        except Exception as db_error:
+            db.session.rollback()
+            app.logger.error(f'Database error while saving event: {str(db_error)}')
+            return jsonify({'error': f'Database error: {str(db_error)}'}), 500
+            
+    except Exception as e:
+        app.logger.error(f'Error creating event: {str(e)}')
+        return jsonify({'error': f'Failed to save event: {str(e)}'}), 500
 
 if __name__ == '__main__':
     with app.app_context():

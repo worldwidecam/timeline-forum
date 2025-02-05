@@ -74,8 +74,8 @@ const HoverMarker = ({
         display: 'flex',
         flexDirection: 'column',
         alignItems: 'center',
-        transition: 'all 0.1s ease-out',
-        zIndex: 0, // Lower z-index so it stays behind buttons
+        transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
+        zIndex: 0,
         pointerEvents: 'none'
       }}
     >
@@ -84,23 +84,25 @@ const HoverMarker = ({
           fontFamily: 'Lobster Two',
           fontSize: '1rem',
           color: theme.palette.primary.main,
-          marginBottom: '4px',
-          padding: '4px 12px',
-          borderRadius: '12px',
+          marginBottom: '8px',
+          padding: '6px 16px',
+          borderRadius: '16px',
           backgroundColor: theme.palette.mode === 'dark' 
-            ? 'rgba(33, 150, 243, 0.1)'
-            : 'rgba(33, 150, 243, 0.05)',
-          border: `1px solid ${theme.palette.primary.main}`,
-          opacity: 0.9,
+            ? 'rgba(33, 150, 243, 0.15)'
+            : 'rgba(33, 150, 243, 0.08)',
+          backdropFilter: 'blur(8px)',
+          border: '1px solid',
+          borderColor: theme.palette.mode === 'dark'
+            ? 'rgba(33, 150, 243, 0.3)'
+            : 'rgba(33, 150, 243, 0.2)',
+          opacity: 0.95,
           whiteSpace: 'nowrap',
-          transition: 'all 0.2s ease-out',
-          '&:hover': {
-            backgroundColor: theme.palette.mode === 'dark' 
-              ? 'rgba(33, 150, 243, 0.2)'
-              : 'rgba(33, 150, 243, 0.1)',
-            transform: 'scale(1.05)',
-            opacity: 1
-          }
+          transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+          boxShadow: theme.palette.mode === 'dark'
+            ? '0 4px 12px rgba(33, 150, 243, 0.1)'
+            : '0 4px 12px rgba(33, 150, 243, 0.05)',
+          letterSpacing: '0.02em',
+          fontWeight: 500
         }}
       >
         {getLabel()}
@@ -109,32 +111,42 @@ const HoverMarker = ({
         sx={{
           width: '2px',
           height: '40px',
-          backgroundColor: theme.palette.primary.main,
-          opacity: 0.8,
+          background: `linear-gradient(180deg, 
+            ${theme.palette.primary.main} 0%, 
+            ${theme.palette.primary.main}40 100%)`,
           position: 'relative',
+          '&::before': {
+            content: '""',
+            position: 'absolute',
+            top: '-4px',
+            left: '-4px',
+            right: '-4px',
+            height: '8px',
+            background: theme.palette.primary.main,
+            borderRadius: '4px',
+            opacity: 0.8,
+          },
           '&::after': {
             content: '""',
             position: 'absolute',
             top: 0,
-            left: '-1px',
-            right: '-1px',
-            bottom: 0,
+            left: '-6px',
+            right: '-6px',
+            bottom: '15px',
             background: theme.palette.primary.main,
-            opacity: 0.4,
-            animation: 'pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+            opacity: 0.2,
+            filter: 'blur(4px)',
+            animation: 'markerPulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite'
           },
-          '@keyframes pulse': {
+          '@keyframes markerPulse': {
             '0%, 100%': {
+              opacity: 0.2,
               transform: 'scaleX(1)',
             },
             '50%': {
-              transform: 'scaleX(3)',
+              opacity: 0.3,
+              transform: 'scaleX(2)',
             },
-          },
-          '&:hover::after': {
-            animation: 'none',
-            opacity: 0.6,
-            transform: 'scaleX(3)',
           }
         }}
       />
