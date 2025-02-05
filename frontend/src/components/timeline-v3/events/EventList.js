@@ -12,7 +12,11 @@ import {
   DialogContent,
   DialogActions,
   Button,
-  Box
+  Box,
+  Select,
+  MenuItem,
+  FormControl,
+  InputLabel
 } from '@mui/material';
 import {
   Search as SearchIcon,
@@ -20,6 +24,7 @@ import {
   Newspaper as NewsIcon,
   PermMedia as MediaIcon,
   Delete as DeleteIcon,
+  Sort as SortIcon
 } from '@mui/icons-material';
 import { motion, AnimatePresence } from 'framer-motion';
 import { EVENT_TYPES, EVENT_TYPE_COLORS } from './EventTypes';
@@ -31,6 +36,7 @@ const EventList = ({ events, onEventEdit, onEventDelete, selectedEventId, onEven
   const theme = useTheme();
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedType, setSelectedType] = useState(null);
+  const [sortOrder, setSortOrder] = useState('newest'); // 'newest' or 'oldest'
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [eventToDelete, setEventToDelete] = useState(null);
   const [previousSelectedId, setPreviousSelectedId] = useState(null);
@@ -178,106 +184,131 @@ const EventList = ({ events, onEventEdit, onEventDelete, selectedEventId, onEven
     );
   };
 
-  const filteredEvents = events.filter(event => {
-    const matchesSearch = event.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                         event.description.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesType = !selectedType || event.type === selectedType;
-    return matchesSearch && matchesType;
-  });
+  // Filter and sort events
+  const filteredAndSortedEvents = events
+    .filter(event => {
+      const matchesSearch = event.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        event.description.toLowerCase().includes(searchQuery.toLowerCase());
+      const matchesType = !selectedType || event.type.toLowerCase() === selectedType.toLowerCase();
+      return matchesSearch && matchesType;
+    })
+    .sort((a, b) => {
+      const dateA = new Date(a.event_date);
+      const dateB = new Date(b.event_date);
+      return sortOrder === 'newest' ? dateB - dateA : dateA - dateB;
+    });
 
   return (
-    <div className="event-list-container">
-      {/* Sticky Header */}
-      <div 
-        style={{
-          position: 'sticky',
-          top: 0,
-          zIndex: 1200,
-          backgroundColor: theme.palette.background.default,
-          paddingBottom: theme.spacing(1),
-          boxShadow: theme.shadows[2]
-        }}
-      >
-        <Box className="search-filter-bar" sx={{ px: 2, pt: 2 }}>
-          {/* Search and Filter */}
-          <div className="mb-6">
-            <TextField
-              fullWidth
-              variant="outlined"
-              placeholder="Search events..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              InputProps={{
-                startAdornment: (
-                  <InputAdornment position="start">
-                    <SearchIcon />
-                  </InputAdornment>
-                ),
-              }}
-            />
+    <Stack spacing={2} sx={{ px: 3 }}>
+      {/* Search and Sort Controls */}
+      <Stack direction="row" spacing={2} alignItems="center">
+        <TextField
+          size="small"
+          placeholder="Search events..."
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          InputProps={{
+            startAdornment: (
+              <InputAdornment position="start">
+                <SearchIcon />
+              </InputAdornment>
+            ),
+          }}
+          sx={{ flexGrow: 1 }}
+        />
+        <FormControl size="small" sx={{ minWidth: 120 }}>
+          <InputLabel>Sort By</InputLabel>
+          <Select
+            value={sortOrder}
+            onChange={(e) => setSortOrder(e.target.value)}
+            label="Sort By"
+            startAdornment={
+              <InputAdornment position="start">
+                <SortIcon />
+              </InputAdornment>
+            }
+          >
+            <MenuItem value="newest">Newest First</MenuItem>
+            <MenuItem value="oldest">Oldest First</MenuItem>
+          </Select>
+        </FormControl>
+      </Stack>
 
-            {/* Type Filters */}
-            <Stack direction="row" spacing={2} className="mt-4">
-              <motion.div
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-                onClick={() => setSelectedType(null)}
-              >
-                <Paper
-                  className={`px-4 py-2 cursor-pointer ${
-                    !selectedType ? 'bg-blue-500 text-white' : ''
-                  }`}
-                >
-                  All
-                </Paper>
-              </motion.div>
-              {Object.values(EVENT_TYPES).map((type) => (
-                <motion.div
-                  key={type}
-                  whileHover={{ scale: 1.05 }}
-                  whileTap={{ scale: 0.95 }}
-                  onClick={() => setSelectedType(type)}
-                >
-                  <Paper
-                    className={`px-4 py-2 cursor-pointer ${
-                      selectedType === type ? 'bg-blue-500 text-white' : ''
-                    }`}
-                  >
-                    {type.charAt(0).toUpperCase() + type.slice(1)}
-                  </Paper>
-                </motion.div>
-              ))}
-            </Stack>
-          </div>
-        </Box>
-      </div>
-
-      {/* Scrollable Content */}
-      <div 
-        style={{
-          overflowY: 'auto',
-          height: `calc(100vh - ${64}px)`, 
-          padding: theme.spacing(1, 2, 0, 2)
+      {/* Filter Options */}
+      <Paper 
+        sx={{ 
+          p: 1,
+          bgcolor: theme => theme.palette.mode === 'light' 
+            ? 'rgba(255, 255, 255, 0.6)' 
+            : 'rgba(0, 0, 0, 0.2)',
+          backdropFilter: 'blur(8px)'
         }}
+        elevation={0}
       >
-        <AnimatePresence mode="popLayout">
-          {filteredEvents.map((event) => (
-            <motion.div
-              key={event.id}
-              layout
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -20 }}
-              ref={el => {
-                eventRefs.current[event.id] = el;
-                console.log('Assigned ref for event:', event.id, 'Element:', el); // Debug log
+        <Stack direction="row" spacing={1} alignItems="center" justifyContent="center">
+          <Button
+            variant={selectedType === null ? "contained" : "outlined"}
+            size="small"
+            onClick={() => setSelectedType(null)}
+            sx={{
+              minWidth: '80px',
+              bgcolor: selectedType === null ? theme.palette.primary.main : 'transparent',
+              '&:hover': {
+                bgcolor: selectedType === null 
+                  ? theme.palette.primary.dark 
+                  : theme.palette.action.hover
+              }
+            }}
+          >
+            All
+          </Button>
+          {Object.entries(EVENT_TYPES).map(([key, type]) => (
+            <Button
+              key={type}
+              variant={selectedType === type ? "contained" : "outlined"}
+              size="small"
+              onClick={() => setSelectedType(selectedType === type ? null : type)}
+              startIcon={
+                type === EVENT_TYPES.REMARK ? <RemarkIcon /> :
+                type === EVENT_TYPES.NEWS ? <NewsIcon /> :
+                <MediaIcon />
+              }
+              sx={{
+                minWidth: '100px',
+                bgcolor: selectedType === type ? EVENT_TYPE_COLORS[type].light : 'transparent',
+                color: selectedType === type ? 'white' : EVENT_TYPE_COLORS[type].light,
+                borderColor: EVENT_TYPE_COLORS[type].light,
+                '&:hover': {
+                  bgcolor: selectedType === type 
+                    ? EVENT_TYPE_COLORS[type].light
+                    : `${EVENT_TYPE_COLORS[type].light}22`,
+                  borderColor: EVENT_TYPE_COLORS[type].light
+                }
               }}
             >
-              {renderEventCard(event)}
-            </motion.div>
+              {type.charAt(0).toUpperCase() + type.slice(1)}
+            </Button>
           ))}
-        </AnimatePresence>
-      </div>
+        </Stack>
+      </Paper>
+
+      {/* Event List */}
+      <AnimatePresence mode="sync">
+        {filteredAndSortedEvents.map((event) => (
+          <motion.div
+            key={event.id}
+            layout
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -20 }}
+            ref={el => {
+              eventRefs.current[event.id] = el;
+            }}
+          >
+            {renderEventCard(event)}
+          </motion.div>
+        ))}
+      </AnimatePresence>
 
       {/* Delete Confirmation Dialog */}
       <Dialog
@@ -293,7 +324,7 @@ const EventList = ({ events, onEventEdit, onEventDelete, selectedEventId, onEven
           <Button onClick={handleDeleteConfirm} color="error">Delete</Button>
         </DialogActions>
       </Dialog>
-    </div>
+    </Stack>
   );
 };
 
