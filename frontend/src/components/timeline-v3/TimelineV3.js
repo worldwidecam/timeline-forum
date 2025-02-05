@@ -320,7 +320,8 @@ function TimelineV3() {
       // Add the new event to state and close form
       const newEvent = response.data;
       setEvents(prev => [...prev, newEvent]);
-      setIsEventFormOpen(false);
+      setDialogOpen(false);
+      setEditingEvent(null);
     } catch (error) {
       console.error('Error creating event:', error);
       console.error('Error response:', error.response);

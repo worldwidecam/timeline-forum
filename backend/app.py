@@ -1159,6 +1159,25 @@ def create_timeline_v3_event(timeline_id):
                         db.session.add(tag_timeline)
                         db.session.flush()  # Get the timeline ID
                         tag.timeline_id = tag_timeline.id
+
+                        # Create a copy of the event in the new timeline
+                        timeline_event = Event(
+                            title=new_event.title,
+                            description=new_event.description,
+                            event_date=new_event.event_date,
+                            type=new_event.type,
+                            url=new_event.url,
+                            url_title=new_event.url_title,
+                            url_description=new_event.url_description,
+                            url_image=new_event.url_image,
+                            media_url=new_event.media_url,
+                            media_type=new_event.media_type,
+                            timeline_id=tag_timeline.id,
+                            created_by=1  # Temporary default user ID
+                        )
+                        # Add the same tags to the new event
+                        timeline_event.tags = new_event.tags
+                        db.session.add(timeline_event)
                 
                 new_event.tags.append(tag)
         
