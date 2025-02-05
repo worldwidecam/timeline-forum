@@ -175,6 +175,13 @@ event_tags = db.Table('event_tags',
     db.Column('created_at', db.DateTime, default=datetime.utcnow)
 )
 
+# Event-Timeline Reference Table
+event_timeline_refs = db.Table('event_timeline_refs',
+    db.Column('event_id', db.Integer, db.ForeignKey('event.id')),
+    db.Column('timeline_id', db.Integer, db.ForeignKey('timeline.id')),
+    db.Column('created_at', db.DateTime, default=datetime.utcnow)
+)
+
 class Event(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     title = db.Column(db.String(200), nullable=False)
@@ -203,6 +210,9 @@ class Event(db.Model):
     # Tags relationship
     tags = db.relationship('Tag', secondary=event_tags, backref=db.backref('events', lazy='dynamic'))
     
+    # Timeline references relationship
+    referenced_in = db.relationship('Timeline', secondary=event_timeline_refs, backref=db.backref('referenced_events', lazy='dynamic'))
+
     def __repr__(self):
         return f'<Event {self.title}>'
 
@@ -1046,8 +1056,23 @@ def get_timeline_v3(timeline_id):
 def get_timeline_v3_events(timeline_id):
     try:
         app.logger.info(f'Getting events for timeline {timeline_id}')
-        events = Event.query.filter_by(timeline_id=timeline_id).order_by(Event.event_date.asc()).all()
-        app.logger.info(f'Found {len(events)} events')
+        # Get events that are directly in this timeline
+        direct_events = Event.query.filter_by(timeline_id=timeline_id).all()
+        
+        # Get the timeline
+        timeline = Timeline.query.get(timeline_id)
+        if not timeline:
+            return jsonify({'error': 'Timeline not found'}), 404
+            
+        # Get events that reference this timeline
+        referenced_events = timeline.referenced_events.all()
+        
+        # Combine both sets of events
+        events = list(set(direct_events + referenced_events))
+        
+        # Sort events by date
+        events.sort(key=lambda x: x.event_date)
+        
         return jsonify([{
             'id': event.id,
             'title': event.title,
@@ -1160,24 +1185,8 @@ def create_timeline_v3_event(timeline_id):
                         db.session.flush()  # Get the timeline ID
                         tag.timeline_id = tag_timeline.id
 
-                        # Create a copy of the event in the new timeline
-                        timeline_event = Event(
-                            title=new_event.title,
-                            description=new_event.description,
-                            event_date=new_event.event_date,
-                            type=new_event.type,
-                            url=new_event.url,
-                            url_title=new_event.url_title,
-                            url_description=new_event.url_description,
-                            url_image=new_event.url_image,
-                            media_url=new_event.media_url,
-                            media_type=new_event.media_type,
-                            timeline_id=tag_timeline.id,
-                            created_by=1  # Temporary default user ID
-                        )
-                        # Add the same tags to the new event
-                        timeline_event.tags = new_event.tags
-                        db.session.add(timeline_event)
+                        # Add this event as a reference in the new timeline
+                        new_event.referenced_in.append(tag_timeline)
                 
                 new_event.tags.append(tag)
         
