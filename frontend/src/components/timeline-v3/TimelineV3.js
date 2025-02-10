@@ -27,16 +27,14 @@ function TimelineV3() {
   // Fetch timeline details when component mounts or timelineId changes
   useEffect(() => {
     const fetchTimelineDetails = async () => {
-      if (!timelineId) return;
+      if (!timelineId || timelineId === 'new') return;
       
       try {
         setIsLoading(true);
-        const response = await axios.get(`${API_BASE_URL}/timeline-v3/${timelineId}`, {
-          headers: {
-            'Authorization': `Bearer ${localStorage.getItem('token')}`
-          }
-        });
-        setTimelineName(response.data.name);
+        const response = await axios.get(`${API_BASE_URL}/timeline-v3/${timelineId}`);
+        if (response.data && response.data.name) {
+          setTimelineName(response.data.name);
+        }
       } catch (error) {
         console.error('Error fetching timeline details:', error);
       } finally {

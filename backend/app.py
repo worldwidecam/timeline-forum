@@ -904,7 +904,6 @@ def create_timeline_v3():
         return jsonify({'error': 'Failed to create timeline'}), 500
 
 @app.route('/api/timeline-v3/<int:timeline_id>', methods=['GET'])
-@jwt_required()
 def get_timeline_v3(timeline_id):
     try:
         timeline = Timeline.query.get_or_404(timeline_id)
