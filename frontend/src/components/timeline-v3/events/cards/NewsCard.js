@@ -1,9 +1,11 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   Typography,
   IconButton,
   Link,
   useTheme,
+  Box,
+  Paper,
 } from '@mui/material';
 import {
   Edit as EditIcon,
@@ -15,9 +17,11 @@ import { motion } from 'framer-motion';
 import { format, parseISO } from 'date-fns';
 import { EVENT_TYPES, EVENT_TYPE_COLORS } from '../EventTypes';
 import TagList from './TagList';
+import EventPopup from '../EventPopup';
 
 const NewsCard = ({ event, onEdit, onDelete }) => {
   const theme = useTheme();
+  const [popupOpen, setPopupOpen] = useState(false);
   const typeColors = EVENT_TYPE_COLORS[EVENT_TYPES.NEWS];
   const color = theme.palette.mode === 'dark' ? typeColors.dark : typeColors.light;
 
@@ -32,108 +36,107 @@ const NewsCard = ({ event, onEdit, onDelete }) => {
   };
 
   return (
-    <motion.div
-      layout
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      exit={{ opacity: 0, y: -20 }}
-      whileHover={{ y: -4 }}
-      whileTap={{ scale: 0.98 }}
-      className="relative w-full cursor-pointer"
-      style={{ perspective: '1000px' }}
-    >
+    <>
       <motion.div
-        className={`
-          relative overflow-hidden rounded-xl
-          ${theme.palette.mode === 'dark' ? 'bg-black/40' : 'bg-white/80'}
-          backdrop-blur-md border
-          ${theme.palette.mode === 'dark' ? 'border-white/5' : 'border-black/5'}
-          shadow-lg
-        `}
-        whileHover={{
-          boxShadow: theme.palette.mode === 'dark'
-            ? '0 20px 40px rgba(0,0,0,0.3)'
-            : '0 20px 40px rgba(0,0,0,0.1)',
-        }}
+        layout
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        exit={{ opacity: 0, y: -20 }}
+        whileHover={{ y: -4 }}
+        whileTap={{ scale: 0.98 }}
+        className="relative w-full cursor-pointer"
+        style={{ perspective: '1000px' }}
+        onClick={() => setPopupOpen(true)}
       >
-        {/* Type Badge */}
-        <div
-          className="absolute top-0 left-0 p-3 rounded-tl-xl rounded-br-2xl flex items-center justify-center text-white"
-          style={{ 
-            backgroundColor: color,
-            width: '48px',
-            height: '48px',
-          }}
+        <motion.div
+          className={`
+            relative overflow-hidden rounded-xl p-4
+            ${theme.palette.mode === 'dark' ? 'bg-black/40' : 'bg-white/80'}
+            backdrop-blur-md border
+            ${theme.palette.mode === 'dark' ? 'border-white/5' : 'border-black/5'}
+            shadow-lg
+          `}
         >
-          <NewsIcon sx={{ fontSize: 24 }} />
-        </div>
-
-        {/* Delete Button */}
-        <IconButton
-          onClick={(e) => {
-            e.stopPropagation();
-            onDelete(event);
-          }}
-          sx={{
-            position: 'absolute',
-            top: 8,
-            right: 8,
-            zIndex: 2,
-            color: 'error.main',
-            backgroundColor: 'background.paper',
-            '&:hover': {
-              backgroundColor: 'error.light',
-              color: 'common.white',
-            },
-          }}
-        >
-          <DeleteIcon />
-        </IconButton>
-
-        {/* Content */}
-        <div className="p-6 pl-16">
-          <Typography variant="h6" className="font-bold mb-2">
-            {event.title}
-          </Typography>
-          
-          <Typography className="text-sm opacity-75">
-            {event.description}
-          </Typography>
-
-          {/* Image Preview */}
-          {event.url_image && (
-            <div className="mt-4 rounded-lg overflow-hidden">
-              <img
-                src={event.url_image}
-                alt={event.title}
-                className="w-full h-48 object-cover"
-              />
-            </div>
-          )}
-
-          {event.url && (
-            <Link 
-              href={event.url}
-              target="_blank"
-              rel="noopener noreferrer" 
-              className="text-sm mt-2 opacity-75 hover:opacity-100 inline-flex items-center gap-1"
-              onClick={(e) => e.stopPropagation()}
+          <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 1, mb: 2 }}>
+            <NewsIcon sx={{ color, mt: 0.5 }} />
+            <Typography 
+              variant="h6" 
+              component="div" 
+              sx={{ 
+                flex: 1, 
+                fontWeight: 'bold',
+                fontSize: '1.25rem',  // Slightly larger than normal h6
+              }}
             >
-              <LinkIcon sx={{ fontSize: 16 }} />
-              View source
-            </Link>
+              {event.title}
+            </Typography>
+            <Box sx={{ display: 'flex', gap: 1 }}>
+              <IconButton size="small" onClick={(e) => { e.stopPropagation(); onEdit(event); }}>
+                <EditIcon fontSize="small" />
+              </IconButton>
+              <IconButton size="small" onClick={(e) => { e.stopPropagation(); onDelete(event); }}>
+                <DeleteIcon fontSize="small" />
+              </IconButton>
+            </Box>
+          </Box>
+
+          {/* URL Preview */}
+          {event.url && (
+            <Paper 
+              variant="outlined" 
+              sx={{ 
+                p: 2, 
+                mb: 2,
+                backgroundColor: theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.02)',
+                borderColor: theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)',
+              }}
+            >
+              <Link
+                href={event.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={(e) => e.stopPropagation()}
+                sx={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 1,
+                  color: 'primary.main',
+                  textDecoration: 'none',
+                  '&:hover': {
+                    textDecoration: 'underline',
+                  },
+                }}
+              >
+                <LinkIcon fontSize="small" />
+                <Typography 
+                  variant="body2" 
+                  sx={{ 
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    whiteSpace: 'nowrap',
+                  }}
+                >
+                  {event.url}
+                </Typography>
+              </Link>
+            </Paper>
           )}
 
-          {/* Metadata */}
-          <div className="mt-4 flex items-center justify-between text-sm opacity-50">
-            <span>{formatDate(event.event_date || event.date)}</span>
-          </div>
-
-          {/* Tags */}
-          <TagList tags={event.tags} />
-        </div>
+          <Box sx={{ mt: 'auto' }}>
+            <TagList tags={event.tags} />
+            <Typography variant="caption" color="text.secondary" sx={{ display: 'block', textAlign: 'right', mt: 1 }}>
+              {formatDate(event.date)}
+            </Typography>
+          </Box>
+        </motion.div>
       </motion.div>
-    </motion.div>
+
+      <EventPopup 
+        event={event}
+        open={popupOpen}
+        onClose={() => setPopupOpen(false)}
+      />
+    </>
   );
 };
 

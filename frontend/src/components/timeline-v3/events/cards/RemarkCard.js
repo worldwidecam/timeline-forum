@@ -1,9 +1,10 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   Typography,
   IconButton,
   Link,
   useTheme,
+  Box,
 } from '@mui/material';
 import {
   Edit as EditIcon,
@@ -15,9 +16,11 @@ import { motion } from 'framer-motion';
 import { format, parseISO } from 'date-fns';
 import { EVENT_TYPES, EVENT_TYPE_COLORS } from '../EventTypes';
 import TagList from './TagList';
+import EventPopup from '../EventPopup';
 
 const RemarkCard = ({ event, onEdit, onDelete }) => {
   const theme = useTheme();
+  const [popupOpen, setPopupOpen] = useState(false);
   const typeColors = EVENT_TYPE_COLORS[EVENT_TYPES.REMARK];
   const color = theme.palette.mode === 'dark' ? typeColors.dark : typeColors.light;
 
@@ -32,98 +35,74 @@ const RemarkCard = ({ event, onEdit, onDelete }) => {
   };
 
   return (
-    <motion.div
-      layout
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      exit={{ opacity: 0, y: -20 }}
-      whileHover={{ y: -4 }}
-      whileTap={{ scale: 0.98 }}
-      className="relative w-full cursor-pointer"
-      style={{ perspective: '1000px' }}
-    >
+    <>
       <motion.div
-        className={`
-          relative overflow-hidden rounded-xl
-          ${theme.palette.mode === 'dark' ? 'bg-black/40' : 'bg-white/80'}
-          backdrop-blur-md border
-          ${theme.palette.mode === 'dark' ? 'border-white/5' : 'border-black/5'}
-          shadow-lg
-        `}
-        whileHover={{
-          boxShadow: theme.palette.mode === 'dark'
-            ? '0 20px 40px rgba(0,0,0,0.3)'
-            : '0 20px 40px rgba(0,0,0,0.1)',
-        }}
+        layout
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        exit={{ opacity: 0, y: -20 }}
+        whileHover={{ y: -4 }}
+        whileTap={{ scale: 0.98 }}
+        className="relative w-full cursor-pointer"
+        style={{ perspective: '1000px' }}
+        onClick={() => setPopupOpen(true)}
       >
-        {/* Type Badge */}
-        <div
-          className="absolute top-0 left-0 p-3 rounded-tl-xl rounded-br-2xl flex items-center justify-center text-white"
-          style={{ 
-            backgroundColor: color,
-            width: '48px',
-            height: '48px',
-          }}
+        <motion.div
+          className={`
+            relative overflow-hidden rounded-xl p-4
+            ${theme.palette.mode === 'dark' ? 'bg-black/40' : 'bg-white/80'}
+            backdrop-blur-md border
+            ${theme.palette.mode === 'dark' ? 'border-white/5' : 'border-black/5'}
+            shadow-lg
+          `}
         >
-          <RemarkIcon sx={{ fontSize: 24 }} />
-        </div>
+          <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 1, mb: 2 }}>
+            <RemarkIcon sx={{ color, mt: 0.5 }} />
+            <Typography variant="h6" component="div" sx={{ flex: 1, fontWeight: 'bold' }}>
+              {event.title}
+            </Typography>
+            <Box sx={{ display: 'flex', gap: 1 }}>
+              <IconButton size="small" onClick={(e) => { e.stopPropagation(); onEdit(event); }}>
+                <EditIcon fontSize="small" />
+              </IconButton>
+              <IconButton size="small" onClick={(e) => { e.stopPropagation(); onDelete(event); }}>
+                <DeleteIcon fontSize="small" />
+              </IconButton>
+            </Box>
+          </Box>
 
-        {/* Delete Button */}
-        <IconButton
-          onClick={(e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            onDelete && onDelete(event);
-          }}
-          sx={{
-            position: 'absolute',
-            top: 8,
-            right: 8,
-            zIndex: 2,
-            color: 'error.main',
-            backgroundColor: 'background.paper',
-            '&:hover': {
-              backgroundColor: 'error.light',
-              color: 'common.white',
-            },
-          }}
-        >
-          <DeleteIcon />
-        </IconButton>
-
-        {/* Content */}
-        <div className="p-6 pl-16">
-          <Typography variant="h6" className="font-semibold mb-2">
-            {event.title}
-          </Typography>
-          
-          <Typography className="text-sm opacity-75">
-            {event.description}
-          </Typography>
-
-          {event.url && (
-            <Link 
-              href={event.url}
-              target="_blank"
-              rel="noopener noreferrer" 
-              className="text-sm mt-2 opacity-75 hover:opacity-100 inline-flex items-center gap-1"
-              onClick={(e) => e.stopPropagation()}
+          {/* Description with larger space */}
+          <Box sx={{ mb: 2, maxHeight: '150px', overflow: 'hidden' }}>
+            <Typography 
+              variant="body1" 
+              sx={{ 
+                whiteSpace: 'pre-wrap',
+                display: '-webkit-box',
+                WebkitLineClamp: 5,
+                WebkitBoxOrient: 'vertical',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+              }}
             >
-              <LinkIcon sx={{ fontSize: 16 }} />
-              View attachment
-            </Link>
-          )}
+              {event.description}
+            </Typography>
+          </Box>
 
-          {/* Metadata */}
-          <div className="mt-4 flex items-center justify-between text-sm opacity-50">
-            <span>{formatDate(event.event_date || event.date)}</span>
-          </div>
-
-          {/* Tags */}
-          <TagList tags={event.tags} />
-        </div>
+          <Box sx={{ mt: 'auto' }}>
+            <TagList tags={event.tags} />
+            <Typography variant="caption" color="text.secondary" sx={{ display: 'block', textAlign: 'right', mt: 1 }}>
+              {formatDate(event.date)}
+            </Typography>
+          </Box>
+        </motion.div>
       </motion.div>
-    </motion.div>
+
+      <EventPopup 
+        event={event}
+        open={popupOpen}
+        onClose={() => setPopupOpen(false)}
+      />
+    </>
   );
 };
 
