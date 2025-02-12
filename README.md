@@ -50,6 +50,24 @@ eventDotContainer.onClick = () => {
 - Timeline scroll position context  
 - Event dot portal rendering
 
+### Future Enhancements
+1. **Profile Personalization**: Users can customize their profile backgrounds, similar to Tumblr and MySpace.
+2. Timeline filters (day/week/month/year)
+3. Event creation and display
+4. Discussion posts integration
+5. Enhanced hashtag system
+6. Social features (comments, likes, sharing)
+7. Additional timeline type support
+
+### Design Guidelines
+- **Styling and Animations**: Ensure all styling and animations are smooth, humble, and modern-looking.
+
+### Database Management
+- **DBMS Considerations**: Focus on effective use of records and fields within the database.
+
+### Online Mailbox Feature
+- **Mailbox Implementation**: Users can send and receive mail visually, using themed stationery like in Animal Crossing, with a virtual inbox to display messages.
+
 ### Original Documentation
 <details>
 <summary>Legacy README Content</summary>
