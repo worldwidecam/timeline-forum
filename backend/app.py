@@ -1,17 +1,20 @@
 from flask import Flask, request, jsonify, send_from_directory
 from flask_sqlalchemy import SQLAlchemy
-from flask_jwt_extended import JWTManager, create_access_token, jwt_required, get_jwt_identity
+from flask_jwt_extended import (
+    JWTManager, create_access_token, create_refresh_token,
+    jwt_required, get_jwt_identity, get_jwt,
+    set_access_cookies, set_refresh_cookies, unset_jwt_cookies
+)
 from flask_cors import CORS
-from datetime import datetime
+from datetime import datetime, timedelta
 from werkzeug.security import generate_password_hash, check_password_hash
 from werkzeug.utils import secure_filename
 import os
 import logging
 import time
-# Removed the incorrect import statement
 
 # Configure logging
-logging.basicConfig(level=logging.DEBUG)
+logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 app = Flask(__name__)
@@ -21,8 +24,11 @@ app.config.update(
     SQLALCHEMY_DATABASE_URI=os.getenv('DATABASE_URL').replace('postgres://', 'postgresql://') if os.getenv('DATABASE_URL') else 'sqlite:///timeline_forum.db',
     SQLALCHEMY_TRACK_MODIFICATIONS=False,
     JWT_SECRET_KEY=os.getenv('JWT_SECRET_KEY', 'your-secret-key'),  # Change this in production
-    JWT_ACCESS_TOKEN_EXPIRES=24*60*60,  # Token expires in 24 hours
-    JWT_TOKEN_LOCATION=['headers', 'cookies'],  # Check both headers and cookies for JWT
+    JWT_ACCESS_TOKEN_EXPIRES=timedelta(hours=1),  # Shorter access token lifetime
+    JWT_REFRESH_TOKEN_EXPIRES=timedelta(days=30),  # Long-lived refresh token
+    JWT_TOKEN_LOCATION=['headers'],
+    JWT_HEADER_NAME='Authorization',
+    JWT_HEADER_TYPE='Bearer',
     JWT_COOKIE_SECURE=False,  # Set to True in production with HTTPS
     JWT_COOKIE_CSRF_PROTECT=False,  # Set to True in production
     MAX_CONTENT_LENGTH=16 * 1024 * 1024  # 16MB max file size
@@ -66,54 +72,6 @@ def allowed_file(filename):
 
 def allowed_audio_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_AUDIO_EXTENSIONS
-
-@app.route('/api/upload', methods=['POST'])
-@jwt_required()
-def upload_file():
-    try:
-        logger.info("Starting file upload process")
-        logger.info(f"Request files: {request.files}")
-        logger.info(f"Request headers: {dict(request.headers)}")
-        
-        if 'file' not in request.files:
-            logger.error("No file part in request")
-            return jsonify({'error': 'No file part'}), 400
-        
-        file = request.files['file']
-        if file.filename == '':
-            logger.error("No selected file")
-            return jsonify({'error': 'No selected file'}), 400
-        
-        if not allowed_file(file.filename):
-            logger.error(f"Invalid file type: {file.filename}")
-            return jsonify({'error': 'Invalid file type'}), 400
-        
-        # Generate secure filename
-        filename = secure_filename(file.filename)
-        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S_')
-        filename = timestamp + filename
-        
-        # Save file
-        file_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
-        logger.info(f"Saving file to: {file_path}")
-        file.save(file_path)
-        
-        # Generate URL
-        file_url = f'/static/uploads/{filename}'
-        logger.info(f"File saved successfully. URL: {file_url}")
-        
-        return jsonify({
-            'url': file_url,
-            'filename': filename
-        })
-    
-    except Exception as e:
-        logger.error(f"Error in upload_file: {str(e)}", exc_info=True)
-        return jsonify({'error': str(e)}), 500
-
-@app.route('/static/uploads/<path:filename>')
-def serve_file(filename):
-    return send_from_directory(app.config['UPLOAD_FOLDER'], filename)
 
 # Models
 class UserMusic(db.Model):
@@ -247,7 +205,106 @@ class Comment(db.Model):
     created_at = db.Column(db.DateTime, default=datetime.now())
     updated_at = db.Column(db.DateTime, default=datetime.now(), onupdate=datetime.now())
 
+class TokenBlocklist(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    jti = db.Column(db.String(36), nullable=False, unique=True)
+    created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+
+# JWT Configuration
+@jwt.token_in_blocklist_loader
+def check_if_token_revoked(jwt_header, jwt_payload):
+    jti = jwt_payload["jti"]
+    token = TokenBlocklist.query.filter_by(jti=jti).first()
+    return token is not None
+
+@jwt.unauthorized_loader
+def unauthorized_callback(error):
+    return jsonify({
+        'error': 'Unauthorized',
+        'message': 'Missing or invalid authentication token',
+        'details': str(error)
+    }), 401
+
+@jwt.invalid_token_loader
+def invalid_token_callback(error):
+    return jsonify({
+        'error': 'Unauthorized',
+        'message': 'Invalid authentication token format or signature',
+        'details': str(error)
+    }), 401
+
+@jwt.expired_token_loader
+def expired_token_callback(jwt_header, jwt_data):
+    return jsonify({
+        'error': 'Unauthorized',
+        'message': 'Authentication token has expired. Please refresh your token or login again.',
+        'is_expired': True
+    }), 401
+
+@jwt.needs_fresh_token_loader
+def token_not_fresh_callback(jwt_header, jwt_data):
+    return jsonify({
+        'error': 'Unauthorized',
+        'message': 'Fresh token required. Please login again.'
+    }), 401
+
+@jwt.revoked_token_loader
+def revoked_token_callback(jwt_header, jwt_data):
+    return jsonify({
+        'error': 'Unauthorized',
+        'message': 'Token has been revoked. Please login again.'
+    }), 401
+
 # Routes
+@app.route('/api/upload', methods=['POST'])
+@jwt_required()
+def upload_file():
+    try:
+        logger.info("Starting file upload process")
+        logger.info(f"Request files: {request.files}")
+        logger.info(f"Request headers: {dict(request.headers)}")
+        
+        if 'file' not in request.files:
+            logger.error("No file part in request")
+            return jsonify({'error': 'No file part'}), 400
+        
+        file = request.files['file']
+        if file.filename == '':
+            logger.error("No selected file")
+            return jsonify({'error': 'No selected file'}), 400
+        
+        if not allowed_file(file.filename):
+            logger.error(f"Invalid file type: {file.filename}")
+            return jsonify({'error': 'Invalid file type'}), 400
+        
+        # Generate secure filename
+        filename = secure_filename(file.filename)
+        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S_')
+        filename = timestamp + filename
+        
+        # Save file
+        file_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+        logger.info(f"Saving file to: {file_path}")
+        file.save(file_path)
+        
+        # Generate URL
+        file_url = f'/static/uploads/{filename}'
+        logger.info(f"File saved successfully. URL: {file_url}")
+        
+        return jsonify({
+            'url': file_url,
+            'filename': filename
+        })
+    
+    except Exception as e:
+        logger.error(f"Error in upload_file: {str(e)}", exc_info=True)
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/static/uploads/<path:filename>')
+def serve_file(filename):
+    return send_from_directory(app.config['UPLOAD_FOLDER'], filename)
+
 @app.route('/api/timeline', methods=['POST'])
 def create_timeline():
     data = request.get_json()
@@ -747,117 +804,136 @@ def register():
 
 @app.route('/api/auth/login', methods=['POST'])
 def login():
-    data = request.get_json()
-    
-    if not all(k in data for k in ['email', 'password']):
-        return jsonify({'error': 'Missing email or password'}), 400
-    
-    user = User.query.filter_by(email=data['email']).first()
-    
-    if not user or not user.check_password(data['password']):
-        return jsonify({'error': 'Invalid email or password'}), 401
-    
-    access_token = create_access_token(identity=user.id)
-    response = jsonify({
-        'id': user.id,
-        'username': user.username,
-        'email': user.email,
-        'token': access_token
-    })
-    
-    # Set JWT token in cookie
-    response.set_cookie(
-        'access_token_cookie',
-        access_token,
-        httponly=True,
-        max_age=24*60*60,  # 24 hours
-        samesite='Lax',
-        secure=False  # Set to True in production with HTTPS
-    )
-    
-    return response
+    try:
+        data = request.get_json()
+        if not all(k in data for k in ['email', 'password']):
+            return jsonify({'error': 'Missing email or password'}), 400
+
+        user = User.query.filter_by(email=data['email']).first()
+        if not user or not user.check_password(data['password']):
+            return jsonify({'error': 'Invalid email or password'}), 401
+
+        access_token = create_access_token(identity=user.id)
+        refresh_token = create_refresh_token(identity=user.id)
+        
+        return jsonify({
+            'id': user.id,
+            'email': user.email,
+            'username': user.username,
+            'avatar_url': user.avatar_url,
+            'bio': user.bio,
+            'access_token': access_token,
+            'refresh_token': refresh_token
+        }), 200
+
+    except Exception as e:
+        logger.error(f"Login error: {str(e)}")
+        return jsonify({'error': 'An error occurred during login'}), 500
+
+@app.route('/api/auth/refresh', methods=['POST'])
+@jwt_required(refresh=True)
+def refresh():
+    try:
+        current_user_id = get_jwt_identity()
+        user = User.query.get(current_user_id)
+        if not user:
+            return jsonify({'error': 'User not found'}), 404
+
+        access_token = create_access_token(identity=current_user_id)
+        return jsonify({
+            'access_token': access_token
+        }), 200
+    except Exception as e:
+        logger.error(f"Token refresh error: {str(e)}")
+        return jsonify({'error': 'Failed to refresh token'}), 500
+
+@app.route('/api/auth/logout', methods=['POST'])
+@jwt_required()
+def logout():
+    try:
+        jti = get_jwt()["jti"]
+        user_id = get_jwt_identity()
+        
+        token_block = TokenBlocklist(jti=jti, user_id=user_id)
+        db.session.add(token_block)
+        db.session.commit()
+        
+        return jsonify({'message': 'Successfully logged out'}), 200
+    except Exception as e:
+        logger.error(f"Logout error: {str(e)}")
+        db.session.rollback()
+        return jsonify({'error': 'Failed to logout'}), 500
+
+@app.route('/api/auth/validate', methods=['POST'])
+@jwt_required()
+def validate_token():
+    try:
+        current_user_id = get_jwt_identity()
+        user = User.query.get(current_user_id)
+        if not user:
+            return jsonify({'error': 'User not found'}), 404
+            
+        return jsonify({
+            'valid': True,
+            'user': {
+                'id': user.id,
+                'email': user.email,
+                'username': user.username
+            }
+        }), 200
+    except Exception as e:
+        logger.error(f"Token validation error: {str(e)}")
+        return jsonify({'error': 'Failed to validate token'}), 500
 
 @app.route('/api/profile/update', methods=['POST'])
 @jwt_required()
 def update_profile():
     try:
-        # Convert JWT identity to integer for database query
-        current_user_id = int(get_jwt_identity())
-        app.logger.info(f'Updating profile for user {current_user_id}')
-        
+        current_user_id = get_jwt_identity()
         user = User.query.get(current_user_id)
         if not user:
-            app.logger.error(f'User {current_user_id} not found')
             return jsonify({'error': 'User not found'}), 404
 
+        # Handle file upload
+        if 'avatar' in request.files:
+            file = request.files['avatar']
+            if file and allowed_file(file.filename):
+                ext = file.filename.rsplit('.', 1)[1].lower()
+                filename = f'avatar_{current_user_id}_{int(time.time())}.{ext}'
+                file_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+                file.save(file_path)
+                user.avatar_url = f'/uploads/{filename}'
+
+        # Update other fields
         form_data = request.form
-        app.logger.info(f'Received form data: {form_data}')
         
-        # Update user fields
-        if 'username' in form_data:
-            existing_user = User.query.filter_by(username=form_data['username']).first()
-            if existing_user and existing_user.id != current_user_id:
+        if 'username' in form_data and form_data['username'] != user.username:
+            if User.query.filter_by(username=form_data['username']).first():
                 return jsonify({'error': 'Username already taken'}), 400
             user.username = form_data['username']
             
-        if 'email' in form_data:
-            existing_user = User.query.filter_by(email=form_data['email']).first()
-            if existing_user and existing_user.id != current_user_id:
-                return jsonify({'error': 'Email already registered'}), 400
+        if 'email' in form_data and form_data['email'] != user.email:
+            if User.query.filter_by(email=form_data['email']).first():
+                return jsonify({'error': 'Email already taken'}), 400
             user.email = form_data['email']
             
         if 'bio' in form_data:
             user.bio = form_data['bio']
-            app.logger.info(f'Updated bio to: {user.bio}')
-            
-        if 'avatar' in request.files:
-            file = request.files['avatar']
-            if file and allowed_file(file.filename):
-                filename = secure_filename(f'avatar_{current_user_id}_{int(time.time())}.{file.filename.rsplit(".", 1)[1].lower()}')
-                file_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
-                file.save(file_path)
-                user.avatar_url = f'http://localhost:5000/static/uploads/{filename}'
-                app.logger.info(f'Updated avatar URL to: {user.avatar_url}')
-                
+
         db.session.commit()
-        app.logger.info('Profile updated successfully')
         
         return jsonify({
             'id': user.id,
             'username': user.username,
             'email': user.email,
-            'bio': user.bio,
             'avatar_url': user.avatar_url,
-            'created_at': user.created_at.isoformat()
-        })
-        
+            'bio': user.bio
+        }), 200
+
     except Exception as e:
-        app.logger.error(f'Error updating profile: {str(e)}')
         db.session.rollback()
-        return jsonify({'error': str(e)}), 500
+        return jsonify({'error': 'Failed to update profile'}), 500
 
-@jwt.invalid_token_loader
-def invalid_token_callback(error_string):
-    return jsonify({
-        'error': 'Invalid token',
-        'message': error_string
-    }), 401
-
-@jwt.unauthorized_loader
-def unauthorized_callback(error_string):
-    return jsonify({
-        'error': 'No token provided',
-        'message': error_string
-    }), 401
-
-@jwt.expired_token_loader
-def expired_token_callback(jwt_header, jwt_data):
-    return jsonify({
-        'error': 'Token has expired',
-        'message': 'Please log in again'
-    }), 401
-
-# Timeline V3 Routes
 @app.route('/api/timeline-v3', methods=['GET'])
 def get_timelines_v3():
     try:
