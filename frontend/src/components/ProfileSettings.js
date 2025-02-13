@@ -72,7 +72,7 @@ const ProfileSettings = () => {
     const fetchMusicPreferences = async () => {
       try {
         const response = await axios.get('http://localhost:5000/api/profile/music', {
-          headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
+          headers: { Authorization: `Bearer ${localStorage.getItem('access_token')}` }
         });
         if (response.data.music_url) {
           setMusicData(response.data);
@@ -203,7 +203,7 @@ const ProfileSettings = () => {
         submitData,
         {
           headers: {
-            'Authorization': `Bearer ${localStorage.getItem('token')}`,
+            'Authorization': `Bearer ${localStorage.getItem('access_token')}`,
             'Content-Type': 'multipart/form-data'
           },
           onUploadProgress: (progressEvent) => {
@@ -238,7 +238,7 @@ const ProfileSettings = () => {
         formData,
         {
           headers: {
-            'Authorization': `Bearer ${localStorage.getItem('token')}`,
+            'Authorization': `Bearer ${localStorage.getItem('access_token')}`,
             'Content-Type': 'multipart/form-data'
           }
         }
