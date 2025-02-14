@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import axios from 'axios';
+import api from '../utils/api';
 import {
   Box,
   Container,
@@ -71,9 +71,7 @@ const ProfileSettings = () => {
   useEffect(() => {
     const fetchMusicPreferences = async () => {
       try {
-        const response = await axios.get('http://localhost:5000/api/profile/music', {
-          headers: { Authorization: `Bearer ${localStorage.getItem('access_token')}` }
-        });
+        const response = await api.get('/api/profile/music');
         if (response.data.music_url) {
           setMusicData(response.data);
         }
@@ -198,12 +196,11 @@ const ProfileSettings = () => {
         submitData.append('new_password', formData.newPassword);
       }
 
-      const response = await axios.post(
-        'http://localhost:5000/api/profile/update',
+      const response = await api.post(
+        '/api/profile/update',
         submitData,
         {
           headers: {
-            'Authorization': `Bearer ${localStorage.getItem('access_token')}`,
             'Content-Type': 'multipart/form-data'
           },
           onUploadProgress: (progressEvent) => {
@@ -233,12 +230,11 @@ const ProfileSettings = () => {
       const formData = new FormData();
       formData.append('music', musicFile);
 
-      const response = await axios.post(
-        'http://localhost:5000/api/profile/music',
+      const response = await api.post(
+        '/api/profile/music',
         formData,
         {
           headers: {
-            'Authorization': `Bearer ${localStorage.getItem('access_token')}`,
             'Content-Type': 'multipart/form-data'
           }
         }

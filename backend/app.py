@@ -2,8 +2,9 @@ from flask import Flask, request, jsonify, send_from_directory
 from flask_sqlalchemy import SQLAlchemy
 from flask_jwt_extended import (
     JWTManager, create_access_token, create_refresh_token,
-    jwt_required, get_jwt_identity, get_jwt,
-    set_access_cookies, set_refresh_cookies, unset_jwt_cookies
+    jwt_required, get_jwt_identity, get_jwt, decode_token,
+    set_access_cookies, set_refresh_cookies, unset_jwt_cookies,
+    verify_jwt_in_request
 )
 from flask_cors import CORS
 from datetime import datetime, timedelta
@@ -24,15 +25,20 @@ app.config.update(
     SQLALCHEMY_DATABASE_URI=os.getenv('DATABASE_URL').replace('postgres://', 'postgresql://') if os.getenv('DATABASE_URL') else 'sqlite:///timeline_forum.db',
     SQLALCHEMY_TRACK_MODIFICATIONS=False,
     JWT_SECRET_KEY=os.getenv('JWT_SECRET_KEY', 'your-secret-key'),  # Change this in production
-    JWT_ACCESS_TOKEN_EXPIRES=timedelta(hours=1),  # Shorter access token lifetime
-    JWT_REFRESH_TOKEN_EXPIRES=timedelta(days=30),  # Long-lived refresh token
+    JWT_ACCESS_TOKEN_EXPIRES=timedelta(hours=4),  # Increased from 1 hour to 4 hours
+    JWT_REFRESH_TOKEN_EXPIRES=timedelta(days=30),  # 30 days refresh token
     JWT_TOKEN_LOCATION=['headers'],
     JWT_HEADER_NAME='Authorization',
-    JWT_HEADER_TYPE='Bearer',
-    JWT_COOKIE_SECURE=False,  # Set to True in production with HTTPS
-    JWT_COOKIE_CSRF_PROTECT=False,  # Set to True in production
-    MAX_CONTENT_LENGTH=16 * 1024 * 1024  # 16MB max file size
+    JWT_HEADER_TYPE='Bearer'
 )
+
+# Initialize extensions
+db = SQLAlchemy(app)
+jwt = JWTManager(app)
+
+# Ensure the database exists
+with app.app_context():
+    db.create_all()
 
 # Configure CORS
 CORS(app, resources={
@@ -44,7 +50,7 @@ CORS(app, resources={
             'http://localhost:3003'
         ],
         "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-        "allow_headers": ["Content-Type", "Authorization"],
+        "allow_headers": ["Content-Type", "Authorization", "X-Refresh-Token"],
         "supports_credentials": True,
         "expose_headers": ["Content-Type", "Authorization"]
     }
@@ -58,10 +64,6 @@ app.config['STATIC_FOLDER'] = os.path.join(base_dir, 'static')
 # Create necessary directories
 os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
 os.makedirs(app.config['STATIC_FOLDER'], exist_ok=True)
-
-# Initialize extensions
-db = SQLAlchemy(app)
-jwt = JWTManager(app)
 
 # File upload configuration
 ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif'}
@@ -771,78 +773,133 @@ def merge_timelines():
 @app.route('/api/auth/register', methods=['POST'])
 def register():
     data = request.get_json()
+    logger.info(f"Received registration request with data: {data}")
     
     # Validate required fields
-    if not all(k in data for k in ['username', 'email', 'password']):
-        return jsonify({'error': 'Missing required fields'}), 400
+    required_fields = ['username', 'email', 'password']
+    missing_fields = [field for field in required_fields if not data.get(field)]
+    if missing_fields:
+        error_msg = f"Missing required fields: {', '.join(missing_fields)}"
+        logger.error(error_msg)
+        return jsonify({'error': error_msg}), 400
+        
+    # Validate email format
+    if not '@' in data['email']:
+        error_msg = "Invalid email format"
+        logger.error(error_msg)
+        return jsonify({'error': error_msg}), 400
         
     # Check if username or email already exists
-    if User.query.filter_by(username=data['username']).first():
-        return jsonify({'error': 'Username already taken'}), 400
-    if User.query.filter_by(email=data['email']).first():
-        return jsonify({'error': 'Email already registered'}), 400
+    existing_user = User.query.filter_by(username=data['username']).first()
+    if existing_user:
+        error_msg = "Username already taken"
+        logger.error(error_msg)
+        return jsonify({'error': error_msg}), 400
+        
+    existing_email = User.query.filter_by(email=data['email']).first()
+    if existing_email:
+        error_msg = "Email already registered"
+        logger.error(error_msg)
+        return jsonify({'error': error_msg}), 400
     
-    # Create new user
-    user = User(
-        username=data['username'],
-        email=data['email']
-    )
-    user.set_password(data['password'])
-    
-    db.session.add(user)
-    db.session.commit()
-    
-    # Create access token with string identity
-    access_token = create_access_token(identity=str(user.id))
-    
-    return jsonify({
-        'id': user.id,
-        'username': user.username,
-        'email': user.email,
-        'token': access_token
-    }), 201
+    try:
+        # Create new user
+        user = User(
+            username=data['username'],
+            email=data['email']
+        )
+        user.set_password(data['password'])
+        
+        db.session.add(user)
+        db.session.commit()
+        
+        # Create access token
+        access_token = create_access_token(identity=str(user.id))
+        logger.info(f"Successfully registered user: {user.username}")
+        
+        return jsonify({
+            'id': user.id,
+            'username': user.username,
+            'email': user.email,
+            'token': access_token
+        }), 201
+        
+    except Exception as e:
+        db.session.rollback()
+        error_msg = f"Database error during registration: {str(e)}"
+        logger.error(error_msg)
+        return jsonify({'error': error_msg}), 500
 
 @app.route('/api/auth/login', methods=['POST'])
 def login():
     try:
         data = request.get_json()
+        logger.info(f"Login attempt for email: {data.get('email', 'not provided')}")
+
+        # Validate required fields
         if not all(k in data for k in ['email', 'password']):
-            return jsonify({'error': 'Missing email or password'}), 400
+            error_msg = 'Missing email or password'
+            logger.error(error_msg)
+            return jsonify({'error': error_msg}), 400
 
         user = User.query.filter_by(email=data['email']).first()
-        if not user or not user.check_password(data['password']):
-            return jsonify({'error': 'Invalid email or password'}), 401
+        if not user:
+            error_msg = 'User not found'
+            logger.error(f"Login failed: {error_msg}")
+            return jsonify({'error': error_msg}), 401
 
-        access_token = create_access_token(identity=user.id)
-        refresh_token = create_refresh_token(identity=user.id)
+        if not user.check_password(data['password']):
+            error_msg = 'Invalid password'
+            logger.error(f"Login failed: {error_msg}")
+            return jsonify({'error': error_msg}), 401
+
+        # Create tokens
+        access_token = create_access_token(identity=str(user.id))
+        refresh_token = create_refresh_token(identity=str(user.id))
         
+        logger.info(f"Login successful for user: {user.username}")
+        
+        # Return consistent response structure
         return jsonify({
             'id': user.id,
-            'email': user.email,
             'username': user.username,
-            'avatar_url': user.avatar_url,
-            'bio': user.bio,
+            'email': user.email,
             'access_token': access_token,
-            'refresh_token': refresh_token
+            'refresh_token': refresh_token,
+            'avatar_url': user.avatar_url,
+            'bio': user.bio
         }), 200
 
     except Exception as e:
-        logger.error(f"Login error: {str(e)}")
-        return jsonify({'error': 'An error occurred during login'}), 500
+        error_msg = f"Login error: {str(e)}"
+        logger.error(error_msg)
+        return jsonify({'error': error_msg}), 500
 
 @app.route('/api/auth/refresh', methods=['POST'])
-@jwt_required(refresh=True)
 def refresh():
     try:
-        current_user_id = get_jwt_identity()
-        user = User.query.get(current_user_id)
-        if not user:
-            return jsonify({'error': 'User not found'}), 404
+        auth_header = request.headers.get('Authorization')
+        if not auth_header or not auth_header.startswith('Bearer '):
+            return jsonify({'error': 'Invalid refresh token format'}), 401
 
-        access_token = create_access_token(identity=current_user_id)
-        return jsonify({
-            'access_token': access_token
-        }), 200
+        refresh_token = auth_header.split(' ')[1]
+        try:
+            # Use verify_jwt_in_request with refresh=True to properly validate the token
+            verify_jwt_in_request(refresh=True)
+            current_user_id = get_jwt_identity()
+            
+            # Get user and create new access token
+            user = User.query.get(current_user_id)
+            if not user:
+                return jsonify({'error': 'User not found'}), 404
+
+            access_token = create_access_token(identity=current_user_id)
+            return jsonify({
+                'access_token': access_token
+            }), 200
+        except Exception as e:
+            logger.error(f"Invalid refresh token: {str(e)}")
+            return jsonify({'error': 'Invalid refresh token'}), 401
     except Exception as e:
         logger.error(f"Token refresh error: {str(e)}")
         return jsonify({'error': 'Failed to refresh token'}), 500
@@ -950,34 +1007,52 @@ def get_timelines_v3():
         return jsonify({'error': 'Failed to fetch timelines'}), 500
 
 @app.route('/api/timeline-v3', methods=['POST'])
+@jwt_required()
 def create_timeline_v3():
     try:
-        data = request.get_json()
+        # Get the current user's ID from the JWT token
+        current_user_id = get_jwt_identity()
+        logger.info(f"Creating timeline for user ID: {current_user_id}")
         
-        if not data or not data.get('name'):
-            return jsonify({'error': 'Name is required'}), 400
+        data = request.get_json()
+        if not data:
+            return jsonify({'error': 'No data provided'}), 400
+            
+        if not data.get('name'):
+            return jsonify({'error': 'Timeline name is required'}), 400
+            
+        # Check if a timeline with this name already exists for the user
+        existing_timeline = Timeline.query.filter_by(
+            name=data['name'],
+            created_by=current_user_id
+        ).first()
+        
+        if existing_timeline:
+            return jsonify({'error': 'You already have a timeline with this name'}), 400
             
         new_timeline = Timeline(
             name=data['name'],
             description=data.get('description', ''),
-            created_by=1  # Temporary default user ID
+            created_by=current_user_id
         )
         
         db.session.add(new_timeline)
         db.session.commit()
         
+        logger.info(f"Timeline created successfully: {new_timeline.id}")
+        
         return jsonify({
             'id': new_timeline.id,
             'name': new_timeline.name,
             'description': new_timeline.description,
-            'created_by': new_timeline.created_by,
             'created_at': new_timeline.created_at.isoformat()
         }), 201
         
     except Exception as e:
+        error_msg = f"Failed to create timeline: {str(e)}"
+        logger.error(error_msg)
         db.session.rollback()
-        app.logger.error(f'Error creating timeline: {str(e)}')
-        return jsonify({'error': 'Failed to create timeline'}), 500
+        return jsonify({'error': error_msg}), 500
 
 @app.route('/api/timeline-v3/<int:timeline_id>', methods=['GET'])
 def get_timeline_v3(timeline_id):
@@ -1168,6 +1243,4 @@ def create_timeline_v3_event(timeline_id):
         return jsonify({'error': f'Failed to save event: {str(e)}'}), 500
 
 if __name__ == '__main__':
-    with app.app_context():
-        db.create_all()  # Create new tables with updated schema
     app.run(debug=True)

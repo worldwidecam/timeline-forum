@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Box, Container, useTheme, Button, Fade, Stack, Typography, Fab, Tooltip } from '@mui/material';
 import { useAuth } from '../../contexts/AuthContext';
-import axios from 'axios';
+import api from '../../utils/api';
 import TimelineBackground from './TimelineBackground';
 import TimelineBar from './TimelineBar';
 import TimeMarkers from './TimeMarkers';
@@ -31,7 +31,7 @@ function TimelineV3() {
       
       try {
         setIsLoading(true);
-        const response = await axios.get(`${API_BASE_URL}/timeline-v3/${timelineId}`);
+        const response = await api.get(`/api/timeline-v3/${timelineId}`);
         if (response.data && response.data.name) {
           setTimelineName(response.data.name);
         }
@@ -216,19 +216,15 @@ function TimelineV3() {
     setSelectedEventId(event.id);
   };
 
-  // Fetch events whenever timelineId changes
+  // Fetch events when timeline ID changes
   useEffect(() => {
     const fetchEvents = async () => {
-      if (!timelineId) return;
+      if (!timelineId || timelineId === 'new') return;
       
       try {
         setIsLoadingEvents(true);
         console.log('Fetching events for timeline:', timelineId);
-        const response = await axios.get(`${API_BASE_URL}/timeline-v3/${timelineId}/events`, {
-          headers: {
-            'Authorization': `Bearer ${localStorage.getItem('token')}`
-          }
-        });
+        const response = await api.get(`/api/timeline-v3/${timelineId}/events`);
         console.log('Events response:', response.data);
         setEvents(response.data);
       } catch (error) {
@@ -237,7 +233,7 @@ function TimelineV3() {
         setIsLoadingEvents(false);
       }
     };
-    
+
     fetchEvents();
   }, [timelineId]);
 
@@ -249,13 +245,9 @@ function TimelineV3() {
         const params = new URLSearchParams(window.location.search);
         const timelineName = params.get('name') || 'Timeline V3';
         
-        const response = await axios.post(`${API_BASE_URL}/timeline-v3`, {
+        const response = await api.post('/api/timeline-v3', {
           name: timelineName,
           description: `A new timeline created: ${timelineName}`
-        }, {
-          headers: {
-            'Authorization': `Bearer ${localStorage.getItem('token')}`
-          }
         });
         setTimelineId(response.data.id);
         console.log('Timeline created:', response.data);
@@ -270,36 +262,10 @@ function TimelineV3() {
   }, [timelineId]);
 
   const handleEventSubmit = async (eventData) => {
-    if (!timelineId) {
-      throw new Error('Timeline ID is required');
-    }
-
+    let mediaUrl = null; // Define mediaUrl here
     try {
-      setSubmitError(null);
-      console.log('Creating event with data:', eventData);
-      console.log('Timeline ID:', timelineId);
-      console.log('Auth token:', localStorage.getItem('token'));
-      
-      // If there's a media file, upload it first
-      let mediaUrl = null;
-      if (eventData.media) {
-        const formData = new FormData();
-        formData.append('file', eventData.media);
-        
-        console.log('Uploading media file:', eventData.media);
-        const uploadResponse = await axios.post(`${API_BASE_URL}/upload`, formData, {
-          headers: {
-            'Authorization': `Bearer ${localStorage.getItem('token')}`,
-            'Content-Type': 'multipart/form-data'
-          }
-        });
-        console.log('Media upload response:', uploadResponse.data);
-        mediaUrl = uploadResponse.data.url;
-      }
-
-      // Create the event
-      console.log('Sending event creation request to:', `${API_BASE_URL}/timeline-v3/${timelineId}/events`);
-      const response = await axios.post(`${API_BASE_URL}/timeline-v3/${timelineId}/events`, {
+      console.log('Sending event creation request to:', `/api/timeline-v3/${timelineId}/events`);
+      const response = await api.post(`/api/timeline-v3/${timelineId}/events`, {
         title: eventData.title,
         description: eventData.description,
         event_date: eventData.event_date,
@@ -312,10 +278,6 @@ function TimelineV3() {
         media_url: mediaUrl || '',
         media_type: eventData.media ? eventData.media.type.split('/')[0] : '',
         tags: eventData.tags || []
-      }, {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
-        }
       });
       console.log('Event creation response:', response.data);
 
@@ -340,11 +302,7 @@ function TimelineV3() {
 
   const handleEventDelete = async (event) => {
     try {
-      await axios.delete(`${API_BASE_URL}/timeline-v3/${timelineId}/events/${event.id}`, {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
-        }
-      });
+      await api.delete(`/api/timeline-v3/${timelineId}/events/${event.id}`);
       setEvents(events.filter(e => e.id !== event.id));
       if (selectedEventId === event.id) {
         setSelectedEventId(null);

@@ -30,7 +30,7 @@ import {
   Divider
 } from '@mui/material';
 import PageTransition from './components/PageTransition';
-import axios from 'axios';
+import api from './utils/api';
 
 // Protected Route component
 const ProtectedRoute = ({ children }) => {
@@ -73,11 +73,7 @@ const Homepage = () => {
       
       try {
         setLoadingTimelines(true);
-        const response = await axios.get('/api/timeline-v3', {
-          headers: {
-            'Authorization': `Bearer ${localStorage.getItem('token')}`
-          }
-        });
+        const response = await api.get('/api/timeline-v3');
         setTimelines(response.data);
       } catch (error) {
         console.error('Error fetching timelines:', error);
@@ -118,27 +114,21 @@ const Homepage = () => {
 
     try {
       setLoading(true);
-      const response = await axios.post('/api/timeline-v3', 
-        {
-          name: formData.name,
-          description: formData.description
-        },
-        {
-          headers: {
-            'Authorization': `Bearer ${localStorage.getItem('token')}`
-          }
-        }
-      );
+      const response = await api.post('/api/timeline-v3', {
+        name: formData.name.trim(),
+        description: formData.description.trim()
+      });
       
       // Add the new timeline to the list
       setTimelines(prev => [response.data, ...prev]);
       
       handleDialogClose();
-      // Pass the timeline name as a URL parameter
-      navigate(`/timeline-v3/${response.data.id}?name=${encodeURIComponent(formData.name)}`);
+      // Navigate to the new timeline
+      navigate(`/timeline-v3/${response.data.id}`);
     } catch (error) {
       console.error('Error creating timeline:', error);
-      alert('Failed to create timeline. Please try again.');
+      const errorMessage = error.response?.data?.error || 'Failed to create timeline. Please try again.';
+      alert(errorMessage);
     } finally {
       setLoading(false);
     }
@@ -153,11 +143,7 @@ const Homepage = () => {
     if (!timelineToDelete) return;
 
     try {
-      const response = await axios.delete(`/api/timelines/${timelineToDelete.id}`, {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
-        }
-      });
+      const response = await api.delete(`/api/timelines/${timelineToDelete.id}`);
       
       // Remove the timeline from the list
       setTimelines(timelines.filter(t => t.id !== timelineToDelete.id));

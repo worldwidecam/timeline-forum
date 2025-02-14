@@ -27,16 +27,34 @@ const Register = () => {
     e.preventDefault();
     setError('');
 
+    // Client-side validation
+    if (!formData.username || !formData.email || !formData.password || !formData.confirmPassword) {
+      setError('All fields are required');
+      return;
+    }
+
     if (formData.password !== formData.confirmPassword) {
       setError('Passwords do not match');
       return;
     }
 
+    if (!formData.email.includes('@')) {
+      setError('Please enter a valid email address');
+      return;
+    }
+
+    if (formData.password.length < 6) {
+      setError('Password must be at least 6 characters long');
+      return;
+    }
+
     try {
-      await register(formData.username, formData.email, formData.password);
+      const response = await register(formData.username, formData.email, formData.password);
+      console.log('Registration successful:', response);
       navigate('/');
     } catch (error) {
-      setError(error.response?.data?.error || 'Failed to register');
+      console.error('Registration error:', error);
+      setError(error.toString());
     }
   };
 
