@@ -139,11 +139,22 @@ export const AuthProvider = ({ children }) => {
     }
   }, []);
 
+  const updateProfile = async (updatedData) => {
+    try {
+      const response = await api.put('/api/auth/profile', updatedData);
+      setUser(response.data);
+    } catch (error) {
+      console.error('Error updating profile:', error);
+      throw new Error(error.response?.data?.error || 'Failed to update profile');
+    }
+  };
+
   const value = {
     user,
     login,
     logout,
     register,
+    updateProfile,
     loading,
     refreshAccessToken
   };

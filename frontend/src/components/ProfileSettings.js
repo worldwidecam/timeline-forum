@@ -196,6 +196,9 @@ const ProfileSettings = () => {
         submitData.append('new_password', formData.newPassword);
       }
 
+      console.log('Submitting profile update with data:', submitData);
+      console.log('Current user:', user);
+
       const response = await api.post(
         '/api/profile/update',
         submitData,
@@ -209,6 +212,7 @@ const ProfileSettings = () => {
           }
         }
       );
+      console.log('Profile update response:', response.data);
 
       if (updateProfile) {
         updateProfile(response.data);

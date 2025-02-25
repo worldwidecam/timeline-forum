@@ -39,6 +39,7 @@ function TimelineV3() {
         console.error('Error fetching timeline details:', error);
       } finally {
         setIsLoading(false);
+        window.scrollTo(0, 0);  // Scroll to the top of the page
       }
     };
 
