@@ -54,6 +54,19 @@ const EventList = ({ events, onEventEdit, onEventDelete, selectedEventId, onEven
     window.dispatchEvent(new Event('storage'));
   }, [sortOrder]);
 
+  // Notify other components when filter type changes
+  useEffect(() => {
+    // Store the selected type in localStorage
+    if (selectedType) {
+      localStorage.setItem('timeline_filter_type', selectedType);
+    } else {
+      localStorage.removeItem('timeline_filter_type');
+    }
+    
+    // Dispatch a custom event to notify other components
+    window.dispatchEvent(new Event('timeline_filter_change'));
+  }, [selectedType]);
+
   const handleDeleteClick = (event) => {
     setEventToDelete(event);
     setDeleteDialogOpen(true);

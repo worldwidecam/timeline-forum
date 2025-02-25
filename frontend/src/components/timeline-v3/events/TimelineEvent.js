@@ -13,6 +13,28 @@ const TimelineEvent = ({ event, position = 'left', onDelete }) => {
   const theme = useTheme();
   const [deleteDialogOpen, setDeleteDialogOpen] = React.useState(false);
 
+  // Return a placeholder if event is undefined or null
+  if (!event) {
+    return (
+      <Paper
+        elevation={3}
+        sx={{
+          p: 2,
+          mb: 3,
+          maxWidth: '600px',
+          width: '100%',
+          backgroundColor: theme.palette.background.paper,
+          borderRadius: '12px',
+          textAlign: 'center'
+        }}
+      >
+        <Typography variant="body2" color="text.secondary">
+          No event data available
+        </Typography>
+      </Paper>
+    );
+  }
+
   const handleDeleteClick = (e) => {
     e.stopPropagation();
     setDeleteDialogOpen(true);

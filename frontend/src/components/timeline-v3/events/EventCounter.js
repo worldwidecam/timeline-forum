@@ -13,15 +13,21 @@ const EventCounter = ({
   viewMode,
   timelineOffset = 0,
   markerSpacing = 100,
-  sortOrder
+  sortOrder,
+  selectedType 
 }) => {
   // State to track day view current event index
   const [dayViewIndex, setDayViewIndex] = useState(0);
   
-  // Reset day view index when view mode changes
+  // Reset day view index when view mode changes or filtering changes
   useEffect(() => {
     setDayViewIndex(0);
-  }, [viewMode]);
+  }, [viewMode, selectedType]);
+  
+  // Reset day view index when sort order changes
+  useEffect(() => {
+    setDayViewIndex(0);
+  }, [sortOrder]);
 
   // Get color based on event type
   const getEventColor = (event) => {
@@ -44,14 +50,57 @@ const EventCounter = ({
 
   // Get filtered events for day view (events with valid dates)
   const getDayViewEvents = () => {
-    return events.filter(event => event.event_date);
+    return events.filter(event => 
+      event.event_date && 
+      (!selectedType || event.type === selectedType)
+    );
+  };
+
+  // Get filtered events for position view
+  const getPositionViewEvents = () => {
+    return events.filter(event => 
+      !selectedType || event.type === selectedType
+    );
   };
 
   const dayViewEvents = getDayViewEvents();
-  const currentDayViewEvent = dayViewEvents[dayViewIndex] || null;
+  const positionViewEvents = getPositionViewEvents();
+  
+  // Reset index if it's out of bounds after filtering
+  useEffect(() => {
+    if (viewMode === 'day' && dayViewEvents.length > 0 && dayViewIndex >= dayViewEvents.length) {
+      setDayViewIndex(0);
+    }
+    if (viewMode !== 'day' && positionViewEvents.length > 0 && currentIndex >= positionViewEvents.length) {
+      onChangeIndex(0);
+    }
+  }, [selectedType, dayViewEvents.length, positionViewEvents.length, dayViewIndex, currentIndex, viewMode, onChangeIndex]);
 
-  // Cycling functions adjusted based on sort order
+  // Position view cycling functions
+  const goToPreviousPosition = () => {
+    if (positionViewEvents.length === 0) return;
+    
+    if (sortOrder === 'newest') {
+      onChangeIndex(currentIndex < positionViewEvents.length - 1 ? currentIndex + 1 : 0);
+    } else {
+      onChangeIndex(currentIndex > 0 ? currentIndex - 1 : positionViewEvents.length - 1);
+    }
+  };
+
+  const goToNextPosition = () => {
+    if (positionViewEvents.length === 0) return;
+    
+    if (sortOrder === 'newest') {
+      onChangeIndex(currentIndex > 0 ? currentIndex - 1 : positionViewEvents.length - 1);
+    } else {
+      onChangeIndex(currentIndex < positionViewEvents.length - 1 ? currentIndex + 1 : 0);
+    }
+  };
+
+  // Day view cycling functions
   const goToPrevious = () => {
+    if (dayViewEvents.length === 0) return;
+    
     if (sortOrder === 'newest') {
       setDayViewIndex(dayViewIndex < dayViewEvents.length - 1 ? dayViewIndex + 1 : 0);
     } else {
@@ -60,6 +109,8 @@ const EventCounter = ({
   };
 
   const goToNext = () => {
+    if (dayViewEvents.length === 0) return;
+    
     if (sortOrder === 'newest') {
       setDayViewIndex(dayViewIndex > 0 ? dayViewIndex - 1 : dayViewEvents.length - 1);
     } else {
@@ -68,7 +119,7 @@ const EventCounter = ({
   };
 
   return (
-    <Box
+    <Box 
       sx={{
         position: 'absolute',
         top: 16,
@@ -105,29 +156,49 @@ const EventCounter = ({
           <EventIcon color="action" />
         </Badge>
       </Box>
-
-      {/* Position view event carousel */}
-      {viewMode === 'position' && events.length > 0 && (
-        <EventCarousel
-          events={events}
-          currentIndex={currentIndex}
-          onChangeIndex={onChangeIndex}
-          onDotClick={onDotClick}
-          goToPrevious={goToPrevious}
-          goToNext={goToNext}
-        />
+      
+      {/* Day View Event Counter */}
+      {viewMode === 'day' && (
+        <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
+          {dayViewEvents.length > 0 ? (
+            <>
+              <EventCarousel 
+                events={dayViewEvents} 
+                currentIndex={dayViewIndex} 
+                onChangeIndex={handleDayViewChange}
+                onDotClick={handleDayViewDotClick}
+                goToPrevious={goToPrevious}
+                goToNext={goToNext}
+              />
+            </>
+          ) : (
+            <Typography variant="caption" color="text.secondary">
+              No events match the current filter
+            </Typography>
+          )}
+        </Box>
       )}
 
-      {/* Day view event carousel */}
-      {viewMode === 'day' && dayViewEvents.length > 0 && (
-        <EventCarousel
-          events={dayViewEvents}
-          currentIndex={dayViewIndex}
-          onChangeIndex={handleDayViewChange}
-          onDotClick={handleDayViewDotClick}
-          goToPrevious={goToPrevious}
-          goToNext={goToNext}
-        />
+      {/* Position View Event Counter */}
+      {viewMode !== 'day' && (
+        <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
+          {positionViewEvents.length > 0 ? (
+            <>
+              <EventCarousel 
+                events={positionViewEvents} 
+                currentIndex={currentIndex} 
+                onChangeIndex={onChangeIndex}
+                onDotClick={onDotClick}
+                goToPrevious={goToPreviousPosition}
+                goToNext={goToNextPosition}
+              />
+            </>
+          ) : (
+            <Typography variant="caption" color="text.secondary">
+              No events match the current filter
+            </Typography>
+          )}
+        </Box>
       )}
     </Box>
   );

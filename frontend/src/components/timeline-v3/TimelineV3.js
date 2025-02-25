@@ -210,6 +210,11 @@ function TimelineV3() {
     return localStorage.getItem('timeline_sort_preference') || 'newest';
   });
 
+  // Get selected filter type from localStorage
+  const [selectedType, setSelectedType] = useState(() => {
+    return localStorage.getItem('timeline_filter_type') || null;
+  });
+
   // Update sortOrder when localStorage changes
   useEffect(() => {
     const handleStorageChange = () => {
@@ -218,6 +223,16 @@ function TimelineV3() {
     
     window.addEventListener('storage', handleStorageChange);
     return () => window.removeEventListener('storage', handleStorageChange);
+  }, []);
+
+  // Update selectedType when filter changes
+  useEffect(() => {
+    const handleFilterChange = () => {
+      setSelectedType(localStorage.getItem('timeline_filter_type') || null);
+    };
+    
+    window.addEventListener('timeline_filter_change', handleFilterChange);
+    return () => window.removeEventListener('timeline_filter_change', handleFilterChange);
   }, []);
 
   const [isRecentering, setIsRecentering] = useState(false);
@@ -563,6 +578,7 @@ function TimelineV3() {
             timelineOffset={timelineOffset}
             markerSpacing={100}
             sortOrder={sortOrder}
+            selectedType={selectedType}
             style={timelineTransitionStyles}
           />
           {/* Event Markers - only show in time-based views */}

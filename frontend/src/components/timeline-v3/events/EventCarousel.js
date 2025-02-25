@@ -1,11 +1,30 @@
 import React, { useState, useCallback } from 'react';
-import { Box, IconButton, useTheme, Paper, Fade, Popper } from '@mui/material';
+import { Box, IconButton, useTheme, Paper, Fade, Popper, Typography } from '@mui/material';
 import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
 import ChevronRightIcon from '@mui/icons-material/ChevronRight';
 import TimelineEvent from './TimelineEvent';
 import { EVENT_TYPE_COLORS } from './EventTypes';
 
-const EventCarousel = ({
+// Empty state component (no hooks)
+const EmptyEventCarousel = () => {
+  return (
+    <Box
+      sx={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: 1,
+        mt: 1
+      }}
+    >
+      <Typography variant="caption" color="text.secondary">
+        No events available
+      </Typography>
+    </Box>
+  );
+};
+
+// Component with events (contains all hooks)
+const PopulatedEventCarousel = ({
   events,
   currentIndex,
   onChangeIndex,
@@ -14,23 +33,25 @@ const EventCarousel = ({
   goToNext
 }) => {
   const theme = useTheme();
-  const currentEvent = events[currentIndex];
   const [anchorEl, setAnchorEl] = useState(null);
   const [isHovered, setIsHovered] = useState(false);
   const [popperPlacement, setPopperPlacement] = useState('bottom');
+  
+  // Ensure currentIndex is within bounds
+  const safeCurrentIndex = Math.min(Math.max(0, currentIndex), events.length - 1);
+  const currentEvent = events[safeCurrentIndex];
 
-  // Get the color based on event type and theme mode
-  const getEventTypeColor = () => {
+  const getEventTypeColor = useCallback(() => {
     if (!currentEvent?.type) return theme.palette.primary.main;
     const colors = EVENT_TYPE_COLORS[currentEvent.type];
-    return theme.palette.mode === 'dark' ? colors.dark : colors.light;
-  };
+    return theme.palette.mode === 'dark' ? colors?.dark : colors?.light;
+  }, [currentEvent, theme.palette.mode, theme.palette.primary.main]);
 
-  const getEventTypeHoverColor = () => {
+  const getEventTypeHoverColor = useCallback(() => {
     if (!currentEvent?.type) return theme.palette.primary.dark;
-    const colors = EVENT_TYPE_COLORS[currentEvent.type].hover;
-    return theme.palette.mode === 'dark' ? colors.dark : colors.light;
-  };
+    const colors = EVENT_TYPE_COLORS[currentEvent.type]?.hover;
+    return theme.palette.mode === 'dark' ? colors?.dark : colors?.light;
+  }, [currentEvent, theme.palette.mode, theme.palette.primary.dark]);
 
   const handleMouseEnter = useCallback((event) => {
     const rect = event.currentTarget.getBoundingClientRect();
@@ -48,34 +69,34 @@ const EventCarousel = ({
     setIsHovered(true);
   }, []);
 
-  const handleMouseLeave = () => {
+  const handleMouseLeave = useCallback(() => {
     setAnchorEl(null);
     setIsHovered(false);
-  };
+  }, []);
 
-  const handleDotClick = (e) => {
+  const handleDotClick = useCallback((e) => {
     e.stopPropagation(); // Prevent event bubbling
     if (onDotClick && currentEvent) {
       onDotClick(currentEvent);
     }
-  };
+  }, [currentEvent, onDotClick]);
 
   // Use provided functions if available, otherwise use default behavior
-  const handlePrevious = () => {
+  const handlePrevious = useCallback(() => {
     if (goToPrevious) {
       goToPrevious();
     } else {
-      onChangeIndex(currentIndex > 0 ? currentIndex - 1 : events.length - 1);
+      onChangeIndex(safeCurrentIndex > 0 ? safeCurrentIndex - 1 : events.length - 1);
     }
-  };
+  }, [goToPrevious, onChangeIndex, safeCurrentIndex, events.length]);
 
-  const handleNext = () => {
+  const handleNext = useCallback(() => {
     if (goToNext) {
       goToNext();
     } else {
-      onChangeIndex(currentIndex < events.length - 1 ? currentIndex + 1 : 0);
+      onChangeIndex(safeCurrentIndex < events.length - 1 ? safeCurrentIndex + 1 : 0);
     }
-  };
+  }, [goToNext, onChangeIndex, safeCurrentIndex, events.length]);
 
   const eventColor = getEventTypeColor();
   const eventHoverColor = getEventTypeHoverColor();
@@ -156,6 +177,18 @@ const EventCarousel = ({
       </Popper>
     </Box>
   );
+};
+
+// Main component that decides which version to render
+const EventCarousel = (props) => {
+  const { events = [] } = props;
+  
+  // No conditional hooks here - just conditional rendering
+  if (!events || events.length === 0) {
+    return <EmptyEventCarousel />;
+  }
+  
+  return <PopulatedEventCarousel {...props} />;
 };
 
 export default EventCarousel;
