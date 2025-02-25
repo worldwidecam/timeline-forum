@@ -12,7 +12,8 @@ const EventCounter = ({
   onDotClick,
   viewMode,
   timelineOffset = 0,
-  markerSpacing = 100
+  markerSpacing = 100,
+  sortOrder
 }) => {
   // State to track day view current event index
   const [dayViewIndex, setDayViewIndex] = useState(0);
@@ -48,6 +49,23 @@ const EventCounter = ({
 
   const dayViewEvents = getDayViewEvents();
   const currentDayViewEvent = dayViewEvents[dayViewIndex] || null;
+
+  // Cycling functions adjusted based on sort order
+  const goToPrevious = () => {
+    if (sortOrder === 'newest') {
+      setDayViewIndex(dayViewIndex < dayViewEvents.length - 1 ? dayViewIndex + 1 : 0);
+    } else {
+      setDayViewIndex(dayViewIndex > 0 ? dayViewIndex - 1 : dayViewEvents.length - 1);
+    }
+  };
+
+  const goToNext = () => {
+    if (sortOrder === 'newest') {
+      setDayViewIndex(dayViewIndex > 0 ? dayViewIndex - 1 : dayViewEvents.length - 1);
+    } else {
+      setDayViewIndex(dayViewIndex < dayViewEvents.length - 1 ? dayViewIndex + 1 : 0);
+    }
+  };
 
   return (
     <Box
@@ -95,6 +113,8 @@ const EventCounter = ({
           currentIndex={currentIndex}
           onChangeIndex={onChangeIndex}
           onDotClick={onDotClick}
+          goToPrevious={goToPrevious}
+          goToNext={goToNext}
         />
       )}
 
@@ -105,6 +125,8 @@ const EventCounter = ({
           currentIndex={dayViewIndex}
           onChangeIndex={handleDayViewChange}
           onDotClick={handleDayViewDotClick}
+          goToPrevious={goToPrevious}
+          goToNext={goToNext}
         />
       )}
     </Box>

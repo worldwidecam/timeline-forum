@@ -205,6 +205,21 @@ function TimelineV3() {
   const [editingEvent, setEditingEvent] = useState(null);
   const [dialogOpen, setDialogOpen] = useState(false);
 
+  // Get sort order from localStorage
+  const [sortOrder, setSortOrder] = useState(() => {
+    return localStorage.getItem('timeline_sort_preference') || 'newest';
+  });
+
+  // Update sortOrder when localStorage changes
+  useEffect(() => {
+    const handleStorageChange = () => {
+      setSortOrder(localStorage.getItem('timeline_sort_preference') || 'newest');
+    };
+    
+    window.addEventListener('storage', handleStorageChange);
+    return () => window.removeEventListener('storage', handleStorageChange);
+  }, []);
+
   const [isRecentering, setIsRecentering] = useState(false);
   const [isFullyFaded, setIsFullyFaded] = useState(false);
 
@@ -547,6 +562,7 @@ function TimelineV3() {
             viewMode={viewMode}
             timelineOffset={timelineOffset}
             markerSpacing={100}
+            sortOrder={sortOrder}
             style={timelineTransitionStyles}
           />
           {/* Event Markers - only show in time-based views */}

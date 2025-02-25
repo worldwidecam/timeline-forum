@@ -9,7 +9,9 @@ const EventCarousel = ({
   events,
   currentIndex,
   onChangeIndex,
-  onDotClick
+  onDotClick,
+  goToPrevious,
+  goToNext
 }) => {
   const theme = useTheme();
   const currentEvent = events[currentIndex];
@@ -58,14 +60,21 @@ const EventCarousel = ({
     }
   };
 
-  // Go to previous event (chronologically earlier)
-  const goToPrevious = () => {
-    onChangeIndex(currentIndex > 0 ? currentIndex - 1 : events.length - 1);
+  // Use provided functions if available, otherwise use default behavior
+  const handlePrevious = () => {
+    if (goToPrevious) {
+      goToPrevious();
+    } else {
+      onChangeIndex(currentIndex > 0 ? currentIndex - 1 : events.length - 1);
+    }
   };
 
-  // Go to next event (chronologically later)
-  const goToNext = () => {
-    onChangeIndex(currentIndex < events.length - 1 ? currentIndex + 1 : 0);
+  const handleNext = () => {
+    if (goToNext) {
+      goToNext();
+    } else {
+      onChangeIndex(currentIndex < events.length - 1 ? currentIndex + 1 : 0);
+    }
   };
 
   const eventColor = getEventTypeColor();
@@ -82,7 +91,7 @@ const EventCarousel = ({
     >
       <IconButton 
         size="small"
-        onClick={goToPrevious}
+        onClick={handlePrevious}
         sx={{ 
           color: eventColor,
           padding: '4px'
@@ -112,7 +121,7 @@ const EventCarousel = ({
 
       <IconButton 
         size="small"
-        onClick={goToNext}
+        onClick={handleNext}
         sx={{ 
           color: eventColor,
           padding: '4px'

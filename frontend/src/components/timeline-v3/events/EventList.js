@@ -31,6 +31,7 @@ import { EVENT_TYPES, EVENT_TYPE_COLORS } from './EventTypes';
 import RemarkCard from './cards/RemarkCard';
 import NewsCard from './cards/NewsCard';
 import MediaCard from './cards/MediaCard';
+import EventCounter from './EventCounter';
 
 const EventList = ({ events, onEventEdit, onEventDelete, selectedEventId, onEventSelect }) => {
   const theme = useTheme();
@@ -48,6 +49,9 @@ const EventList = ({ events, onEventEdit, onEventDelete, selectedEventId, onEven
   // Save sort preference whenever it changes
   useEffect(() => {
     localStorage.setItem('timeline_sort_preference', sortOrder);
+    
+    // Dispatch a storage event to notify other components
+    window.dispatchEvent(new Event('storage'));
   }, [sortOrder]);
 
   const handleDeleteClick = (event) => {
