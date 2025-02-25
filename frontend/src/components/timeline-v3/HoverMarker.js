@@ -18,12 +18,24 @@ const HoverMarker = ({
     return `${displayHours}:${minutes.toString().padStart(2, '0')} ${ampm}`;
   };
 
-  const getCurrentDay = () => {
+  const getTimeOfDay = () => {
+    const now = new Date();
+    const hours = now.getHours();
+    if (hours < 12) return 'Morning';
+    if (hours < 18) return 'Afternoon';
+    return 'Evening';
+  };
+
+  const getCurrentDayWithTime = () => {
     const now = new Date();
     const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-    const month = now.toLocaleString('default', { month: 'short' });
-    const date = now.getDate();
-    return `${days[now.getDay()]}, ${month} ${date}`;
+    const dayName = days[now.getDay()];
+    const timeOfDay = getTimeOfDay();
+    return `${dayName} ${timeOfDay}`;
+  };
+
+  const getCurrentDay = () => {
+    return `${getCurrentDayWithTime()}`;
   };
 
   const getCurrentDayShort = () => {
