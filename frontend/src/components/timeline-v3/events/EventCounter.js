@@ -1,7 +1,8 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Box, Badge, Typography } from '@mui/material';
 import EventIcon from '@mui/icons-material/Event';
 import EventCarousel from './EventCarousel';
+import { EVENT_TYPE_COLORS } from './EventTypes';
 
 const EventCounter = ({ 
   count, 
@@ -9,8 +10,45 @@ const EventCounter = ({
   currentIndex = 0, 
   onChangeIndex,
   onDotClick,
-  viewMode 
+  viewMode,
+  timelineOffset = 0,
+  markerSpacing = 100
 }) => {
+  // State to track day view current event index
+  const [dayViewIndex, setDayViewIndex] = useState(0);
+  
+  // Reset day view index when view mode changes
+  useEffect(() => {
+    setDayViewIndex(0);
+  }, [viewMode]);
+
+  // Get color based on event type
+  const getEventColor = (event) => {
+    if (!event?.type) return 'primary.main';
+    const colors = EVENT_TYPE_COLORS[event.type];
+    return colors ? colors.light : 'primary.main';
+  };
+
+  // Handle day view navigation
+  const handleDayViewChange = (newIndex) => {
+    setDayViewIndex(newIndex);
+  };
+
+  // Handle day view dot click
+  const handleDayViewDotClick = (event) => {
+    if (onDotClick) {
+      onDotClick(event);
+    }
+  };
+
+  // Get filtered events for day view (events with valid dates)
+  const getDayViewEvents = () => {
+    return events.filter(event => event.event_date);
+  };
+
+  const dayViewEvents = getDayViewEvents();
+  const currentDayViewEvent = dayViewEvents[dayViewIndex] || null;
+
   return (
     <Box
       sx={{
@@ -50,12 +88,23 @@ const EventCounter = ({
         </Badge>
       </Box>
 
+      {/* Position view event carousel */}
       {viewMode === 'position' && events.length > 0 && (
         <EventCarousel
           events={events}
           currentIndex={currentIndex}
           onChangeIndex={onChangeIndex}
           onDotClick={onDotClick}
+        />
+      )}
+
+      {/* Day view event carousel */}
+      {viewMode === 'day' && dayViewEvents.length > 0 && (
+        <EventCarousel
+          events={dayViewEvents}
+          currentIndex={dayViewIndex}
+          onChangeIndex={handleDayViewChange}
+          onDotClick={handleDayViewDotClick}
         />
       )}
     </Box>

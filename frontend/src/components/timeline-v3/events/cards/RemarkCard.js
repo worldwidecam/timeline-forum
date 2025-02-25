@@ -5,12 +5,15 @@ import {
   Link,
   useTheme,
   Box,
+  Chip,
 } from '@mui/material';
 import {
   Edit as EditIcon,
   Delete as DeleteIcon,
   Comment as RemarkIcon,
   Link as LinkIcon,
+  Event as EventIcon,
+  AccessTime as AccessTimeIcon,
 } from '@mui/icons-material';
 import { motion } from 'framer-motion';
 import { format, parseISO } from 'date-fns';
@@ -58,9 +61,20 @@ const RemarkCard = ({ event, onEdit, onDelete }) => {
         >
           <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 1, mb: 2 }}>
             <RemarkIcon sx={{ color, mt: 0.5 }} />
-            <Typography variant="h6" component="div" sx={{ flex: 1, fontWeight: 'bold' }}>
-              {event.title}
-            </Typography>
+            <Box sx={{ flex: 1 }}>
+              <Typography variant="h6" component="div" sx={{ fontWeight: 'bold', mb: 1 }}>
+                {event.title}
+              </Typography>
+              {event.event_date && (
+                <Chip
+                  icon={<EventIcon />}
+                  label={formatDate(event.event_date)}
+                  size="small"
+                  color="primary"
+                  sx={{ mb: 1 }}
+                />
+              )}
+            </Box>
             <Box sx={{ display: 'flex', gap: 1 }}>
               <IconButton size="small" onClick={(e) => { e.stopPropagation(); onEdit(event); }}>
                 <EditIcon fontSize="small" />
@@ -90,9 +104,12 @@ const RemarkCard = ({ event, onEdit, onDelete }) => {
 
           <Box sx={{ mt: 'auto' }}>
             <TagList tags={event.tags} />
-            <Typography variant="caption" color="text.secondary" sx={{ display: 'block', textAlign: 'right', mt: 1 }}>
-              {formatDate(event.date)}
-            </Typography>
+            <Box sx={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', mt: 1 }}>
+              <AccessTimeIcon fontSize="small" sx={{ mr: 0.5, color: 'text.secondary', fontSize: '0.75rem' }} />
+              <Typography variant="caption" color="text.secondary">
+                Published On {formatDate(event.created_at || event.date)}
+              </Typography>
+            </Box>
           </Box>
         </motion.div>
       </motion.div>

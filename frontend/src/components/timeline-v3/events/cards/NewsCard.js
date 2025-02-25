@@ -5,13 +5,14 @@ import {
   Link,
   useTheme,
   Box,
-  Paper,
+  Chip,
 } from '@mui/material';
 import {
   Edit as EditIcon,
   Delete as DeleteIcon,
-  Newspaper as NewsIcon,
-  Link as LinkIcon,
+  Article as NewsIcon,
+  Event as EventIcon,
+  AccessTime as AccessTimeIcon,
 } from '@mui/icons-material';
 import { motion } from 'framer-motion';
 import { format, parseISO } from 'date-fns';
@@ -59,17 +60,27 @@ const NewsCard = ({ event, onEdit, onDelete }) => {
         >
           <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 1, mb: 2 }}>
             <NewsIcon sx={{ color, mt: 0.5 }} />
-            <Typography 
-              variant="h6" 
-              component="div" 
-              sx={{ 
-                flex: 1, 
-                fontWeight: 'bold',
-                fontSize: '1.25rem',  // Slightly larger than normal h6
-              }}
-            >
-              {event.title}
-            </Typography>
+            <Box sx={{ flex: 1 }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                <Typography 
+                  variant="h6" 
+                  component="div" 
+                  sx={{ 
+                    fontWeight: 'bold',
+                  }}
+                >
+                  {event.title}
+                </Typography>
+                {event.event_date && (
+                  <Chip
+                    icon={<EventIcon />}
+                    label={formatDate(event.event_date)}
+                    size="small"
+                    color="primary"
+                  />
+                )}
+              </Box>
+            </Box>
             <Box sx={{ display: 'flex', gap: 1 }}>
               <IconButton size="small" onClick={(e) => { e.stopPropagation(); onEdit(event); }}>
                 <EditIcon fontSize="small" />
@@ -80,53 +91,55 @@ const NewsCard = ({ event, onEdit, onDelete }) => {
             </Box>
           </Box>
 
-          {/* URL Preview */}
           {event.url && (
-            <Paper 
-              variant="outlined" 
+            <Link 
+              href={event.url} 
+              target="_blank" 
+              rel="noopener noreferrer"
+              onClick={(e) => e.stopPropagation()}
               sx={{ 
-                p: 2, 
+                display: 'block', 
                 mb: 2,
-                backgroundColor: theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.02)',
-                borderColor: theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)',
+                color: color,
+                textDecoration: 'none',
+                '&:hover': {
+                  textDecoration: 'underline'
+                }
               }}
             >
-              <Link
-                href={event.url}
-                target="_blank"
-                rel="noopener noreferrer"
-                onClick={(e) => e.stopPropagation()}
-                sx={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 1,
-                  color: 'primary.main',
-                  textDecoration: 'none',
-                  '&:hover': {
-                    textDecoration: 'underline',
-                  },
-                }}
-              >
-                <LinkIcon fontSize="small" />
-                <Typography 
-                  variant="body2" 
-                  sx={{ 
-                    overflow: 'hidden',
-                    textOverflow: 'ellipsis',
-                    whiteSpace: 'nowrap',
-                  }}
-                >
-                  {event.url}
-                </Typography>
-              </Link>
-            </Paper>
+              {event.url}
+            </Link>
+          )}
+
+          {event.description && (
+            <Typography 
+              variant="body2" 
+              sx={{ 
+                mb: 2,
+                color: theme.palette.text.secondary,
+                whiteSpace: 'pre-wrap',
+                display: '-webkit-box',
+                WebkitLineClamp: 3,
+                WebkitBoxOrient: 'vertical',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+              }}
+            >
+              {event.description}
+            </Typography>
           )}
 
           <Box sx={{ mt: 'auto' }}>
             <TagList tags={event.tags} />
-            <Typography variant="caption" color="text.secondary" sx={{ display: 'block', textAlign: 'right', mt: 1 }}>
-              {formatDate(event.date)}
-            </Typography>
+            <Box sx={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', mt: 1 }}>
+              <AccessTimeIcon fontSize="small" sx={{ mr: 0.5, color: 'text.secondary', fontSize: '0.75rem' }} />
+              <Typography 
+                variant="caption" 
+                color="text.secondary"
+              >
+                Published On {formatDate(event.created_at || event.date)}
+              </Typography>
+            </Box>
           </Box>
         </motion.div>
       </motion.div>

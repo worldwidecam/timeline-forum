@@ -1,12 +1,13 @@
 import React from 'react';
 import { Paper, Typography, Box, IconButton, Chip, Link, Dialog, DialogTitle, DialogContent, DialogActions, Button } from '@mui/material';
 import { useTheme } from '@mui/material/styles';
-import { formatDistanceToNow } from 'date-fns';
+import { formatDistanceToNow, format } from 'date-fns';
 import AccessTimeIcon from '@mui/icons-material/AccessTime';
 import PersonIcon from '@mui/icons-material/Person';
 import AudiotrackIcon from '@mui/icons-material/Audiotrack';
 import LinkIcon from '@mui/icons-material/Link';
 import DeleteIcon from '@mui/icons-material/Delete';
+import EventIcon from '@mui/icons-material/Event';
 
 const TimelineEvent = ({ event, position = 'left', onDelete }) => {
   const theme = useTheme();
@@ -24,7 +25,15 @@ const TimelineEvent = ({ event, position = 'left', onDelete }) => {
 
   const formatEventDate = (date) => {
     try {
-      return formatDistanceToNow(new Date(date), { addSuffix: true });
+      return format(new Date(date), 'PPP p'); // e.g., "April 29, 1945 at 3:30 PM"
+    } catch (e) {
+      return 'Date unknown';
+    }
+  };
+
+  const formatCreatedDate = (date) => {
+    try {
+      return format(new Date(date), 'PPP p'); // Use the same format as event date
     } catch (e) {
       return 'Date unknown';
     }
@@ -111,17 +120,32 @@ const TimelineEvent = ({ event, position = 'left', onDelete }) => {
 
         {/* Content Section */}
         <Box sx={{ p: 3 }}>
-          <Typography
-            variant="h6"
-            gutterBottom
-            sx={{
-              fontWeight: 600,
-              color: theme.palette.text.primary,
-              lineHeight: 1.3,
-            }}
-          >
-            {event.title}
-          </Typography>
+          <Box sx={{ 
+            display: 'flex', 
+            flexDirection: 'column',
+            mb: 2
+          }}>
+            <Typography
+              variant="h6"
+              sx={{
+                fontWeight: 600,
+                color: theme.palette.text.primary,
+                lineHeight: 1.3,
+                mb: 1
+              }}
+            >
+              {event.title}
+            </Typography>
+            
+            {/* Event Date Chip - Moved next to title */}
+            <Chip
+              icon={<EventIcon />}
+              label={formatEventDate(event.event_date)}
+              size="small"
+              color="primary"
+              sx={{ alignSelf: 'flex-start', mb: 1 }}
+            />
+          </Box>
 
           <Box
             sx={{
@@ -133,18 +157,20 @@ const TimelineEvent = ({ event, position = 'left', onDelete }) => {
             }}
           >
             <Chip
-              icon={<AccessTimeIcon />}
-              label={formatEventDate(event.event_date)}
-              size="small"
-              color="primary"
-              variant="outlined"
-            />
-            <Chip
               icon={<PersonIcon />}
               label={`Created by User ${event.created_by}`}
               size="small"
               variant="outlined"
             />
+            {event.created_at && (
+              <Chip
+                icon={<AccessTimeIcon />}
+                label={`Published On ${formatCreatedDate(event.created_at)}`}
+                size="small"
+                variant="outlined"
+                color="secondary"
+              />
+            )}
           </Box>
 
           <Typography

@@ -51,10 +51,21 @@ const EventCarousel = ({
     setIsHovered(false);
   };
 
-  const handleDotClick = () => {
-    if (onDotClick) {
+  const handleDotClick = (e) => {
+    e.stopPropagation(); // Prevent event bubbling
+    if (onDotClick && currentEvent) {
       onDotClick(currentEvent);
     }
+  };
+
+  // Go to previous event (chronologically earlier)
+  const goToPrevious = () => {
+    onChangeIndex(currentIndex > 0 ? currentIndex - 1 : events.length - 1);
+  };
+
+  // Go to next event (chronologically later)
+  const goToNext = () => {
+    onChangeIndex(currentIndex < events.length - 1 ? currentIndex + 1 : 0);
   };
 
   const eventColor = getEventTypeColor();
@@ -71,7 +82,7 @@ const EventCarousel = ({
     >
       <IconButton 
         size="small"
-        onClick={() => onChangeIndex(currentIndex > 0 ? currentIndex - 1 : events.length - 1)}
+        onClick={goToPrevious}
         sx={{ 
           color: eventColor,
           padding: '4px'
@@ -101,7 +112,7 @@ const EventCarousel = ({
 
       <IconButton 
         size="small"
-        onClick={() => onChangeIndex(currentIndex < events.length - 1 ? currentIndex + 1 : 0)}
+        onClick={goToNext}
         sx={{ 
           color: eventColor,
           padding: '4px'

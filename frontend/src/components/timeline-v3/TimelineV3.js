@@ -538,17 +538,17 @@ function TimelineV3() {
             theme={theme}
             style={timelineTransitionStyles}
           />
-          {viewMode === 'position' && (
-            <EventCounter
-              count={events.length}
-              events={events}
-              currentIndex={currentEventIndex}
-              onChangeIndex={setCurrentEventIndex}
-              onDotClick={handleDotClick}
-              viewMode={viewMode}
-              style={timelineTransitionStyles}
-            />
-          )}
+          <EventCounter
+            count={events.length}
+            events={events}
+            currentIndex={currentEventIndex}
+            onChangeIndex={setCurrentEventIndex}
+            onDotClick={handleDotClick}
+            viewMode={viewMode}
+            timelineOffset={timelineOffset}
+            markerSpacing={100}
+            style={timelineTransitionStyles}
+          />
           {/* Event Markers - only show in time-based views */}
           {viewMode !== 'position' && events.map((event, index) => (
             <EventMarker

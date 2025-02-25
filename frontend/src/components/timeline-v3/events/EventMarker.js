@@ -31,26 +31,33 @@ const EventMarker = ({
 
       switch (viewMode) {
         case 'day':
+          // Calculate minutes since start of day (midnight)
           const minutes = eventDate.getHours() * 60 + eventDate.getMinutes();
-          positionValue = (minutes / (24 * 60)) * markerSpacing;
+          // Position as percentage of day (24 hours = 1440 minutes)
+          positionValue = (minutes / 1440) * 100 * (markerSpacing / 100);
           break;
           
         case 'week':
-          const dayOfWeek = eventDate.getDay();
+          // Calculate minutes since start of week (Sunday)
+          const dayOfWeek = eventDate.getDay(); // 0-6 (Sunday-Saturday)
           const minutesInDay = eventDate.getHours() * 60 + eventDate.getMinutes();
-          positionValue = ((dayOfWeek * 24 * 60 + minutesInDay) / (7 * 24 * 60)) * markerSpacing;
+          const totalMinutes = dayOfWeek * 1440 + minutesInDay; // Total minutes since start of week
+          positionValue = (totalMinutes / (7 * 1440)) * 100 * (markerSpacing / 100);
           break;
           
         case 'month':
-          const dayOfMonth = eventDate.getDate();
+          // Calculate position based on day of month
+          const dayOfMonth = eventDate.getDate() - 1; // 0-based day of month
           const daysInMonth = new Date(eventDate.getFullYear(), eventDate.getMonth() + 1, 0).getDate();
-          positionValue = ((dayOfMonth - 1) / daysInMonth) * markerSpacing;
+          positionValue = (dayOfMonth / daysInMonth) * 100 * (markerSpacing / 100);
           break;
           
         case 'year':
+          // Calculate position based on day of year
           const startOfYear = new Date(eventDate.getFullYear(), 0, 1);
           const dayOfYear = Math.floor((eventDate - startOfYear) / (1000 * 60 * 60 * 24));
-          positionValue = (dayOfYear / 365) * markerSpacing;
+          const daysInYear = (eventDate.getFullYear() % 4 === 0) ? 366 : 365; // Account for leap years
+          positionValue = (dayOfYear / daysInYear) * 100 * (markerSpacing / 100);
           break;
       }
 
@@ -201,6 +208,7 @@ const EventMarker = ({
             width: '14px',
             height: '14px',
             cursor: 'pointer',
+            zIndex: 3,
             '&::before': {
               content: '""',
               position: 'absolute',
@@ -209,7 +217,6 @@ const EventMarker = ({
               borderRadius: '50%',
               opacity: 0,
               transition: 'opacity 0.3s ease-in-out',
-              transform: 'translateX(50%)',
             },
             '&:hover::before': {
               opacity: 1,
@@ -222,10 +229,9 @@ const EventMarker = ({
               borderRadius: '50%',
               transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
               boxShadow: `0 0 10px ${getColor()}40`,
-              transform: 'translateX(50%)',
             },
             '&:hover::after': {
-              transform: 'translateX(50%) scale(1.2)',
+              transform: 'scale(1.2)',
               boxShadow: `
                 0 0 0 2px ${theme.palette.background.paper},
                 0 0 0 4px ${getColor()}40,
