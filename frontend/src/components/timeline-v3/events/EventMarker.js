@@ -1,3 +1,6 @@
+// NOTE: This component requires accurate date/time information for proper functionality.
+// There are additional considerations to ensure it works correctly.
+
 import React, { useState } from 'react';
 import { Box, Paper, Popper, Fade, Typography, useTheme, IconButton } from '@mui/material';
 import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
@@ -75,12 +78,11 @@ const EventMarker = ({
   };
 
   const handleMouseEnter = (event) => {
-    setAnchorEl(event.currentTarget);
     setIsHovered(true);
+    setHoverPosition({ x: event.clientX, y: event.clientY });
   };
 
   const handleMouseLeave = () => {
-    setAnchorEl(null);
     setIsHovered(false);
   };
 
@@ -114,6 +116,9 @@ const EventMarker = ({
     <>
       {viewMode === 'position' ? (
         <Box
+          className={isHovered ? 'pulsing-marker' : ''}
+          onMouseEnter={handleMouseEnter}
+          onMouseLeave={handleMouseLeave}
           sx={{
             position: 'absolute',
             left: '50%',
@@ -198,8 +203,9 @@ const EventMarker = ({
         </Box>
       ) : (
         <Box
-          onMouseEnter={handleMouseEnterMarker}
-          onMouseLeave={() => setShowHover(false)}
+          className={isHovered ? 'pulsing-marker' : ''}
+          onMouseEnter={handleMouseEnter}
+          onMouseLeave={handleMouseLeave}
           sx={{
             position: 'absolute',
             left: `${position.x}px`,

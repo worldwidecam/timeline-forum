@@ -68,6 +68,9 @@ eventDotContainer.onClick = () => {
 ### Online Mailbox Feature
 - **Mailbox Implementation**: Users can send and receive mail visually, using themed stationery like in Animal Crossing, with a virtual inbox to display messages.
 
+### Note on EventMarker Component
+- The EventMarker component requires accurate date/time information for proper functionality. There are additional considerations to ensure it works correctly.
+
 ### Original Documentation
 <details>
 <summary>Legacy README Content</summary>
