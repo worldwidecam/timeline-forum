@@ -157,7 +157,7 @@ class Post(db.Model):
 class Tag(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(100), unique=True, nullable=False)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    created_at = db.Column(db.DateTime, default=datetime.now)
     timeline_id = db.Column(db.Integer, db.ForeignKey('timeline.id'), nullable=True)
 
     def __repr__(self):
@@ -167,14 +167,14 @@ class Tag(db.Model):
 event_tags = db.Table('event_tags',
     db.Column('event_id', db.Integer, db.ForeignKey('event.id')),
     db.Column('tag_id', db.Integer, db.ForeignKey('tag.id')),
-    db.Column('created_at', db.DateTime, default=datetime.utcnow)
+    db.Column('created_at', db.DateTime, default=datetime.now)
 )
 
 # Event-Timeline Reference Table (for events referenced in multiple timelines)
 event_timeline_refs = db.Table('event_timeline_refs',
     db.Column('event_id', db.Integer, db.ForeignKey('event.id')),
     db.Column('timeline_id', db.Integer, db.ForeignKey('timeline.id')),
-    db.Column('created_at', db.DateTime, default=datetime.utcnow)
+    db.Column('created_at', db.DateTime, default=datetime.now)
 )
 
 class Event(db.Model):
@@ -191,8 +191,8 @@ class Event(db.Model):
     media_type = db.Column(db.String(50), nullable=True)
     timeline_id = db.Column(db.Integer, db.ForeignKey('timeline.id'), nullable=False)
     created_by = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
-    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at = db.Column(db.DateTime, default=datetime.now)
+    updated_at = db.Column(db.DateTime, default=datetime.now, onupdate=datetime.now)
     tags = db.relationship('Tag', secondary=event_tags, backref=db.backref('events', lazy='dynamic'))
     referenced_in = db.relationship('Timeline', secondary=event_timeline_refs, backref=db.backref('referenced_events', lazy='dynamic'))
 
@@ -210,7 +210,7 @@ class Comment(db.Model):
 class TokenBlocklist(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     jti = db.Column(db.String(36), nullable=False, unique=True)
-    created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+    created_at = db.Column(db.DateTime, nullable=False, default=datetime.now)
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
 
 # JWT Configuration
@@ -1151,24 +1151,35 @@ def create_timeline_v3_event(timeline_id):
             
             # Apply timezone offset if provided (offset is in minutes)
             if 'timezone_offset' in data:
-                # Convert timezone offset from minutes to seconds
-                offset_seconds = int(data['timezone_offset']) * 60
-                # Add the offset to convert from UTC to local time
-                # Note: getTimezoneOffset() returns the difference in minutes between UTC and local time,
-                # with a negative sign for timezones ahead of UTC
-                event_date = event_date + timedelta(seconds=offset_seconds)
+                # JavaScript's getTimezoneOffset() returns the opposite of what we need:
+                # For PST (UTC-8), it returns +480 minutes
+                # To convert from UTC to local time, we need to SUBTRACT this value
+                offset_seconds = -int(data['timezone_offset']) * 60
+                
+                app.logger.info(f'Original event_date: {event_date}')
+                app.logger.info(f'Timezone offset (minutes): {data["timezone_offset"]}')
+                app.logger.info(f'Adjusted offset (seconds): {offset_seconds}')
+                
+                # SUBTRACT the offset to convert from UTC to local time
+                # This is because JavaScript's toISOString() converts to UTC,
+                # and we need to convert back to the user's local time
+                event_date = event_date - timedelta(seconds=offset_seconds)
+                app.logger.info(f'Adjusted event_date: {event_date}')
                 
                 # If created_at is provided, apply the same offset
                 if 'created_at' in data:
                     created_at_str = data['created_at'].replace('Z', '+00:00')
-                    created_at = datetime.fromisoformat(created_at_str) + timedelta(seconds=offset_seconds)
+                    created_at = datetime.fromisoformat(created_at_str)
+                    app.logger.info(f'Original created_at: {created_at}')
+                    created_at = created_at - timedelta(seconds=offset_seconds)
+                    app.logger.info(f'Adjusted created_at: {created_at}')
                 else:
-                    created_at = datetime.utcnow()
+                    created_at = datetime.now()
             else:
-                created_at = datetime.utcnow()
+                created_at = datetime.now()
                 
             app.logger.info(f'Parsed event date: {event_date}')
-            app.logger.info(f'Created at: {created_at}')
+            app.logger.info(f'Final created_at: {created_at}')
         except ValueError as e:
             app.logger.error(f'Date parsing error: {str(e)}')
             return jsonify({'error': 'Invalid date format. Please use ISO format (YYYY-MM-DDTHH:MM:SS)'}), 400

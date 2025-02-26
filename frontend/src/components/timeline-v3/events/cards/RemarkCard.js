@@ -29,10 +29,14 @@ const RemarkCard = ({ event, onEdit, onDelete }) => {
 
   const formatDate = (dateStr) => {
     try {
-      const date = dateStr ? parseISO(dateStr) : new Date();
+      if (!dateStr) return 'Invalid date';
+      
+      // Parse the ISO string into a Date object
+      const date = parseISO(dateStr);
+      
       // Format with "Published on" prefix, without seconds
-      // The backend now handles timezone adjustment
-      return `Published on ${format(date, 'PPp')}`;
+      // Use explicit formatting to ensure consistency
+      return `Published on ${format(date, 'MMM d, yyyy, h:mm a')}`;
     } catch (error) {
       console.error('Error formatting date:', error);
       return 'Invalid date';
@@ -41,10 +45,14 @@ const RemarkCard = ({ event, onEdit, onDelete }) => {
 
   const formatEventDate = (dateStr) => {
     try {
-      const date = dateStr ? parseISO(dateStr) : new Date();
+      if (!dateStr) return 'Invalid date';
+      
+      // Parse the ISO string into a Date object
+      const date = parseISO(dateStr);
+      
       // Format event date without "Published on" prefix
-      // The backend now handles timezone adjustment
-      return format(date, 'PPp');
+      // Use explicit formatting to ensure consistency
+      return format(date, 'MMM d, yyyy, h:mm a');
     } catch (error) {
       console.error('Error formatting date:', error);
       return 'Invalid date';

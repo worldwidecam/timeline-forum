@@ -97,19 +97,30 @@ const EventForm = ({ open, onClose, timelineId, onEventCreated }) => {
 
   const handleDateChange = (newDate) => {
     if (newDate && !isNaN(newDate)) {
-        // Store the date in ISO format but include timezone offset to preserve local time
+        // Store the date in ISO format
         const isoString = newDate.toISOString();
-        const tzOffset = (new Date()).getTimezoneOffset() * 60000; // offset in milliseconds
+        
+        // Get timezone offset in minutes
+        // Note: getTimezoneOffset returns minutes WEST of UTC
+        // For PST (UTC-8), it returns +480 minutes
+        const tzOffset = newDate.getTimezoneOffset();
+        const tzName = Intl.DateTimeFormat().resolvedOptions().timeZone;
         
         console.log('Selected date:', newDate);
         console.log('ISO string:', isoString);
-        console.log('Timezone offset (minutes):', (new Date()).getTimezoneOffset());
+        console.log('Timezone offset (minutes):', tzOffset);
+        console.log('Local timezone:', tzName);
+        
+        // For debugging, show what the date would look like in UTC
+        const utcDate = new Date(newDate.valueOf() + tzOffset * 60000);
+        console.log('Date in UTC:', utcDate);
         
         setFormData(prev => ({
             ...prev,
             event_date: isoString,
             // Include timezone info for the backend
-            timezone_offset: (new Date()).getTimezoneOffset()
+            timezone_offset: tzOffset,
+            timezone_name: tzName
         }));
         setError('');
     }
@@ -173,15 +184,23 @@ const EventForm = ({ open, onClose, timelineId, onEventCreated }) => {
       setLoading(true);
       setError('');
 
-      console.log('Creating event with type:', formData.type); // Debug log
+      console.log('Creating event with type:', formData.type);
 
-      // Add a created_at timestamp that won't change, using the local timezone
+      // Add a created_at timestamp with consistent timezone handling
       const now = new Date();
+      const tzOffset = now.getTimezoneOffset();
+      const tzName = Intl.DateTimeFormat().resolvedOptions().timeZone;
+      
+      console.log('Current date:', now);
+      console.log('Current date ISO:', now.toISOString());
+      console.log('Timezone offset (minutes):', tzOffset);
+      console.log('Local timezone:', tzName);
+      
       const eventData = {
         ...formData,
         created_at: now.toISOString(),
-        // Include timezone offset for both dates
-        timezone_offset: now.getTimezoneOffset()
+        timezone_offset: tzOffset,
+        timezone_name: tzName
       };
 
       console.log('Submitting event with data:', eventData);
