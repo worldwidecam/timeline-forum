@@ -1148,7 +1148,27 @@ def create_timeline_v3_event(timeline_id):
             # Parse the date, support both with and without timezone
             date_str = data['event_date'].replace('Z', '+00:00')
             event_date = datetime.fromisoformat(date_str)
+            
+            # Apply timezone offset if provided (offset is in minutes)
+            if 'timezone_offset' in data:
+                # Convert timezone offset from minutes to seconds
+                offset_seconds = int(data['timezone_offset']) * 60
+                # Add the offset to convert from UTC to local time
+                # Note: getTimezoneOffset() returns the difference in minutes between UTC and local time,
+                # with a negative sign for timezones ahead of UTC
+                event_date = event_date + timedelta(seconds=offset_seconds)
+                
+                # If created_at is provided, apply the same offset
+                if 'created_at' in data:
+                    created_at_str = data['created_at'].replace('Z', '+00:00')
+                    created_at = datetime.fromisoformat(created_at_str) + timedelta(seconds=offset_seconds)
+                else:
+                    created_at = datetime.utcnow()
+            else:
+                created_at = datetime.utcnow()
+                
             app.logger.info(f'Parsed event date: {event_date}')
+            app.logger.info(f'Created at: {created_at}')
         except ValueError as e:
             app.logger.error(f'Date parsing error: {str(e)}')
             return jsonify({'error': 'Invalid date format. Please use ISO format (YYYY-MM-DDTHH:MM:SS)'}), 400
@@ -1160,7 +1180,8 @@ def create_timeline_v3_event(timeline_id):
             event_date=event_date,
             type=data['type'],
             timeline_id=timeline_id,
-            created_by=1  # Temporary default user ID
+            created_by=1,  # Temporary default user ID
+            created_at=created_at  # Use the adjusted created_at time
         )
         
         # Handle optional URL data

@@ -30,6 +30,20 @@ const RemarkCard = ({ event, onEdit, onDelete }) => {
   const formatDate = (dateStr) => {
     try {
       const date = dateStr ? parseISO(dateStr) : new Date();
+      // Format with "Published on" prefix, without seconds
+      // The backend now handles timezone adjustment
+      return `Published on ${format(date, 'PPp')}`;
+    } catch (error) {
+      console.error('Error formatting date:', error);
+      return 'Invalid date';
+    }
+  };
+
+  const formatEventDate = (dateStr) => {
+    try {
+      const date = dateStr ? parseISO(dateStr) : new Date();
+      // Format event date without "Published on" prefix
+      // The backend now handles timezone adjustment
       return format(date, 'PPp');
     } catch (error) {
       console.error('Error formatting date:', error);
@@ -68,7 +82,7 @@ const RemarkCard = ({ event, onEdit, onDelete }) => {
               {event.event_date && (
                 <Chip
                   icon={<EventIcon />}
-                  label={formatDate(event.event_date)}
+                  label={formatEventDate(event.event_date)}
                   size="small"
                   color="primary"
                   sx={{ mb: 1 }}
@@ -107,7 +121,7 @@ const RemarkCard = ({ event, onEdit, onDelete }) => {
             <Box sx={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', mt: 1 }}>
               <AccessTimeIcon fontSize="small" sx={{ mr: 0.5, color: 'text.secondary', fontSize: '0.75rem' }} />
               <Typography variant="caption" color="text.secondary">
-                Published On {formatDate(event.created_at || event.date)}
+                {formatDate(event.created_at)}
               </Typography>
             </Box>
           </Box>

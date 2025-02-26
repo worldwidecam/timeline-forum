@@ -30,6 +30,20 @@ const EventPopup = ({ event, open, onClose }) => {
   const formatDate = (dateStr) => {
     try {
       const date = dateStr ? parseISO(dateStr) : new Date();
+      // Format with "Published on" prefix, without seconds
+      // The backend now handles timezone adjustment
+      return `Published on ${format(date, 'PPp')}`;
+    } catch (error) {
+      console.error('Error formatting date:', error);
+      return 'Invalid date';
+    }
+  };
+
+  const formatEventDate = (dateStr) => {
+    try {
+      const date = dateStr ? parseISO(dateStr) : new Date();
+      // Format event date without "Published on" prefix
+      // The backend now handles timezone adjustment
       return format(date, 'PPp');
     } catch (error) {
       console.error('Error formatting date:', error);
@@ -139,8 +153,13 @@ const EventPopup = ({ event, open, onClose }) => {
 
         <Box sx={{ mt: 'auto' }}>
           <TagList tags={event.tags} />
-          <Typography variant="caption" color="text.secondary" sx={{ display: 'block', textAlign: 'right', mt: 1 }}>
-            {formatDate(event.date)}
+          {event.event_date && (
+            <Typography variant="caption" color="text.secondary" sx={{ display: 'block', textAlign: 'right', mt: 1 }}>
+              Timeline Date: {formatEventDate(event.event_date)}
+            </Typography>
+          )}
+          <Typography variant="caption" color="text.secondary" sx={{ display: 'block', textAlign: 'right', mt: 0.5 }}>
+            {formatDate(event.created_at)}
           </Typography>
         </Box>
       </DialogContent>

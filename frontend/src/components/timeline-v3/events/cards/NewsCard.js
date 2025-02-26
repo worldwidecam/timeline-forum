@@ -28,11 +28,25 @@ const NewsCard = ({ event, onEdit, onDelete }) => {
 
   const formatDate = (dateStr) => {
     try {
-      const date = dateStr ? parseISO(dateStr) : new Date();
-      return format(date, 'PPp');
+        const date = dateStr ? parseISO(dateStr) : new Date();
+        // Format with "Published on" prefix, without seconds
+        // The backend now handles timezone adjustment
+        return `Published on ${format(date, 'PPp')}`;
     } catch (error) {
-      console.error('Error formatting date:', error);
-      return 'Invalid date';
+        console.error('Error formatting date:', error);
+        return 'Invalid date';
+    }
+  };
+
+  const formatEventDate = (dateStr) => {
+    try {
+        const date = dateStr ? parseISO(dateStr) : new Date();
+        // Format event date without "Published on" prefix
+        // The backend now handles timezone adjustment
+        return format(date, 'PPp');
+    } catch (error) {
+        console.error('Error formatting date:', error);
+        return 'Invalid date';
     }
   };
 
@@ -74,7 +88,7 @@ const NewsCard = ({ event, onEdit, onDelete }) => {
                 {event.event_date && (
                   <Chip
                     icon={<EventIcon />}
-                    label={formatDate(event.event_date)}
+                    label={formatEventDate(event.event_date)}
                     size="small"
                     color="primary"
                   />
@@ -137,7 +151,7 @@ const NewsCard = ({ event, onEdit, onDelete }) => {
                 variant="caption" 
                 color="text.secondary"
               >
-                Published On {formatDate(event.created_at || event.date)}
+                {formatDate(event.created_at)}
               </Typography>
             </Box>
           </Box>

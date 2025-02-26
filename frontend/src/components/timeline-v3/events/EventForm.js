@@ -97,11 +97,21 @@ const EventForm = ({ open, onClose, timelineId, onEventCreated }) => {
 
   const handleDateChange = (newDate) => {
     if (newDate && !isNaN(newDate)) {
-      setFormData(prev => ({
-        ...prev,
-        event_date: newDate.toISOString()
-      }));
-      setError('');
+        // Store the date in ISO format but include timezone offset to preserve local time
+        const isoString = newDate.toISOString();
+        const tzOffset = (new Date()).getTimezoneOffset() * 60000; // offset in milliseconds
+        
+        console.log('Selected date:', newDate);
+        console.log('ISO string:', isoString);
+        console.log('Timezone offset (minutes):', (new Date()).getTimezoneOffset());
+        
+        setFormData(prev => ({
+            ...prev,
+            event_date: isoString,
+            // Include timezone info for the backend
+            timezone_offset: (new Date()).getTimezoneOffset()
+        }));
+        setError('');
     }
   };
 
@@ -165,9 +175,20 @@ const EventForm = ({ open, onClose, timelineId, onEventCreated }) => {
 
       console.log('Creating event with type:', formData.type); // Debug log
 
+      // Add a created_at timestamp that won't change, using the local timezone
+      const now = new Date();
+      const eventData = {
+        ...formData,
+        created_at: now.toISOString(),
+        // Include timezone offset for both dates
+        timezone_offset: now.getTimezoneOffset()
+      };
+
+      console.log('Submitting event with data:', eventData);
+
       const response = await axios.post(
         `/api/timeline-v3/${timelineId}/events`,
-        formData,
+        eventData,
         {
           headers: {
             'Authorization': `Bearer ${localStorage.getItem('token')}`
