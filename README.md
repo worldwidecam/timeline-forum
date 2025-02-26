@@ -50,6 +50,24 @@ eventDotContainer.onClick = () => {
 - Timeline scroll position context  
 - Event dot portal rendering
 
+### Recent Fixes and Improvements
+
+#### Timezone Handling
+- **JavaScript/Python Timezone Integration**: Implemented proper timezone handling between frontend and backend
+- **Key Insight**: JavaScript's `getTimezoneOffset()` returns minutes WEST of UTC with opposite sign convention
+  - For PST (UTC-8), it returns +480 minutes
+  - Backend now correctly subtracts this offset to convert from UTC to local time
+- **Implementation Details**:
+  - Frontend sends ISO dates with timezone offset information
+  - Backend adjusts dates using the timezone offset before storing
+  - Card components use consistent date formatting with `format(date, 'MMM d, yyyy, h:mm a')`
+
+#### UI Improvements
+- **Description Length Management**: Limited event card descriptions to 15 words to prevent layout issues
+  - Full descriptions remain accessible in event popups
+  - Implemented in all card types (News, Remark, Media)
+- **Consistent Date Formatting**: Standardized date display across all components
+
 ### Future Enhancements
 1. **Profile Personalization**: Users can customize their profile backgrounds, similar to Tumblr and MySpace.
 2. Timeline filters (day/week/month/year)

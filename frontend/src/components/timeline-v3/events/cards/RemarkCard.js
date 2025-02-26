@@ -59,6 +59,14 @@ const RemarkCard = ({ event, onEdit, onDelete }) => {
     }
   };
 
+  // Function to limit description to 15 words
+  const limitDescription = (text) => {
+    if (!text) return '';
+    const words = text.split(/\s+/);
+    if (words.length <= 15) return text;
+    return words.slice(0, 15).join(' ') + '...';
+  };
+
   return (
     <>
       <motion.div
@@ -120,7 +128,7 @@ const RemarkCard = ({ event, onEdit, onDelete }) => {
                 textOverflow: 'ellipsis',
               }}
             >
-              {event.description}
+              {limitDescription(event.description)}
             </Typography>
           </Box>
 
