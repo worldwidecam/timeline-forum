@@ -1113,68 +1113,33 @@ def get_timeline_v3_events(timeline_id):
 @app.route('/api/timeline-v3/<timeline_id>/events', methods=['POST'])
 def create_timeline_v3_event(timeline_id):
     try:
-        app.logger.info(f'Creating event for timeline {timeline_id}')
-        # First, check if timeline exists
-        timeline = Timeline.query.get(timeline_id)
-        if not timeline:
-            app.logger.error(f'Timeline {timeline_id} not found')
-            return jsonify({'error': 'Timeline not found'}), 404
+        # Get JSON data from request
+        data = request.json
+        app.logger.info(f'Creating event with data: {data}')
+        
+        # Validate required fields
+        if not all(key in data for key in ['title', 'event_date', 'type']):
+            return jsonify({'error': 'Missing required fields'}), 400
             
-        # Get and validate the data
-        data = request.get_json()
-        if not data:
-            app.logger.error('No data provided in request')
-            return jsonify({'error': 'No data provided'}), 400
-            
-        app.logger.info(f'Received event data: {data}')
-        
-        # Required fields validation
-        required_fields = {
-            'title': str,
-            'event_date': str,
-            'type': str,
-        }
-        
-        for field, field_type in required_fields.items():
-            value = data.get(field)
-            if not value:
-                app.logger.error(f'Missing required field: {field}')
-                return jsonify({'error': f'Missing required field: {field}'}), 400
-            if not isinstance(value, field_type):
-                app.logger.error(f'Invalid type for field {field}')
-                return jsonify({'error': f'Invalid type for field {field}. Expected {field_type.__name__}'}), 400
-        
+        # Parse the event date from ISO format
         try:
-            # Parse the date, support both with and without timezone
-            date_str = data['event_date'].replace('Z', '+00:00')
-            event_date = datetime.fromisoformat(date_str)
+            # Accept the date string exactly as provided by the frontend
+            # This preserves the user's input without any timezone adjustments
+            event_date_str = data['event_date'].replace('Z', '+00:00')
+            event_date = datetime.fromisoformat(event_date_str)
             
-            # Apply timezone offset if provided (offset is in minutes)
+            app.logger.info(f'Original event_date: {event_date}')
+            
+            # Log timezone information if provided (for debugging only)
             if 'timezone_offset' in data:
-                # JavaScript's getTimezoneOffset() returns the opposite of what we need:
-                # For PST (UTC-8), it returns +480 minutes
-                # To convert from UTC to local time, we need to SUBTRACT this value
-                offset_seconds = -int(data['timezone_offset']) * 60
-                
-                app.logger.info(f'Original event_date: {event_date}')
                 app.logger.info(f'Timezone offset (minutes): {data["timezone_offset"]}')
-                app.logger.info(f'Adjusted offset (seconds): {offset_seconds}')
-                
-                # SUBTRACT the offset to convert from UTC to local time
-                # This is because JavaScript's toISOString() converts to UTC,
-                # and we need to convert back to the user's local time
-                event_date = event_date - timedelta(seconds=offset_seconds)
-                app.logger.info(f'Adjusted event_date: {event_date}')
-                
-                # If created_at is provided, apply the same offset
-                if 'created_at' in data:
-                    created_at_str = data['created_at'].replace('Z', '+00:00')
-                    created_at = datetime.fromisoformat(created_at_str)
-                    app.logger.info(f'Original created_at: {created_at}')
-                    created_at = created_at - timedelta(seconds=offset_seconds)
-                    app.logger.info(f'Adjusted created_at: {created_at}')
-                else:
-                    created_at = datetime.now()
+                app.logger.info(f'Timezone name: {data.get("timezone_name", "Unknown")}')
+            
+            # Use created_at as provided or current time
+            if 'created_at' in data:
+                created_at_str = data['created_at'].replace('Z', '+00:00')
+                created_at = datetime.fromisoformat(created_at_str)
+                app.logger.info(f'Original created_at: {created_at}')
             else:
                 created_at = datetime.now()
                 

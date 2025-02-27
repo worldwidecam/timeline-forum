@@ -296,10 +296,20 @@ function TimelineV3() {
     let mediaUrl = null; // Define mediaUrl here
     try {
       console.log('Sending event creation request to:', `/api/timeline-v3/${timelineId}/events`);
+      
+      // Create a new date object from the event_date
+      const originalDate = new Date(eventData.event_date);
+      console.log('Original date before adjustment:', originalDate);
+      
+      // Subtract 8 hours to counteract the timezone issue
+      const adjustedDate = new Date(originalDate.getTime() - (8 * 60 * 60 * 1000));
+      console.log('Adjusted date (8 hours subtracted):', adjustedDate);
+      
+      // Use the adjusted date in the request
       const response = await api.post(`/api/timeline-v3/${timelineId}/events`, {
         title: eventData.title,
         description: eventData.description,
-        event_date: eventData.event_date,
+        event_date: adjustedDate.toISOString(), // Use adjusted date
         type: eventData.type,
         url: eventData.url || '',
         url_title: eventData.url_title || '',
