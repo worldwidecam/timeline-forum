@@ -26,7 +26,7 @@ def fix_hashtag_timelines():
         for old_timeline in hashtag_timelines:
             # Get the name without the '#' prefix
             clean_name = old_timeline.name[1:]
-            capitalized_name = clean_name.capitalize()
+            capitalized_name = clean_name.upper()
             
             print(f"Processing timeline: {old_timeline.name} -> {capitalized_name}")
             

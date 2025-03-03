@@ -27,8 +27,8 @@ def standardize_case():
                 continue
                 
             old_name = timeline.name
-            # Capitalize the timeline name
-            new_name = timeline.name.capitalize()
+            # Use ALL CAPS for timeline names
+            new_name = timeline.name.upper()
             
             if old_name != new_name:
                 print(f"Updating timeline: '{old_name}' -> '{new_name}'")

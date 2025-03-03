@@ -1064,61 +1064,109 @@ def get_timeline_v3(timeline_id):
 @app.route('/api/timeline-v3/<timeline_id>/events', methods=['GET'])
 def get_timeline_v3_events(timeline_id):
     try:
-        app.logger.info(f'Getting events for timeline {timeline_id}')
-        # Get the timeline
+        # Get timeline
         timeline = Timeline.query.get(timeline_id)
         if not timeline:
             return jsonify({'error': 'Timeline not found'}), 404
             
-        # Get events that are directly in this timeline
+        # Get all events directly in this timeline
         direct_events = Event.query.filter_by(timeline_id=timeline_id).all()
         
-        # Get events that reference this timeline
+        # Get all events that reference this timeline
         referenced_events = timeline.referenced_events.all()
         
-        # Get events that have tags associated with this timeline's name
-        # First, find tags that match the timeline name (case insensitive)
-        timeline_name = timeline.name
+        # Combine both sets of events
+        all_events = direct_events + referenced_events
         
-        # Remove '#' prefix if it exists (for backward compatibility)
-        clean_timeline_name = timeline_name[1:] if timeline_name.startswith('#') else timeline_name
+        # Get tag filter from query parameters
+        tag_filter = request.args.get('tag')
         
-        # Find tags that match the timeline name (case insensitive)
-        matching_tags = Tag.query.filter(
-            db.func.lower(Tag.name) == db.func.lower(clean_timeline_name)
-        ).all()
+        # If tag filter is provided, filter events by tag
+        if tag_filter:
+            # Handle case-insensitive matching
+            tag_filter = tag_filter.lower()
+            
+            # Try to find the tag (case insensitive)
+            tag = Tag.query.filter(db.func.lower(Tag.name) == tag_filter).first()
+            
+            if tag:
+                # Filter events that have this tag
+                filtered_events = []
+                for event in all_events:
+                    for event_tag in event.tags:
+                        if db.func.lower(event_tag.name) == tag_filter:
+                            filtered_events.append(event)
+                            break
+                all_events = filtered_events
+            else:
+                # If tag doesn't exist, return empty list
+                all_events = []
         
-        # Then find events with those tags
-        tagged_events = []
-        for tag in matching_tags:
-            tagged_events.extend(tag.events.all())
+        # Sort events by event_date
+        all_events.sort(key=lambda x: x.event_date, reverse=True)
         
-        # Combine all sets of events and remove duplicates
-        all_events = direct_events + referenced_events + tagged_events
-        events = list({event.id: event for event in all_events}.values())
+        # Convert events to JSON
+        events_json = []
+        for event in all_events:
+            # Get tags for this event
+            tags = [{'id': tag.id, 'name': tag.name} for tag in event.tags]
+            
+            # Add the original timeline's tag if viewing from a different timeline
+            if event.timeline_id != int(timeline_id):
+                original_timeline = Timeline.query.get(event.timeline_id)
+                if original_timeline:
+                    # Check if the original timeline's tag is already in the list
+                    original_tag_name = original_timeline.name.lower()
+                    tag_exists = False
+                    for tag in tags:
+                        if tag['name'].lower() == original_tag_name:
+                            tag_exists = True
+                            break
+                    
+                    # Add the original timeline's tag if it's not already there
+                    if not tag_exists:
+                        # Find or create a tag for the original timeline
+                        original_tag = Tag.query.filter(db.func.lower(Tag.name) == original_tag_name).first()
+                        if not original_tag:
+                            original_tag = Tag(
+                                name=original_tag_name,
+                                timeline_id=original_timeline.id
+                            )
+                            db.session.add(original_tag)
+                            db.session.flush()
+                        
+                        # Add the tag to the event's tags list
+                        tags.append({
+                            'id': original_tag.id,
+                            'name': original_tag.name,
+                            'is_original_timeline': True  # Flag to identify this as the original timeline
+                        })
+            
+            # Create event JSON
+            event_json = {
+                'id': event.id,
+                'title': event.title,
+                'description': event.description,
+                'event_date': event.event_date.isoformat(),
+                'type': event.type,
+                'url': event.url,
+                'url_title': event.url_title,
+                'url_description': event.url_description,
+                'url_image': event.url_image,
+                'media_url': event.media_url,
+                'media_type': event.media_type,
+                'timeline_id': event.timeline_id,
+                'created_by': event.created_by,
+                'created_at': event.created_at.isoformat(),
+                'tags': tags
+            }
+            events_json.append(event_json)
         
-        # Sort events by date
-        events.sort(key=lambda x: x.event_date)
+        return jsonify(events_json), 200
         
-        return jsonify([{
-            'id': event.id,
-            'title': event.title,
-            'description': event.description,
-            'event_date': event.event_date.isoformat(),
-            'type': event.type,
-            'url': event.url,
-            'url_title': event.url_title,
-            'url_description': event.url_description,
-            'url_image': event.url_image,
-            'media_url': event.media_url,
-            'media_type': event.media_type,
-            'created_by': event.created_by,
-            'created_at': event.created_at.isoformat(),
-            'tags': [{'id': tag.id, 'name': tag.name} for tag in event.tags]
-        } for event in events])
     except Exception as e:
-        app.logger.error(f'Error getting events: {str(e)}')
-        return jsonify({'error': 'Failed to get events'}), 500
+        app.logger.error(f'Error getting timeline events: {str(e)}')
+        return jsonify({'error': f'Failed to get timeline events: {str(e)}'}), 500
 
 @app.route('/api/timeline-v3/<timeline_id>/events', methods=['POST'])
 def create_timeline_v3_event(timeline_id):
@@ -1199,7 +1247,7 @@ def create_timeline_v3_event(timeline_id):
                     
                     # Create a new timeline for this tag if it doesn't exist
                     # First check for the capitalized version
-                    capitalized_tag_name = tag_name.capitalize()
+                    capitalized_tag_name = tag_name.upper()
                     
                     # Check for both normal and hashtag-prefixed versions (for backward compatibility)
                     tag_timeline = Timeline.query.filter(
@@ -1210,10 +1258,10 @@ def create_timeline_v3_event(timeline_id):
                     ).first()
                     
                     if not tag_timeline:
-                        # Create a new timeline with capitalized name
+                        # Create a new timeline with ALL CAPS name
                         tag_timeline = Timeline(
                             name=capitalized_tag_name,
-                            description=f"Timeline for #{capitalized_tag_name}",
+                            description=f"Timeline for #{tag_name}",
                             created_by=1  # Temporary default user ID
                         )
                         db.session.add(tag_timeline)
