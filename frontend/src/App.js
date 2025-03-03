@@ -143,7 +143,7 @@ const Homepage = () => {
     if (!timelineToDelete) return;
 
     try {
-      const response = await api.delete(`/api/timelines/${timelineToDelete.id}`);
+      await api.delete(`/api/timeline-v3/${timelineToDelete.id}`);
       
       // Remove the timeline from the list
       setTimelines(timelines.filter(t => t.id !== timelineToDelete.id));
@@ -301,7 +301,7 @@ const Homepage = () => {
         <DialogContent>
           <DialogContentText>
             Are you sure you want to delete "{timelineToDelete?.name}"? This action cannot be undone.
-            All events will be moved to the general timeline.
+            Events that are only in this timeline will be deleted. Events that are referenced in other timelines will be preserved.
           </DialogContentText>
         </DialogContent>
         <DialogActions>

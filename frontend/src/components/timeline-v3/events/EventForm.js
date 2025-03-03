@@ -184,26 +184,11 @@ const EventForm = ({ open, onClose, timelineId, onEventCreated }) => {
       setLoading(true);
       setError('');
 
-      console.log('Creating event with type:', formData.type);
-
-      // Add a created_at timestamp with consistent timezone handling
-      const now = new Date();
-      const tzOffset = now.getTimezoneOffset();
-      const tzName = Intl.DateTimeFormat().resolvedOptions().timeZone;
-      
-      console.log('Current date:', now);
-      console.log('Current date ISO:', now.toISOString());
-      console.log('Timezone offset (minutes):', tzOffset);
-      console.log('Local timezone:', tzName);
-      
+      // Use the event_date directly from formData, which is already in ISO format
+      // from the DateTimePicker component
       const eventData = {
-        ...formData,
-        created_at: now.toISOString(),
-        timezone_offset: tzOffset,
-        timezone_name: tzName
+        ...formData
       };
-
-      console.log('Submitting event with data:', eventData);
 
       const response = await axios.post(
         `/api/timeline-v3/${timelineId}/events`,

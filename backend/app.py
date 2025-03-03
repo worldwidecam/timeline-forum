@@ -392,7 +392,7 @@ def create_post(timeline_id):
             'url': new_post.url,
             'url_title': new_post.url_title,
             'url_description': new_post.url_description,
-            'url_image': new_post.url_image,
+                    'url_image': new_post.url_image,
             'created_by': new_post.created_by,
             'created_at': new_post.created_at.isoformat(),
             'upvotes': new_post.upvotes,
@@ -448,7 +448,7 @@ def create_post_without_timeline():
 
         # Add tags
         for tag_name in tags:
-            tag = Tag.query.filter_by(name=tag_name.lower()).first()
+            tag = Tag.query.filter(db.func.lower(Tag.name) == tag_name.lower()).first()
             if not tag:
                 tag = Tag(name=tag_name.lower())
                 db.session.add(tag)
@@ -685,52 +685,44 @@ def get_music_preferences():
 @jwt_required()
 def delete_timeline(timeline_id):
     try:
-        # Get current user
-        current_user_id = get_jwt_identity()
+        app.logger.info(f'Deleting timeline {timeline_id}')
         
-        # Only allow admin (user_id 1) to delete timelines
-        if current_user_id != 1:
-            return jsonify({'error': 'Unauthorized. Only admin can delete timelines'}), 403
+        # Get the timeline
+        timeline = Timeline.query.get(timeline_id)
+        if not timeline:
+            return jsonify({'error': 'Timeline not found'}), 404
             
-        timeline = Timeline.query.get_or_404(timeline_id)
+        # Get all events that are directly in this timeline
+        direct_events = Event.query.filter_by(timeline_id=timeline_id).all()
         
-        # Don't allow deletion of the general timeline
-        if timeline.name == 'general':
-            return jsonify({'error': 'Cannot delete the general timeline'}), 400
-            
-        # Get all posts associated with this timeline
-        posts = Post.query.filter_by(timeline_id=timeline_id).all()
+        # For each direct event, remove it from the timeline
+        for event in direct_events:
+            # If the event is referenced in other timelines, just remove it from this one
+            if event.referenced_in:
+                # Keep the event, but change its primary timeline to one of its references
+                event.timeline_id = event.referenced_in[0].id
+                # Remove this timeline from its references
+                event.referenced_in.remove(timeline)
+            else:
+                # If the event is not referenced elsewhere, delete it
+                db.session.delete(event)
         
-        # Move posts to general timeline
-        general_timeline = Timeline.query.filter(
-            func.lower(Timeline.name) == 'general'
-        ).first()
+        # Find tags associated with this timeline
+        associated_tags = Tag.query.filter_by(timeline_id=timeline_id).all()
         
-        if not general_timeline:
-            general_timeline = Timeline(
-                name='general',
-                description='General timeline for uncategorized posts',
-                created_by=1
-            )
-            db.session.add(general_timeline)
-            db.session.commit()
-        
-        # Move posts to general timeline
-        for post in posts:
-            post.timeline_id = general_timeline.id
+        # For each tag, remove the timeline association
+        for tag in associated_tags:
+            tag.timeline_id = None
         
         # Delete the timeline
         db.session.delete(timeline)
         db.session.commit()
         
-        return jsonify({
-            'message': f'Timeline {timeline.name} deleted successfully. All posts moved to general timeline.'
-        }), 200
-        
+        return jsonify({'message': 'Timeline deleted successfully'}), 200
     except Exception as e:
-        app.logger.error(f"Error deleting timeline: {str(e)}")
         db.session.rollback()
-        return jsonify({'error': str(e)}), 500
+        app.logger.error(f'Error deleting timeline: {str(e)}')
+        return jsonify({'error': f'Failed to delete timeline: {str(e)}'}), 500
 
 @app.route('/api/timelines/merge', methods=['POST'])
 @jwt_required()
@@ -1073,19 +1065,37 @@ def get_timeline_v3(timeline_id):
 def get_timeline_v3_events(timeline_id):
     try:
         app.logger.info(f'Getting events for timeline {timeline_id}')
-        # Get events that are directly in this timeline
-        direct_events = Event.query.filter_by(timeline_id=timeline_id).all()
-        
         # Get the timeline
         timeline = Timeline.query.get(timeline_id)
         if not timeline:
             return jsonify({'error': 'Timeline not found'}), 404
             
+        # Get events that are directly in this timeline
+        direct_events = Event.query.filter_by(timeline_id=timeline_id).all()
+        
         # Get events that reference this timeline
         referenced_events = timeline.referenced_events.all()
         
-        # Combine both sets of events
-        events = list(set(direct_events + referenced_events))
+        # Get events that have tags associated with this timeline's name
+        # First, find tags that match the timeline name (case insensitive)
+        timeline_name = timeline.name
+        
+        # Remove '#' prefix if it exists (for backward compatibility)
+        clean_timeline_name = timeline_name[1:] if timeline_name.startswith('#') else timeline_name
+        
+        # Find tags that match the timeline name (case insensitive)
+        matching_tags = Tag.query.filter(
+            db.func.lower(Tag.name) == db.func.lower(clean_timeline_name)
+        ).all()
+        
+        # Then find events with those tags
+        tagged_events = []
+        for tag in matching_tags:
+            tagged_events.extend(tag.events.all())
+        
+        # Combine all sets of events and remove duplicates
+        all_events = direct_events + referenced_events + tagged_events
+        events = list({event.id: event for event in all_events}.values())
         
         # Sort events by date
         events.sort(key=lambda x: x.event_date)
@@ -1180,28 +1190,48 @@ def create_timeline_v3_event(timeline_id):
                 if not tag_name:
                     continue
                     
-                # Find or create tag
-                tag = Tag.query.filter_by(name=tag_name).first()
+                # Find or create tag (case insensitive)
+                tag = Tag.query.filter(db.func.lower(Tag.name) == tag_name).first()
                 if not tag:
                     # Create new tag
                     tag = Tag(name=tag_name)
                     db.session.add(tag)
                     
                     # Create a new timeline for this tag if it doesn't exist
-                    tag_timeline = Timeline.query.filter_by(name=f"#{tag_name}").first()
+                    # First check for the capitalized version
+                    capitalized_tag_name = tag_name.capitalize()
+                    
+                    # Check for both normal and hashtag-prefixed versions (for backward compatibility)
+                    tag_timeline = Timeline.query.filter(
+                        db.or_(
+                            db.func.lower(Timeline.name) == tag_name,
+                            db.func.lower(Timeline.name) == f"#{tag_name}"
+                        )
+                    ).first()
+                    
                     if not tag_timeline:
+                        # Create a new timeline with capitalized name
                         tag_timeline = Timeline(
-                            name=f"#{tag_name}",
-                            description=f"Timeline for #{tag_name}",
+                            name=capitalized_tag_name,
+                            description=f"Timeline for #{capitalized_tag_name}",
                             created_by=1  # Temporary default user ID
                         )
                         db.session.add(tag_timeline)
                         db.session.flush()  # Get the timeline ID
                         tag.timeline_id = tag_timeline.id
+                    else:
+                        # Use existing timeline
+                        tag.timeline_id = tag_timeline.id
 
-                        # Add this event as a reference in the new timeline
-                        new_event.referenced_in.append(tag_timeline)
-                
+                    # Add this event as a reference in the timeline
+                    new_event.referenced_in.append(tag_timeline)
+                else:
+                    # If tag exists, ensure this event is added to the corresponding timeline
+                    if tag.timeline_id:
+                        existing_timeline = Timeline.query.get(tag.timeline_id)
+                        if existing_timeline and existing_timeline not in new_event.referenced_in:
+                            new_event.referenced_in.append(existing_timeline)
+                    
                 new_event.tags.append(tag)
         
         app.logger.info('Attempting to save event to database')
@@ -1238,6 +1268,48 @@ def create_timeline_v3_event(timeline_id):
     except Exception as e:
         app.logger.error(f'Error creating event: {str(e)}')
         return jsonify({'error': f'Failed to save event: {str(e)}'}), 500
+
+@app.route('/api/timeline-v3/<timeline_id>', methods=['DELETE'])
+def delete_timeline_v3(timeline_id):
+    try:
+        app.logger.info(f'Deleting timeline {timeline_id}')
+        
+        # Get the timeline
+        timeline = Timeline.query.get(timeline_id)
+        if not timeline:
+            return jsonify({'error': 'Timeline not found'}), 404
+            
+        # Get all events that are directly in this timeline
+        direct_events = Event.query.filter_by(timeline_id=timeline_id).all()
+        
+        # For each direct event, remove it from the timeline
+        for event in direct_events:
+            # If the event is referenced in other timelines, just remove it from this one
+            if event.referenced_in:
+                # Keep the event, but change its primary timeline to one of its references
+                event.timeline_id = event.referenced_in[0].id
+                # Remove this timeline from its references
+                event.referenced_in.remove(timeline)
+            else:
+                # If the event is not referenced elsewhere, delete it
+                db.session.delete(event)
+        
+        # Find tags associated with this timeline
+        associated_tags = Tag.query.filter_by(timeline_id=timeline_id).all()
+        
+        # For each tag, remove the timeline association
+        for tag in associated_tags:
+            tag.timeline_id = None
+        
+        # Delete the timeline
+        db.session.delete(timeline)
+        db.session.commit()
+        
+        return jsonify({'message': 'Timeline deleted successfully'}), 200
+    except Exception as e:
+        db.session.rollback()
+        app.logger.error(f'Error deleting timeline: {str(e)}')
+        return jsonify({'error': f'Failed to delete timeline: {str(e)}'}), 500
 
 if __name__ == '__main__':
     app.run(debug=True)
