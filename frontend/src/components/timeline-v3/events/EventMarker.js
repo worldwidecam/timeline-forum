@@ -48,42 +48,37 @@ const EventMarker = ({
       // Calculate position relative to current time (point [0])
       switch (viewMode) {
         case 'day':
-          // In day view, each marker represents an hour
-          // Calculate the precise time difference in hours between event time and current time
-          const isSameDayEvent = isSameDay(eventDate, currentDate);
+          // New approach: Use the actual hour and minute directly for positioning
+          // In day view, we have 24 markers (0-23) representing each hour
           
-          if (isSameDayEvent) {
-            // For events on the same day, calculate direct hour difference with minute precision
-            const hourDiff = differenceInHours(eventDate, currentDate);
-            const minuteDiff = differenceInMinutes(eventDate, currentDate) % 60;
-            const hourFraction = minuteDiff / 60;
-            
-            // Combine hours and minutes for precise positioning
-            markerPosition = hourDiff + hourFraction;
-          } else {
-            // For events on different days
-            const isEventInPast = eventDate < currentDate;
-            
-            if (isEventInPast) {
-              // Calculate total hours difference for past events (negative value)
-              const diffMs = differenceInMilliseconds(eventDate, currentDate);
-              markerPosition = diffMs / (1000 * 60 * 60); // Convert ms to hours
-            } else {
-              // Calculate total hours difference for future events (positive value)
-              const diffMs = differenceInMilliseconds(eventDate, currentDate);
-              markerPosition = diffMs / (1000 * 60 * 60); // Convert ms to hours
-            }
-          }
+          // Extract hour (0-23) and minute (0-59) from the event date
+          const eventHour = eventDate.getHours();
+          const eventMinute = eventDate.getMinutes();
           
-          // Convert hour difference to position value
+          // Current hour is the reference point (position 0)
+          const currentHour = currentDate.getHours();
+          
+          // Calculate the hour difference (can be negative for past hours or positive for future hours)
+          const hourDiff = eventHour - currentHour;
+          
+          // Calculate the minute as a fraction of an hour (0-0.98)
+          const minuteFraction = eventMinute / 60;
+          
+          // Combine hour difference and minute fraction for precise positioning
+          // For example, 10:30 AM when current time is 7:00 PM would be at position -8.5
+          markerPosition = hourDiff + minuteFraction;
+          
+          // Convert marker position to pixel position
           positionValue = markerPosition * markerSpacing;
           
-          // For debugging, log the marker position and event time
-          console.log(`Event: ${event.title}, Time: ${eventDate.toLocaleTimeString()}, Position: ${markerPosition.toFixed(2)} hours, Current: ${currentDate.toLocaleTimeString()}`);
+          // For debugging
+          console.log(`Event: ${event.title}, Time: ${eventDate.toLocaleTimeString()}`);
+          console.log(`Current hour: ${currentHour}, Event hour: ${eventHour}, Hour diff: ${hourDiff}`);
+          console.log(`Event minute: ${eventMinute}, Minute fraction: ${minuteFraction.toFixed(2)}`);
+          console.log(`Final position: ${markerPosition.toFixed(2)} markers (${positionValue}px)`);
           break;
           
         case 'week':
-          // In week view, each marker represents a day
           // Calculate the day difference between event date and current date with hour precision
           const dayDiffMs = differenceInMilliseconds(eventDate, currentDate);
           const dayDiff = dayDiffMs / (1000 * 60 * 60 * 24); // Convert ms to days
