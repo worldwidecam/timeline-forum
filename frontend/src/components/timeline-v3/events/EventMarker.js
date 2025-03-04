@@ -1,7 +1,7 @@
 // NOTE: This component requires accurate date/time information for proper functionality.
 // There are additional considerations to ensure it works correctly.
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Box, Paper, Popper, Fade, Typography, useTheme, IconButton } from '@mui/material';
 import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
 import ChevronRightIcon from '@mui/icons-material/ChevronRight';
@@ -28,7 +28,6 @@ const EventMarker = ({
   totalEvents,
   currentIndex,
   onChangeIndex,
-  currentDate = new Date(),
   minMarker,
   maxMarker
 }) => {
@@ -37,6 +36,15 @@ const EventMarker = ({
   const [isHovered, setIsHovered] = useState(false);
   const [showHover, setShowHover] = useState(false);
   const [hoverPosition, setHoverPosition] = useState({ x: 0, y: 0 });
+  const [freshCurrentDate, setFreshCurrentDate] = useState(new Date());
+
+  useEffect(() => {
+    const intervalId = setInterval(() => {
+      setFreshCurrentDate(new Date());
+    }, 1000); // Update every second
+
+    return () => clearInterval(intervalId);
+  }, []);
 
   const calculatePosition = () => {
     // For time-based views, calculate position based on event_date
@@ -48,80 +56,94 @@ const EventMarker = ({
       // Calculate position relative to current time (point [0])
       switch (viewMode) {
         case 'day':
-          // New approach: Use the actual hour and minute directly for positioning
-          // In day view, we have 24 markers (0-23) representing each hour
+          // Calculate the day difference first (to handle different dates)
+          const dayDiffMs = differenceInMilliseconds(
+            new Date(
+              eventDate.getFullYear(),
+              eventDate.getMonth(),
+              eventDate.getDate()
+            ),
+            new Date(
+              freshCurrentDate.getFullYear(),
+              freshCurrentDate.getMonth(),
+              freshCurrentDate.getDate()
+            )
+          );
           
-          // Extract hour (0-23) and minute (0-59) from the event date
+          // Convert to days
+          const dayDiff = dayDiffMs / (1000 * 60 * 60 * 24);
+          
+          // Now handle the hour and minute within the day
           const eventHour = eventDate.getHours();
           const eventMinute = eventDate.getMinutes();
+          const currentHour = freshCurrentDate.getHours();
+          const currentMinute = freshCurrentDate.getMinutes();
           
-          // Current hour is the reference point (position 0)
-          const currentHour = currentDate.getHours();
+          // Calculate hour difference within the day
+          const hourDiffInDay = eventHour - currentHour;
           
-          // Calculate the hour difference (can be negative for past hours or positive for future hours)
-          const hourDiff = eventHour - currentHour;
+          // Calculate minute difference as a fraction of an hour
+          const minuteFraction = (eventMinute - (hourDiffInDay === 0 ? currentMinute : 0)) / 60;
           
-          // Calculate the minute as a fraction of an hour (0-0.98)
-          const minuteFraction = eventMinute / 60;
-          
-          // Combine hour difference and minute fraction for precise positioning
-          // For example, 10:30 AM when current time is 7:00 PM would be at position -8.5
-          markerPosition = hourDiff + minuteFraction;
+          // Combine day difference (in hours) with hour and minute difference
+          markerPosition = (dayDiff * 24) + hourDiffInDay + minuteFraction;
           
           // Convert marker position to pixel position
           positionValue = markerPosition * markerSpacing;
           
           // For debugging
-          console.log(`Event: ${event.title}, Time: ${eventDate.toLocaleTimeString()}`);
-          console.log(`Current hour: ${currentHour}, Event hour: ${eventHour}, Hour diff: ${hourDiff}`);
-          console.log(`Event minute: ${eventMinute}, Minute fraction: ${minuteFraction.toFixed(2)}`);
+          console.log(`Event: ${event.title}, Full Date: ${eventDate.toLocaleString()}`);
+          console.log(`Current Date: ${freshCurrentDate.toLocaleString()}`);
+          console.log(`Day difference: ${dayDiff.toFixed(2)} days (${dayDiff * 24} hours)`);
+          console.log(`Hour difference within day: ${hourDiffInDay}`);
+          console.log(`Minute fraction: ${minuteFraction.toFixed(2)}`);
           console.log(`Final position: ${markerPosition.toFixed(2)} markers (${positionValue}px)`);
           break;
           
         case 'week':
           // Calculate the day difference between event date and current date with hour precision
-          const dayDiffMs = differenceInMilliseconds(eventDate, currentDate);
-          const dayDiff = dayDiffMs / (1000 * 60 * 60 * 24); // Convert ms to days
+          const dayDiffMsWeek = differenceInMilliseconds(eventDate, freshCurrentDate);
+          const dayDiffWeek = dayDiffMsWeek / (1000 * 60 * 60 * 24); // Convert ms to days
           
           // Convert day difference to marker position
-          markerPosition = dayDiff;
-          positionValue = dayDiff * markerSpacing;
+          markerPosition = dayDiffWeek;
+          positionValue = dayDiffWeek * markerSpacing;
           
           // For debugging
-          console.log(`Event: ${event.title}, Date: ${eventDate.toLocaleDateString()}, Position: ${markerPosition.toFixed(2)} days, Current: ${currentDate.toLocaleDateString()}`);
+          console.log(`Event: ${event.title}, Date: ${eventDate.toLocaleDateString()}, Position: ${markerPosition.toFixed(2)} days, Current: ${freshCurrentDate.toLocaleDateString()}`);
           break;
           
         case 'month':
           // In month view, each marker represents a day within the month
-          if (isSameMonth(eventDate, currentDate) && isSameYear(eventDate, currentDate)) {
+          if (isSameMonth(eventDate, freshCurrentDate) && isSameYear(eventDate, freshCurrentDate)) {
             // For events in the same month and year, calculate direct day difference
-            const dayDiff = differenceInDays(eventDate, currentDate);
-            const hourFraction = (differenceInHours(eventDate, currentDate) % 24) / 24;
-            markerPosition = dayDiff + hourFraction;
+            const dayDiffMonth = differenceInDays(eventDate, freshCurrentDate);
+            const hourFraction = (differenceInHours(eventDate, freshCurrentDate) % 24) / 24;
+            markerPosition = dayDiffMonth + hourFraction;
           } else {
             // For events in different months
-            const dayDiffMs = differenceInMilliseconds(eventDate, currentDate);
-            markerPosition = dayDiffMs / (1000 * 60 * 60 * 24); // Convert ms to days
+            const dayDiffMsMonth = differenceInMilliseconds(eventDate, freshCurrentDate);
+            markerPosition = dayDiffMsMonth / (1000 * 60 * 60 * 24); // Convert ms to days
           }
           
           // Convert day difference to position value
           positionValue = markerPosition * markerSpacing;
           
           // For debugging
-          console.log(`Event: ${event.title}, Date: ${eventDate.toLocaleDateString()}, Position: ${markerPosition.toFixed(2)} days, Current: ${currentDate.toLocaleDateString()}`);
+          console.log(`Event: ${event.title}, Date: ${eventDate.toLocaleDateString()}, Position: ${markerPosition.toFixed(2)} days, Current: ${freshCurrentDate.toLocaleDateString()}`);
           break;
           
         case 'year':
           // In year view, each marker represents a month
-          if (isSameYear(eventDate, currentDate)) {
+          if (isSameYear(eventDate, freshCurrentDate)) {
             // For events in the same year, calculate direct month difference with day precision
-            const monthDiff = differenceInMonths(eventDate, currentDate);
-            const dayFraction = differenceInDays(eventDate, currentDate) % 30 / 30;
+            const monthDiff = differenceInMonths(eventDate, freshCurrentDate);
+            const dayFraction = differenceInDays(eventDate, freshCurrentDate) % 30 / 30;
             markerPosition = monthDiff + dayFraction;
           } else {
             // For events in different years
             // Calculate total months difference (including fractional months)
-            const monthDiffMs = differenceInMilliseconds(eventDate, currentDate);
+            const monthDiffMs = differenceInMilliseconds(eventDate, freshCurrentDate);
             // Average month length in milliseconds (30.44 days)
             const avgMonthMs = 1000 * 60 * 60 * 24 * 30.44;
             markerPosition = monthDiffMs / avgMonthMs;
@@ -131,7 +153,7 @@ const EventMarker = ({
           positionValue = markerPosition * markerSpacing;
           
           // For debugging
-          console.log(`Event: ${event.title}, Date: ${eventDate.toLocaleDateString()}, Position: ${markerPosition.toFixed(2)} months, Current: ${currentDate.toLocaleDateString()}`);
+          console.log(`Event: ${event.title}, Date: ${eventDate.toLocaleDateString()}, Position: ${markerPosition.toFixed(2)} months, Current: ${freshCurrentDate.toLocaleDateString()}`);
           break;
           
         default:

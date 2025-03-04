@@ -604,7 +604,6 @@ function TimelineV3() {
               totalEvents={events.length}
               currentIndex={currentEventIndex}
               onChangeIndex={setCurrentEventIndex}
-              currentDate={getCurrentDateTime()}
               minMarker={Math.min(...markers)}
               maxMarker={Math.max(...markers)}
               style={timelineTransitionStyles}
