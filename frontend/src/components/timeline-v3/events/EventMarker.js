@@ -196,23 +196,32 @@ const EventMarker = ({
           break;
           
         case 'month':
-          // In month view, each marker represents a day within the month
-          if (isSameMonth(eventDate, freshCurrentDate) && isSameYear(eventDate, freshCurrentDate)) {
-            // For events in the same month and year, calculate direct day difference
-            const dayDiffMonth = differenceInDays(eventDate, freshCurrentDate);
-            const hourFraction = (differenceInHours(eventDate, freshCurrentDate) % 24) / 24;
-            markerPosition = dayDiffMonth + hourFraction;
-          } else {
-            // For events in different months
-            const dayDiffMsMonth = differenceInMilliseconds(eventDate, freshCurrentDate);
-            markerPosition = dayDiffMsMonth / (1000 * 60 * 60 * 24); // Convert ms to days
-          }
+          // In month view, each marker represents a month
+          const eventMonth = eventDate.getMonth();
+          const eventYear = eventDate.getFullYear();
+          const currentMonth = freshCurrentDate.getMonth();
+          const currentYear = freshCurrentDate.getFullYear();
           
-          // Convert day difference to position value
+          // Calculate total month difference between event date and current date
+          const yearDiff = eventYear - currentYear;
+          const monthDiff = eventMonth - currentMonth + (yearDiff * 12);
+          
+          // Calculate day position within the month (as a fraction)
+          const eventDay = eventDate.getDate();
+          const daysInMonth = new Date(eventYear, eventMonth + 1, 0).getDate(); // Get days in event's month
+          const dayFraction = (eventDay - 1) / daysInMonth;
+          
+          // Position between month markers based on month difference and day fraction
+          markerPosition = monthDiff + dayFraction;
+          
+          // Convert month difference to position value
           positionValue = markerPosition * markerSpacing;
           
           // For debugging
-          console.log(`Event: ${event.title}, Date: ${eventDate.toLocaleDateString()}, Position: ${markerPosition.toFixed(2)} days, Current: ${freshCurrentDate.toLocaleDateString()}`);
+          console.log(`Event: ${event.title}, Date: ${eventDate.toLocaleDateString()}`);
+          console.log(`Year: ${eventYear}, Month: ${eventMonth}, Day: ${eventDay}`);
+          console.log(`Month diff: ${monthDiff}, Day fraction: ${dayFraction.toFixed(3)}`);
+          console.log(`Final position: ${markerPosition.toFixed(3)} months from current date`);
           break;
           
         case 'year':
