@@ -82,25 +82,46 @@ const EventMarker = ({
           const currentHour = freshCurrentDate.getHours();
           const currentMinute = freshCurrentDate.getMinutes();
           
-          // Calculate hour difference within the day
-          const hourDiffInDay = eventHour - currentHour;
-          
-          // Calculate minute difference as a fraction of an hour
-          const minuteFraction = (eventMinute - (hourDiffInDay === 0 ? currentMinute : 0)) / 60;
-          
-          // Combine day difference (in hours) with hour and minute difference
-          markerPosition = (dayDiff * 24) + hourDiffInDay + minuteFraction;
+          // For today's events (dayDiff === 0), handle specially
+          if (dayDiff === 0) {
+            // For events happening today
+            if (eventHour === currentHour) {
+              // For events in the current hour, position between marker 0 (current hour) and marker 1 (next hour)
+              // based on how far into the hour the event is
+              const minuteFraction = eventMinute / 60;
+              markerPosition = minuteFraction;
+              
+              console.log(`Current hour event: ${event.title} at ${eventHour}:${eventMinute}`);
+              console.log(`Event is ${(minuteFraction * 100).toFixed(1)}% into the hour`);
+              console.log(`Positioned at ${markerPosition.toFixed(3)} between current hour (0) and next hour (1)`);
+            } else {
+              // For events in other hours today
+              const hourDiff = eventHour - currentHour;
+              const minuteFraction = eventMinute / 60;
+              markerPosition = hourDiff + minuteFraction;
+              
+              console.log(`Today's event: ${event.title} at ${eventHour}:${eventMinute}`);
+              console.log(`Hour difference: ${hourDiff}, Minute fraction: ${minuteFraction.toFixed(2)}`);
+              console.log(`Positioned at ${markerPosition.toFixed(3)}`);
+            }
+          } else {
+            // For events on different days
+            // Calculate hour difference within the day
+            const hourDiffInDay = eventHour;
+            
+            // Calculate minute difference as a fraction of an hour
+            const minuteFraction = eventMinute / 60;
+            
+            // Combine day difference (in hours) with hour and minute difference
+            markerPosition = (dayDiff * 24) + hourDiffInDay + minuteFraction;
+            
+            console.log(`Different day event: ${event.title}, Day diff: ${dayDiff.toFixed(1)}`);
+            console.log(`Event time: ${eventHour}:${eventMinute}`);
+            console.log(`Positioned at ${markerPosition.toFixed(3)}`);
+          }
           
           // Convert marker position to pixel position
           positionValue = markerPosition * markerSpacing;
-          
-          // For debugging
-          console.log(`Event: ${event.title}, Full Date: ${eventDate.toLocaleString()}`);
-          console.log(`Current Date: ${freshCurrentDate.toLocaleString()}`);
-          console.log(`Day difference: ${dayDiff.toFixed(2)} days (${dayDiff * 24} hours)`);
-          console.log(`Hour difference within day: ${hourDiffInDay}`);
-          console.log(`Minute fraction: ${minuteFraction.toFixed(2)}`);
-          console.log(`Final position: ${markerPosition.toFixed(2)} markers (${positionValue}px)`);
           break;
           
         case 'week':

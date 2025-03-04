@@ -32,12 +32,70 @@ eventDotContainer.onClick = () => {
 };
 ```
 
+### Event Marker Positioning System
+
+The EventMarker component uses a sophisticated hierarchical time-based positioning system to place events accurately on the timeline across different view modes.
+
+#### Key Principles
+
+1. **Reference Point System**:
+   - Point [0] represents the current time reference (now)
+   - Positive values represent future times
+   - Negative values represent past times
+
+2. **Hierarchical Time Units**:
+   - **Year**: Broadest time unit, providing general positioning area
+   - **Month**: Narrows position within a year
+   - **Day**: Further narrows position within a month
+   - **Hour/Minute**: Provides exact positioning within a day
+
+3. **View Mode-Specific Positioning**:
+   - **Day View**: 
+     - Each marker represents an hour
+     - Events in current hour positioned between marker [0] (current hour) and marker [1] (next hour)
+     - Position calculated as fraction of hour completed
+   
+   - **Week View**: 
+     - Each marker represents a day
+     - Today's events positioned between marker [0] (today) and marker [1] (tomorrow)
+     - Position calculated as fraction of day completed
+
+   - **Month View**: 
+     - Each marker represents a day within the month
+     - For same month events: Position based on day difference
+     - For different month events: Position based on total day difference
+
+   - **Year View**: 
+     - Each marker represents a month
+     - For same year events: Position based on month difference with day precision
+     - For different year events: Position based on total month difference
+
+4. **Visibility Logic**:
+   - Events are only rendered if they fall within the visible range or are currently selected
+   - View-specific visibility checks (e.g., within current week for week view)
+   - Selected events always remain visible regardless of timeline position
+
+5. **Position Calculation Formula**:
+   ```
+   position = primaryUnitDifference + (secondaryUnitValue / secondaryUnitTotal)
+   ```
+   Example (Day View): position = hourDifference + (minutes / 60)
+
+#### Implementation Details
+
+- Uses `date-fns` library for accurate date calculations
+- Real-time updates with interval-based current time refresh
+- Debug logging for position calculations
+- Special handling for same-day/same-hour events
+- Visibility optimizations to prevent rendering off-screen markers
+
 ### Component Reference Table
 | Component          | Key Functionality          | Location                                  |
 |--------------------|----------------------------|-------------------------------------------|
 | Timeline Core      | Coordinate calculations    | `frontend/src/components/timeline-v3/`   |
 | Event List         | Unified display render     | `EventList.js:36` (current focus)         |
 | Time Markers       | Dynamic generation         | `TimelineV3.js:142`                      |
+| Event Marker       | Event positioning system   | `events/EventMarker.js`                  |
 
 ### Current Focus Area: Day View
 1. **Completion Requirements**  
