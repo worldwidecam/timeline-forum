@@ -16,7 +16,10 @@ import {
   differenceInMilliseconds,
   isSameDay,
   isSameMonth,
-  isSameYear
+  isSameYear,
+  startOfWeek,
+  endOfWeek,
+  isWithinInterval
 } from 'date-fns';
 
 const EventMarker = ({ 
@@ -101,16 +104,74 @@ const EventMarker = ({
           break;
           
         case 'week':
-          // Calculate the day difference between event date and current date with hour precision
-          const dayDiffMsWeek = differenceInMilliseconds(eventDate, freshCurrentDate);
-          const dayDiffWeek = dayDiffMsWeek / (1000 * 60 * 60 * 24); // Convert ms to days
+          // Calculate the day difference between event date and current date
+          const dayDiffMsWeek = differenceInMilliseconds(
+            new Date(
+              eventDate.getFullYear(),
+              eventDate.getMonth(),
+              eventDate.getDate()
+            ),
+            new Date(
+              freshCurrentDate.getFullYear(),
+              freshCurrentDate.getMonth(),
+              freshCurrentDate.getDate()
+            )
+          );
           
-          // Convert day difference to marker position
-          markerPosition = dayDiffWeek;
-          positionValue = dayDiffWeek * markerSpacing;
+          // Convert to days for primary position
+          const dayDiffWeek = dayDiffMsWeek / (1000 * 60 * 60 * 24);
+          
+          // For today's events (dayDiffWeek === 0), we need to handle them specially
+          if (dayDiffWeek === 0) {
+            // Today's events should be positioned between marker 0 (today) and marker 1 (tomorrow)
+            // based on how far into the day the event is
+            
+            // Calculate what fraction of the day has passed for the event
+            const totalMinutesInDay = 24 * 60;
+            const eventMinutesIntoDay = eventDate.getHours() * 60 + eventDate.getMinutes();
+            const eventFractionOfDay = eventMinutesIntoDay / totalMinutesInDay;
+            
+            // Position between today (0) and tomorrow (1) based on time of day
+            markerPosition = eventFractionOfDay;
+            
+            console.log(`Today's event: ${event.title} at ${eventDate.getHours()}:${eventDate.getMinutes()}`);
+            console.log(`Event is ${(eventFractionOfDay * 100).toFixed(1)}% into the day`);
+            console.log(`Positioned at ${markerPosition.toFixed(3)} between today (0) and tomorrow (1)`);
+          } else {
+            // For non-today events, calculate position based on day difference and time
+            const eventHourWeek = eventDate.getHours();
+            const eventMinuteWeek = eventDate.getMinutes();
+            
+            // Calculate what fraction of the day the event represents
+            const totalMinutesInDay = 24 * 60;
+            const eventMinutesIntoDay = eventHourWeek * 60 + eventMinuteWeek;
+            const eventFractionOfDay = eventMinutesIntoDay / totalMinutesInDay;
+            
+            // Position is day difference (whole number) plus fraction of day
+            markerPosition = Math.floor(dayDiffWeek) + eventFractionOfDay;
+            
+            console.log(`Non-today event: ${event.title}, Day diff: ${dayDiffWeek.toFixed(1)}`);
+            console.log(`Event time: ${eventHourWeek}:${eventMinuteWeek} (${(eventFractionOfDay * 100).toFixed(1)}% into day)`);
+            console.log(`Positioned at ${markerPosition.toFixed(3)}`);
+          }
+          
+          // Convert marker position to pixel position
+          positionValue = markerPosition * markerSpacing;
+          
+          // Check if the event is within the current week for visibility
+          const weekStart = startOfWeek(freshCurrentDate, { weekStartsOn: 0 }); // 0 = Sunday
+          const weekEnd = endOfWeek(freshCurrentDate, { weekStartsOn: 0 });
+          const isWithinWeek = isWithinInterval(eventDate, { start: weekStart, end: weekEnd });
           
           // For debugging
-          console.log(`Event: ${event.title}, Date: ${eventDate.toLocaleDateString()}, Position: ${markerPosition.toFixed(2)} days, Current: ${freshCurrentDate.toLocaleDateString()}`);
+          console.log(`Event: ${event.title}, Full Date: ${eventDate.toLocaleString()}`);
+          console.log(`Current Date: ${freshCurrentDate.toLocaleString()}`);
+          console.log(`Is within current week: ${isWithinWeek}`);
+          
+          // If not within current week and not the current index, mark for not rendering
+          if (!isWithinWeek && index !== currentIndex) {
+            console.log(`Event ${event.title} is outside current week and not selected - will not render`);
+          }
           break;
           
         case 'month':
