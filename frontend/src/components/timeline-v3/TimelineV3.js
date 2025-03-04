@@ -56,6 +56,7 @@ function TimelineV3() {
   }, [timelineId]);
 
   const getCurrentDateTime = () => {
+    // Return the current date and time
     return new Date();
   };
 
@@ -601,6 +602,11 @@ function TimelineV3() {
               viewMode={viewMode}
               index={index}
               totalEvents={events.length}
+              currentIndex={currentEventIndex}
+              onChangeIndex={setCurrentEventIndex}
+              currentDate={getCurrentDateTime()}
+              minMarker={Math.min(...markers)}
+              maxMarker={Math.max(...markers)}
               style={timelineTransitionStyles}
             />
           ))}
