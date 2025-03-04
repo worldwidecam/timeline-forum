@@ -1359,5 +1359,25 @@ def delete_timeline_v3(timeline_id):
         app.logger.error(f'Error deleting timeline: {str(e)}')
         return jsonify({'error': f'Failed to delete timeline: {str(e)}'}), 500
 
+@app.route('/api/timeline-v3/name/<string:timeline_name>', methods=['GET'])
+def get_timeline_v3_by_name(timeline_name):
+    try:
+        # Convert the timeline name to uppercase to match our standardized format
+        timeline_name_upper = timeline_name.upper()
+        
+        # Find the timeline by name (case-insensitive)
+        timeline = Timeline.query.filter(Timeline.name == timeline_name_upper).first_or_404()
+        
+        return jsonify({
+            'id': timeline.id,
+            'name': timeline.name,
+            'description': timeline.description,
+            'created_by': timeline.created_by,
+            'created_at': timeline.created_at.isoformat()
+        })
+    except Exception as e:
+        app.logger.error(f'Error fetching timeline by name: {str(e)}')
+        return jsonify({'error': 'Failed to fetch timeline'}), 500
+
 if __name__ == '__main__':
     app.run(debug=True)

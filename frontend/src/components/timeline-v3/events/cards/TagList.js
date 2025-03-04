@@ -2,10 +2,35 @@ import React from 'react';
 import { Chip, Box, useTheme } from '@mui/material';
 import { Label as TagIcon } from '@mui/icons-material';
 import { alpha } from '@mui/material/styles';
+import api from '../../../../utils/api';
 
 const TagList = ({ tags }) => {
   const theme = useTheme();
   if (!tags || tags.length === 0) return null;
+
+  // Function to handle tag click - opens the respective timeline in a new tab
+  const handleTagClick = async (e, tagName) => {
+    e.stopPropagation(); // Prevent event bubbling to parent components
+    
+    try {
+      // First try to get the timeline ID by name
+      const timelineName = tagName.toUpperCase();
+      const response = await api.get(`/api/timeline-v3/name/${encodeURIComponent(timelineName)}`);
+      
+      if (response.data && response.data.id) {
+        // If we found the timeline, open it in a new tab
+        window.open(`/timeline-v3/${response.data.id}`, '_blank');
+      } else {
+        console.error('Timeline not found for tag:', tagName);
+      }
+    } catch (error) {
+      console.error('Error fetching timeline for tag:', tagName, error);
+      // If there's an error, we can still try to open the timeline by name
+      // This is a fallback in case the API call fails
+      const timelineName = tagName.toUpperCase();
+      window.open(`/timeline-v3/new?name=${encodeURIComponent(timelineName)}`, '_blank');
+    }
+  };
 
   return (
     <Box 
@@ -42,6 +67,7 @@ const TagList = ({ tags }) => {
             }
             label={tag.name}
             size="small"
+            onClick={(e) => handleTagClick(e, tag.name)}
             sx={{
               height: '24px',
               backgroundColor: theme.palette.mode === 'dark' 
@@ -62,6 +88,7 @@ const TagList = ({ tags }) => {
                   : alpha(tagColor, 0.2),
                 transform: 'translateY(-1px)',
                 boxShadow: `0 4px 8px ${alpha(tagColor, 0.2)}`,
+                cursor: 'pointer',
               },
               '& .MuiChip-label': {
                 px: 1,
