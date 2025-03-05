@@ -1,6 +1,10 @@
 // NOTE: This component requires accurate date/time information for proper functionality.
 // There are additional considerations to ensure it works correctly.
 
+// FUTURE ENHANCEMENT: Implement a smooth curvature winding line that rests on top of all event marker lines,
+// connecting them visually like an audioform soundwave. This would provide a visual continuity
+// to the timeline, especially in year view where many events may be displayed.
+
 import React, { useState, useEffect } from 'react';
 import { Box, Paper, Popper, Fade, Typography, useTheme, IconButton } from '@mui/material';
 import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
@@ -40,6 +44,9 @@ const EventMarker = ({
   const [showHover, setShowHover] = useState(false);
   const [hoverPosition, setHoverPosition] = useState({ x: 0, y: 0 });
   const [freshCurrentDate, setFreshCurrentDate] = useState(new Date());
+  const [overlappingFactor, setOverlappingFactor] = useState(1);
+  const [horizontalOffset, setHorizontalOffset] = useState(0);
+  const [position, setPosition] = useState(null);
 
   useEffect(() => {
     const intervalId = setInterval(() => {
@@ -49,17 +56,81 @@ const EventMarker = ({
     return () => clearInterval(intervalId);
   }, []);
 
+  // Calculate if this event overlaps with others based on position
+  useEffect(() => {
+    if (viewMode !== 'position' && position) {
+      const eventPositions = window.timelineEventPositions || [];
+      
+      // Update this event's position in the global array
+      const existingIndex = eventPositions.findIndex(ep => ep.id === event.id);
+      if (existingIndex >= 0) {
+        eventPositions[existingIndex] = {
+          id: event.id,
+          x: position.x,
+          viewMode,
+          type: event.type
+        };
+      } else {
+        eventPositions.push({
+          id: event.id,
+          x: position.x,
+          viewMode,
+          type: event.type
+        });
+      }
+      window.timelineEventPositions = eventPositions;
+      
+      // Adjust proximity threshold based on view mode
+      // Larger views (year, month) need larger thresholds
+      let proximityThreshold = 10; // Default
+      if (viewMode === 'month') proximityThreshold = 15;
+      if (viewMode === 'year') proximityThreshold = 20;
+      
+      // Find nearby events with more sophisticated collision detection
+      const nearbyEvents = eventPositions.filter(ep => 
+        ep.id !== event.id && 
+        ep.viewMode === viewMode &&
+        Math.abs(ep.x - position.x) < proximityThreshold
+      );
+      
+      // Calculate overlapping factor with diminishing returns
+      // First few overlaps have more impact, then it tapers off
+      const baseGrowth = 1;
+      const maxGrowth = 2.5; // Cap the maximum growth
+      
+      if (nearbyEvents.length === 0) {
+        setOverlappingFactor(1);
+        setHorizontalOffset(0);
+      } else {
+        // Logarithmic growth function to prevent excessive height
+        const factor = baseGrowth + (Math.log(nearbyEvents.length + 1) / Math.log(5));
+        setOverlappingFactor(Math.min(factor, maxGrowth));
+        
+        // Calculate a subtle horizontal offset based on event ID to prevent perfect alignment
+        // This creates a more natural, less rigid appearance when events overlap
+        let offsetBase = 0;
+        if (event.id && typeof event.id === 'string') {
+          offsetBase = (event.id.charCodeAt(0) % 5) - 2; // Range from -2 to 2
+        } else if (event.id) {
+          // If id exists but is not a string (e.g., a number), convert to string first
+          offsetBase = (String(event.id).charCodeAt(0) % 5) - 2;
+        } else {
+          // Fallback to a random offset if id doesn't exist
+          offsetBase = (Math.floor(Math.random() * 5) - 2);
+        }
+        setHorizontalOffset(nearbyEvents.length > 0 ? offsetBase : 0);
+      }
+    }
+  }, [event.id, event.type, viewMode, position]);
+
   const calculatePosition = () => {
-    // For time-based views, calculate position based on event_date
     if (viewMode !== 'position') {
       const eventDate = new Date(event.event_date);
       let positionValue = 0;
-      let markerPosition = 0; // Position in terms of marker units (for visibility check)
+      let markerPosition = 0;
       
-      // Calculate position relative to current time (point [0])
       switch (viewMode) {
         case 'day':
-          // Calculate the day difference first (to handle different dates)
           const dayDiffMs = differenceInMilliseconds(
             new Date(
               eventDate.getFullYear(),
@@ -73,59 +144,27 @@ const EventMarker = ({
             )
           );
           
-          // Convert to days
           const dayDiff = dayDiffMs / (1000 * 60 * 60 * 24);
           
-          // Now handle the hour and minute within the day
-          const eventHour = eventDate.getHours();
-          const eventMinute = eventDate.getMinutes();
-          const currentHour = freshCurrentDate.getHours();
-          const currentMinute = freshCurrentDate.getMinutes();
-          
-          // For today's events (dayDiff === 0), handle specially
           if (dayDiff === 0) {
-            // For events happening today
-            if (eventHour === currentHour) {
-              // For events in the current hour, position between marker 0 (current hour) and marker 1 (next hour)
-              // based on how far into the hour the event is
-              const minuteFraction = eventMinute / 60;
+            if (eventDate.getHours() === freshCurrentDate.getHours()) {
+              const minuteFraction = eventDate.getMinutes() / 60;
               markerPosition = minuteFraction;
-              
-              console.log(`Current hour event: ${event.title} at ${eventHour}:${eventMinute}`);
-              console.log(`Event is ${(minuteFraction * 100).toFixed(1)}% into the hour`);
-              console.log(`Positioned at ${markerPosition.toFixed(3)} between current hour (0) and next hour (1)`);
             } else {
-              // For events in other hours today
-              const hourDiff = eventHour - currentHour;
-              const minuteFraction = eventMinute / 60;
+              const hourDiff = eventDate.getHours() - freshCurrentDate.getHours();
+              const minuteFraction = eventDate.getMinutes() / 60;
               markerPosition = hourDiff + minuteFraction;
-              
-              console.log(`Today's event: ${event.title} at ${eventHour}:${eventMinute}`);
-              console.log(`Hour difference: ${hourDiff}, Minute fraction: ${minuteFraction.toFixed(2)}`);
-              console.log(`Positioned at ${markerPosition.toFixed(3)}`);
             }
           } else {
-            // For events on different days
-            // Calculate hour difference within the day
-            const hourDiffInDay = eventHour;
-            
-            // Calculate minute difference as a fraction of an hour
-            const minuteFraction = eventMinute / 60;
-            
-            // Combine day difference (in hours) with hour and minute difference
+            const hourDiffInDay = eventDate.getHours();
+            const minuteFraction = eventDate.getMinutes() / 60;
             markerPosition = (dayDiff * 24) + hourDiffInDay + minuteFraction;
-            
-            console.log(`Different day event: ${event.title}, Day diff: ${dayDiff.toFixed(1)}`);
-            console.log(`Event time: ${eventHour}:${eventMinute}`);
-            console.log(`Positioned at ${markerPosition.toFixed(3)}`);
           }
           
-          // Convert marker position to pixel position
           positionValue = markerPosition * markerSpacing;
           break;
           
         case 'week':
-          // Calculate the day difference between event date and current date
           const dayDiffMsWeek = differenceInMilliseconds(
             new Date(
               eventDate.getFullYear(),
@@ -139,153 +178,100 @@ const EventMarker = ({
             )
           );
           
-          // Convert to days for primary position
           const dayDiffWeek = dayDiffMsWeek / (1000 * 60 * 60 * 24);
           
-          // For today's events (dayDiffWeek === 0), we need to handle them specially
           if (dayDiffWeek === 0) {
-            // Today's events should be positioned between marker 0 (today) and marker 1 (tomorrow)
-            // based on how far into the day the event is
-            
-            // Calculate what fraction of the day has passed for the event
             const totalMinutesInDay = 24 * 60;
             const eventMinutesIntoDay = eventDate.getHours() * 60 + eventDate.getMinutes();
             const eventFractionOfDay = eventMinutesIntoDay / totalMinutesInDay;
             
-            // Position between today (0) and tomorrow (1) based on time of day
             markerPosition = eventFractionOfDay;
-            
-            console.log(`Today's event: ${event.title} at ${eventDate.getHours()}:${eventDate.getMinutes()}`);
-            console.log(`Event is ${(eventFractionOfDay * 100).toFixed(1)}% into the day`);
-            console.log(`Positioned at ${markerPosition.toFixed(3)} between today (0) and tomorrow (1)`);
           } else {
-            // For non-today events, calculate position based on day difference and time
             const eventHourWeek = eventDate.getHours();
             const eventMinuteWeek = eventDate.getMinutes();
             
-            // Calculate what fraction of the day the event represents
             const totalMinutesInDay = 24 * 60;
             const eventMinutesIntoDay = eventHourWeek * 60 + eventMinuteWeek;
             const eventFractionOfDay = eventMinutesIntoDay / totalMinutesInDay;
             
-            // Position is day difference (whole number) plus fraction of day
             markerPosition = Math.floor(dayDiffWeek) + eventFractionOfDay;
-            
-            console.log(`Non-today event: ${event.title}, Day diff: ${dayDiffWeek.toFixed(1)}`);
-            console.log(`Event time: ${eventHourWeek}:${eventMinuteWeek} (${(eventFractionOfDay * 100).toFixed(1)}% into day)`);
-            console.log(`Positioned at ${markerPosition.toFixed(3)}`);
           }
           
-          // Convert marker position to pixel position
           positionValue = markerPosition * markerSpacing;
           
-          // Check if the event is within the current week for visibility
-          const weekStart = startOfWeek(freshCurrentDate, { weekStartsOn: 0 }); // 0 = Sunday
+          const weekStart = startOfWeek(freshCurrentDate, { weekStartsOn: 0 });
           const weekEnd = endOfWeek(freshCurrentDate, { weekStartsOn: 0 });
           const isWithinWeek = isWithinInterval(eventDate, { start: weekStart, end: weekEnd });
           
-          // For debugging
-          console.log(`Event: ${event.title}, Full Date: ${eventDate.toLocaleString()}`);
-          console.log(`Current Date: ${freshCurrentDate.toLocaleString()}`);
-          console.log(`Is within current week: ${isWithinWeek}`);
-          
-          // If not within current week and not the current index, mark for not rendering
           if (!isWithinWeek && index !== currentIndex) {
-            console.log(`Event ${event.title} is outside current week and not selected - will not render`);
+            return null;
           }
           break;
           
         case 'month':
-          // In month view, each marker represents a month
           const eventYear = eventDate.getFullYear();
           const currentYear = freshCurrentDate.getFullYear();
           const eventMonth = eventDate.getMonth();
           const currentMonth = freshCurrentDate.getMonth();
           const eventDay = eventDate.getDate();
-          const daysInMonth = new Date(eventYear, eventMonth + 1, 0).getDate(); // Get days in event's month
+          const daysInMonth = new Date(eventYear, eventMonth + 1, 0).getDate();
           
-          // Calculate total month difference between event date and current date
           const monthYearDiff = eventYear - currentYear;
           const monthDiff = eventMonth - currentMonth + (monthYearDiff * 12);
           
-          // Calculate day position within the month (as a fraction)
           const monthDayFraction = (eventDay - 1) / daysInMonth;
           
-          // Position between month markers based on month difference and day fraction
           markerPosition = monthDiff + monthDayFraction;
           
-          // Convert month difference to position value
           positionValue = markerPosition * markerSpacing;
-          
-          // For debugging
-          console.log(`Event: ${event.title}, Date: ${eventDate.toLocaleDateString()}`);
-          console.log(`Year: ${eventYear}, Month: ${eventMonth}, Day: ${eventDay}`);
-          console.log(`Month diff: ${monthDiff}, Day fraction: ${monthDayFraction.toFixed(3)}`);
-          console.log(`Final position: ${markerPosition.toFixed(3)} months from current date`);
           break;
           
         case 'year':
-          // In year view, each marker represents a year
-          // Calculate year difference
           const yearDiff = eventDate.getFullYear() - freshCurrentDate.getFullYear();
           
-          // Calculate month position within the year (as a fraction)
           const yearMonthFraction = eventDate.getMonth() / 12;
-          
-          // Day fraction (0-1 representing position within the month)
           const yearDayFraction = (eventDate.getDate() - 1) / new Date(eventDate.getFullYear(), eventDate.getMonth() + 1, 0).getDate();
           
-          // Combine for precise positioning (year + month + day)
-          // The month contributes 1/12 of a year, and the day contributes 1/(12*daysInMonth) of a year
           const yearMonthContribution = eventDate.getMonth() / 12;
-          const yearDayContribution = yearDayFraction / 12; // Scale day fraction to month's contribution
+          const yearDayContribution = yearDayFraction / 12;
           
           markerPosition = yearDiff + yearMonthContribution + yearDayContribution;
           
-          // Convert year position to pixel position
           positionValue = markerPosition * markerSpacing;
-          
-          // For debugging
-          console.log(`Event: ${event.title}, Date: ${eventDate.toLocaleDateString()}`);
-          console.log(`Year: ${eventDate.getFullYear()}, Month: ${eventDate.getMonth()}, Day: ${eventDate.getDate()}`);
-          console.log(`Year diff: ${yearDiff}, Month contribution: ${yearMonthContribution.toFixed(3)}, Day contribution: ${yearDayContribution.toFixed(4)}`);
-          console.log(`Final position: ${markerPosition.toFixed(3)} years from current date`);
           break;
           
         default:
-          // For base coordinate view, center below event counter
           return {
             x: 0,
-            y: 70, // Increased to match active marker height
+            y: 70,
           };
       }
 
-      // Check if the position would be visible in the current view
-      // We consider the visible range to be from minMarker to maxMarker
       const isVisible = minMarker <= markerPosition && markerPosition <= maxMarker;
       
-      // If the marker is outside the visible range and not the current index, don't render it
       if (!isVisible && index !== currentIndex) {
         return null;
       }
       
       return {
         x: Math.round(window.innerWidth/2 + positionValue + timelineOffset),
-        y: 70, // Increased to match active marker height
+        y: 70,
       };
     } else {
-      // For position view, use the index to calculate position
       const centerX = window.innerWidth / 2;
       const positionValue = (index - currentIndex) * markerSpacing;
       
       return {
         x: Math.round(centerX + positionValue + timelineOffset),
-        y: 70, // Increased to match active marker height
+        y: 70,
       };
     }
   };
 
-  const position = calculatePosition();
+  useEffect(() => {
+    const position = calculatePosition();
+    setPosition(position);
+  }, [viewMode, freshCurrentDate, index, currentIndex, timelineOffset, markerSpacing, minMarker, maxMarker]);
 
   const handleMouseEnter = () => {
     setIsHovered(true);
@@ -324,7 +310,6 @@ const EventMarker = ({
     onChangeIndex(index);
   };
 
-  // If the position is null or undefined, don't render the marker
   if (!position) return null;
 
   return (
@@ -333,13 +318,13 @@ const EventMarker = ({
         <Box
           sx={{
             position: 'absolute',
-            left: `${position.x}px`,
+            left: `${position.x + horizontalOffset}px`, // Add horizontal offset
             bottom: `${position.y}px`,
             display: 'flex',
             alignItems: 'center',
             gap: 1,
             transform: 'translateX(-50%)',
-            zIndex: 1000, // Higher than background
+            zIndex: 1000,
           }}
         >
           <IconButton 
@@ -364,29 +349,29 @@ const EventMarker = ({
             onMouseLeave={handleMouseLeaveMarker}
             onClick={handleClick}
             sx={{
-              width: '20px',
-              height: '20px',
+              width: `${4 + (overlappingFactor - 1) * 0.5}px`, // Increase width slightly for overlapping events
+              height: `${40 * overlappingFactor}px`, // Adjust height based on overlapping factor
               cursor: 'pointer',
               position: 'relative',
               '&::before': {
                 content: '""',
                 position: 'absolute',
                 inset: '-8px',
-                background: `radial-gradient(circle, ${getColor()}30 0%, transparent 70%)`,
-                borderRadius: '50%',
+                background: `radial-gradient(ellipse at center, ${getColor()}30 0%, transparent 70%)`,
+                borderRadius: '4px',
                 animation: 'pulse 2s infinite',
               },
               '&::after': {
                 content: '""',
                 position: 'absolute',
                 inset: 0,
-                background: getColor(),
-                borderRadius: '50%',
+                background: `linear-gradient(to top, ${getColor()}99, ${getColor()})`,
+                borderRadius: '4px',
                 transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
                 boxShadow: `0 0 10px ${getColor()}40`,
               },
               '&:hover::after': {
-                transform: 'scale(1.2)',
+                transform: 'scaleY(1.1) scaleX(1.5)',
                 boxShadow: `
                   0 0 0 2px ${theme.palette.background.paper},
                   0 0 0 4px ${getColor()}40,
@@ -416,20 +401,21 @@ const EventMarker = ({
         <Box
           sx={{
             position: 'absolute',
-            left: `${position.x}px`,
+            left: `${position.x + horizontalOffset}px`, // Add horizontal offset
             bottom: `${position.y}px`,
-            width: '14px',
-            height: '14px',
-            borderRadius: '50%',
-            backgroundColor: getColor(),
+            width: `${3 + (overlappingFactor - 1) * 0.5}px`, // Increase width slightly for overlapping events
+            height: `${24 * overlappingFactor}px`, // Adjust height based on overlapping factor
+            borderRadius: '2px',
+            background: `linear-gradient(to top, ${getColor()}80, ${getColor()})`,
             transform: 'translateX(-50%)',
             cursor: 'pointer',
             transition: 'all 0.2s ease-in-out',
             '&:hover': {
-              backgroundColor: getHoverColor(),
-              transform: 'translateX(-50%) scale(1.2)',
+              background: `linear-gradient(to top, ${getHoverColor()}90, ${getHoverColor()})`,
+              transform: 'translateX(-50%) scaleY(1.2) scaleX(1.3)',
+              boxShadow: `0 0 8px ${getColor()}40`,
             },
-            zIndex: 1000, // Higher than background
+            zIndex: 1000,
           }}
           onClick={handleClick}
           onMouseEnter={handleMouseEnterMarker}

@@ -388,6 +388,9 @@ function TimelineV3() {
     if (viewMode !== 'position') {
       setCurrentEventIndex(0);
       setSelectedEventId(null);
+      
+      // Clear event positions when view mode changes
+      window.timelineEventPositions = [];
     }
   }, [viewMode]);
 
@@ -396,9 +399,11 @@ function TimelineV3() {
     if (currentEventIndex >= events.length && currentEventIndex !== -1) {
       setCurrentEventIndex(Math.max(0, events.length - 1));
     }
+    
+    // Clear event positions when events change
+    window.timelineEventPositions = [];
   }, [events.length, currentEventIndex]);
 
-  // Navigation functions
   const handleLeft = () => {
     const minMarker = Math.min(...markers);
     setMarkers([...markers, minMarker - 1]);

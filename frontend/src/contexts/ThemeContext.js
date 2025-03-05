@@ -70,7 +70,7 @@ export const CustomThemeProvider = ({ children }) => {
         dark: '#c2185b',
       },
       background: {
-        default: '#f5f5f5',
+        default: '#f8f5f0',
         paper: '#ffffff',
       },
       text: {
