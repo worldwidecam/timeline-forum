@@ -322,27 +322,10 @@ const EventMarker = ({
             bottom: `${position.y}px`,
             display: 'flex',
             alignItems: 'center',
-            gap: 1,
             transform: 'translateX(-50%)',
             zIndex: 1000,
           }}
         >
-          <IconButton 
-            size="small"
-            onClick={() => onChangeIndex(currentIndex > 0 ? currentIndex - 1 : totalEvents - 1)}
-            sx={{ 
-              color: theme.palette.primary.main,
-              transition: 'all 0.2s ease-in-out',
-              '&:hover': {
-                backgroundColor: theme.palette.mode === 'dark' 
-                  ? 'rgba(33, 150, 243, 0.15)'
-                  : 'rgba(33, 150, 243, 0.08)',
-              }
-            }}
-          >
-            <ChevronLeftIcon />
-          </IconButton>
-
           <Box
             className="active-marker"
             onMouseEnter={handleMouseEnterMarker}
@@ -380,22 +363,6 @@ const EventMarker = ({
               }
             }}
           />
-
-          <IconButton 
-            size="small"
-            onClick={() => onChangeIndex(currentIndex < totalEvents - 1 ? currentIndex + 1 : 0)}
-            sx={{ 
-              color: theme.palette.primary.main,
-              transition: 'all 0.2s ease-in-out',
-              '&:hover': {
-                backgroundColor: theme.palette.mode === 'dark' 
-                  ? 'rgba(33, 150, 243, 0.15)'
-                  : 'rgba(33, 150, 243, 0.08)',
-              }
-            }}
-          >
-            <ChevronRightIcon />
-          </IconButton>
         </Box>
       ) : (
         <Box

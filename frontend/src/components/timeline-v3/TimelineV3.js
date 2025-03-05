@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Box, Container, useTheme, Button, Fade, Stack, Typography, Fab, Tooltip } from '@mui/material';
 import { useAuth } from '../../contexts/AuthContext';
@@ -383,11 +383,20 @@ function TimelineV3() {
     return () => window.removeEventListener('resize', handleResize);
   }, [timelineOffset]);
 
+  // Store the previous view mode to detect first load
+  const prevViewModeRef = useRef(null);
+
   // Reset current event index when switching views
   useEffect(() => {
     if (viewMode !== 'position') {
-      setCurrentEventIndex(0);
-      setSelectedEventId(null);
+      // Only reset selection on first load, not when switching between views
+      if (prevViewModeRef.current === null) {
+        setCurrentEventIndex(0);
+        setSelectedEventId(null);
+      }
+      
+      // Update the ref with current view mode
+      prevViewModeRef.current = viewMode;
       
       // Clear event positions when view mode changes
       window.timelineEventPositions = [];
@@ -399,9 +408,6 @@ function TimelineV3() {
     if (currentEventIndex >= events.length && currentEventIndex !== -1) {
       setCurrentEventIndex(Math.max(0, events.length - 1));
     }
-    
-    // Clear event positions when events change
-    window.timelineEventPositions = [];
   }, [events.length, currentEventIndex]);
 
   const handleLeft = () => {
