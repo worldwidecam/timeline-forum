@@ -84,34 +84,65 @@ const EventMarker = ({
       // Larger views (year, month) need larger thresholds
       let proximityThreshold = 10; // Default
       if (viewMode === 'month') proximityThreshold = 15;
-      if (viewMode === 'year') proximityThreshold = 20;
+      if (viewMode === 'year') proximityThreshold = 30; // Increased from 20 to 30 for year view
       
       // Find nearby events with more sophisticated collision detection
-      const nearbyEvents = eventPositions.filter(ep => 
-        ep.id !== event.id && 
-        ep.viewMode === viewMode &&
-        Math.abs(ep.x - position.x) < proximityThreshold
-      );
+      let nearbyEvents = [];
+      
+      if (viewMode === 'year') {
+        // For year view, use a more aggressive proximity detection
+        // Consider events within the same month or adjacent months as nearby
+        nearbyEvents = eventPositions.filter(ep => {
+          if (ep.id === event.id || ep.viewMode !== viewMode) return false;
+          
+          // Check if events are close horizontally
+          const isClose = Math.abs(ep.x - position.x) < proximityThreshold;
+          
+          // Make sure both event objects and their dates exist before comparing
+          if (event && event.event_date && ep.eventData && ep.eventData.event_date) {
+            // If events are in the same month (or close), count them as nearby
+            // This helps detect clustering in year view where events might be stacked
+            const eventDate = new Date(event.event_date);
+            const otherEventDate = new Date(ep.eventData.event_date);
+            const sameMonth = eventDate.getMonth() === otherEventDate.getMonth();
+            const adjacentMonth = Math.abs(eventDate.getMonth() - otherEventDate.getMonth()) <= 1;
+            
+            return isClose || (sameMonth && Math.abs(ep.x - position.x) < 50) || 
+                   (adjacentMonth && Math.abs(ep.x - position.x) < 35);
+          }
+          
+          // If we can't compare dates, just use horizontal proximity
+          return isClose;
+        });
+      } else {
+        // For other views, use the standard proximity detection
+        nearbyEvents = eventPositions.filter(ep => 
+          ep.id !== event.id && 
+          ep.viewMode === viewMode &&
+          Math.abs(ep.x - position.x) < proximityThreshold
+        );
+      }
       
       // Calculate overlapping factor with diminishing returns
       // First few overlaps have more impact, then it tapers off
       const baseGrowth = 1;
-      const maxGrowth = 2.5; // Cap the maximum growth
+      const maxGrowth = 6.0; // Increased maximum growth significantly to make differences more noticeable
       
       if (nearbyEvents.length === 0) {
         setOverlappingFactor(1);
         setHorizontalOffset(0);
       } else {
         // Logarithmic growth function to prevent excessive height
-        const factor = baseGrowth + (Math.log(nearbyEvents.length + 1) / Math.log(5));
+        // Use a more aggressive logarithmic base for faster growth
+        const factor = baseGrowth + (Math.log(nearbyEvents.length + 1) / Math.log(3));
         setOverlappingFactor(Math.min(factor, maxGrowth));
         
         // Calculate a subtle horizontal offset based on event ID to prevent perfect alignment
         // This creates a more natural, less rigid appearance when events overlap
         let offsetBase = 0;
-        if (event.id && typeof event.id === 'string') {
+        if (event && event.id && typeof event.id === 'string') {
           offsetBase = (event.id.charCodeAt(0) % 5) - 2; // Range from -2 to 2
-        } else if (event.id) {
+        } else if (event && event.id) {
           // If id exists but is not a string (e.g., a number), convert to string first
           offsetBase = (String(event.id).charCodeAt(0) % 5) - 2;
         } else {
@@ -125,13 +156,13 @@ const EventMarker = ({
 
   const calculatePosition = () => {
     if (viewMode !== 'position') {
-      const eventDate = new Date(event.event_date);
+      const eventDate = event && event.event_date ? new Date(event.event_date) : null;
       let positionValue = 0;
       let markerPosition = 0;
       
       switch (viewMode) {
         case 'day':
-          const dayDiffMs = differenceInMilliseconds(
+          const dayDiffMs = eventDate ? differenceInMilliseconds(
             new Date(
               eventDate.getFullYear(),
               eventDate.getMonth(),
@@ -142,22 +173,22 @@ const EventMarker = ({
               freshCurrentDate.getMonth(),
               freshCurrentDate.getDate()
             )
-          );
+          ) : 0;
           
           const dayDiff = dayDiffMs / (1000 * 60 * 60 * 24);
           
           if (dayDiff === 0) {
-            if (eventDate.getHours() === freshCurrentDate.getHours()) {
+            if (eventDate && eventDate.getHours() === freshCurrentDate.getHours()) {
               const minuteFraction = eventDate.getMinutes() / 60;
               markerPosition = minuteFraction;
             } else {
-              const hourDiff = eventDate.getHours() - freshCurrentDate.getHours();
-              const minuteFraction = eventDate.getMinutes() / 60;
+              const hourDiff = eventDate ? eventDate.getHours() - freshCurrentDate.getHours() : 0;
+              const minuteFraction = eventDate ? eventDate.getMinutes() / 60 : 0;
               markerPosition = hourDiff + minuteFraction;
             }
           } else {
-            const hourDiffInDay = eventDate.getHours();
-            const minuteFraction = eventDate.getMinutes() / 60;
+            const hourDiffInDay = eventDate ? eventDate.getHours() : 0;
+            const minuteFraction = eventDate ? eventDate.getMinutes() / 60 : 0;
             markerPosition = (dayDiff * 24) + hourDiffInDay + minuteFraction;
           }
           
@@ -165,7 +196,7 @@ const EventMarker = ({
           break;
           
         case 'week':
-          const dayDiffMsWeek = differenceInMilliseconds(
+          const dayDiffMsWeek = eventDate ? differenceInMilliseconds(
             new Date(
               eventDate.getFullYear(),
               eventDate.getMonth(),
@@ -176,19 +207,19 @@ const EventMarker = ({
               freshCurrentDate.getMonth(),
               freshCurrentDate.getDate()
             )
-          );
+          ) : 0;
           
           const dayDiffWeek = dayDiffMsWeek / (1000 * 60 * 60 * 24);
           
           if (dayDiffWeek === 0) {
             const totalMinutesInDay = 24 * 60;
-            const eventMinutesIntoDay = eventDate.getHours() * 60 + eventDate.getMinutes();
+            const eventMinutesIntoDay = eventDate ? eventDate.getHours() * 60 + eventDate.getMinutes() : 0;
             const eventFractionOfDay = eventMinutesIntoDay / totalMinutesInDay;
             
             markerPosition = eventFractionOfDay;
           } else {
-            const eventHourWeek = eventDate.getHours();
-            const eventMinuteWeek = eventDate.getMinutes();
+            const eventHourWeek = eventDate ? eventDate.getHours() : 0;
+            const eventMinuteWeek = eventDate ? eventDate.getMinutes() : 0;
             
             const totalMinutesInDay = 24 * 60;
             const eventMinutesIntoDay = eventHourWeek * 60 + eventMinuteWeek;
@@ -201,7 +232,7 @@ const EventMarker = ({
           
           const weekStart = startOfWeek(freshCurrentDate, { weekStartsOn: 0 });
           const weekEnd = endOfWeek(freshCurrentDate, { weekStartsOn: 0 });
-          const isWithinWeek = isWithinInterval(eventDate, { start: weekStart, end: weekEnd });
+          const isWithinWeek = eventDate ? isWithinInterval(eventDate, { start: weekStart, end: weekEnd }) : false;
           
           if (!isWithinWeek && index !== currentIndex) {
             return null;
@@ -209,12 +240,12 @@ const EventMarker = ({
           break;
           
         case 'month':
-          const eventYear = eventDate.getFullYear();
+          const eventYear = eventDate ? eventDate.getFullYear() : 0;
           const currentYear = freshCurrentDate.getFullYear();
-          const eventMonth = eventDate.getMonth();
+          const eventMonth = eventDate ? eventDate.getMonth() : 0;
           const currentMonth = freshCurrentDate.getMonth();
-          const eventDay = eventDate.getDate();
-          const daysInMonth = new Date(eventYear, eventMonth + 1, 0).getDate();
+          const eventDay = eventDate ? eventDate.getDate() : 0;
+          const daysInMonth = eventDate ? new Date(eventYear, eventMonth + 1, 0).getDate() : 0;
           
           const monthYearDiff = eventYear - currentYear;
           const monthDiff = eventMonth - currentMonth + (monthYearDiff * 12);
@@ -227,13 +258,13 @@ const EventMarker = ({
           break;
           
         case 'year':
-          const yearDiff = eventDate.getFullYear() - freshCurrentDate.getFullYear();
+          const yearDiff = eventDate ? eventDate.getFullYear() - freshCurrentDate.getFullYear() : 0;
           
-          const yearMonthFraction = eventDate.getMonth() / 12;
-          const yearDayFraction = (eventDate.getDate() - 1) / new Date(eventDate.getFullYear(), eventDate.getMonth() + 1, 0).getDate();
+          const yearMonthFraction = eventDate ? eventDate.getMonth() / 12 : 0;
+          const yearDayFraction = eventDate ? (eventDate.getDate() - 1) / new Date(eventDate.getFullYear(), eventDate.getMonth() + 1, 0).getDate() : 0;
           
-          const yearMonthContribution = eventDate.getMonth() / 12;
-          const yearDayContribution = yearDayFraction / 12;
+          const yearMonthContribution = eventDate ? eventDate.getMonth() / 12 : 0;
+          const yearDayContribution = eventDate ? yearDayFraction / 12 : 0;
           
           markerPosition = yearDiff + yearMonthContribution + yearDayContribution;
           
@@ -436,7 +467,7 @@ const EventMarker = ({
                 {event.description}
               </Typography>
               <Typography variant="caption" color="text.secondary">
-                {new Date(event.event_date).toLocaleString()}
+                {event && event.event_date ? new Date(event.event_date).toLocaleString() : ''}
               </Typography>
             </Paper>
           </Fade>

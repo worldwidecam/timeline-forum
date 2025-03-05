@@ -39,6 +39,8 @@ const EventCounter = ({
   // Handle day view navigation
   const handleDayViewChange = (newIndex) => {
     setDayViewIndex(newIndex);
+    // Also update the main index to ensure event markers are highlighted
+    onChangeIndex(newIndex);
   };
 
   // Handle day view dot click
@@ -101,21 +103,31 @@ const EventCounter = ({
   const goToPrevious = () => {
     if (dayViewEvents.length === 0) return;
     
+    let newIndex;
     if (sortOrder === 'newest') {
-      setDayViewIndex(dayViewIndex < dayViewEvents.length - 1 ? dayViewIndex + 1 : 0);
+      newIndex = dayViewIndex < dayViewEvents.length - 1 ? dayViewIndex + 1 : 0;
     } else {
-      setDayViewIndex(dayViewIndex > 0 ? dayViewIndex - 1 : dayViewEvents.length - 1);
+      newIndex = dayViewIndex > 0 ? dayViewIndex - 1 : dayViewEvents.length - 1;
     }
+    
+    setDayViewIndex(newIndex);
+    // Also update the main index to ensure event markers are highlighted
+    onChangeIndex(newIndex);
   };
 
   const goToNext = () => {
     if (dayViewEvents.length === 0) return;
     
+    let newIndex;
     if (sortOrder === 'newest') {
-      setDayViewIndex(dayViewIndex > 0 ? dayViewIndex - 1 : dayViewEvents.length - 1);
+      newIndex = dayViewIndex > 0 ? dayViewIndex - 1 : dayViewEvents.length - 1;
     } else {
-      setDayViewIndex(dayViewIndex < dayViewEvents.length - 1 ? dayViewIndex + 1 : 0);
+      newIndex = dayViewIndex < dayViewEvents.length - 1 ? dayViewIndex + 1 : 0;
     }
+    
+    setDayViewIndex(newIndex);
+    // Also update the main index to ensure event markers are highlighted
+    onChangeIndex(newIndex);
   };
 
   return (
