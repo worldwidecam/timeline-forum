@@ -197,22 +197,22 @@ const EventMarker = ({
           
         case 'month':
           // In month view, each marker represents a month
-          const eventMonth = eventDate.getMonth();
           const eventYear = eventDate.getFullYear();
-          const currentMonth = freshCurrentDate.getMonth();
           const currentYear = freshCurrentDate.getFullYear();
-          
-          // Calculate total month difference between event date and current date
-          const yearDiff = eventYear - currentYear;
-          const monthDiff = eventMonth - currentMonth + (yearDiff * 12);
-          
-          // Calculate day position within the month (as a fraction)
+          const eventMonth = eventDate.getMonth();
+          const currentMonth = freshCurrentDate.getMonth();
           const eventDay = eventDate.getDate();
           const daysInMonth = new Date(eventYear, eventMonth + 1, 0).getDate(); // Get days in event's month
-          const dayFraction = (eventDay - 1) / daysInMonth;
+          
+          // Calculate total month difference between event date and current date
+          const monthYearDiff = eventYear - currentYear;
+          const monthDiff = eventMonth - currentMonth + (monthYearDiff * 12);
+          
+          // Calculate day position within the month (as a fraction)
+          const monthDayFraction = (eventDay - 1) / daysInMonth;
           
           // Position between month markers based on month difference and day fraction
-          markerPosition = monthDiff + dayFraction;
+          markerPosition = monthDiff + monthDayFraction;
           
           // Convert month difference to position value
           positionValue = markerPosition * markerSpacing;
@@ -220,31 +220,36 @@ const EventMarker = ({
           // For debugging
           console.log(`Event: ${event.title}, Date: ${eventDate.toLocaleDateString()}`);
           console.log(`Year: ${eventYear}, Month: ${eventMonth}, Day: ${eventDay}`);
-          console.log(`Month diff: ${monthDiff}, Day fraction: ${dayFraction.toFixed(3)}`);
+          console.log(`Month diff: ${monthDiff}, Day fraction: ${monthDayFraction.toFixed(3)}`);
           console.log(`Final position: ${markerPosition.toFixed(3)} months from current date`);
           break;
           
         case 'year':
-          // In year view, each marker represents a month
-          if (isSameYear(eventDate, freshCurrentDate)) {
-            // For events in the same year, calculate direct month difference with day precision
-            const monthDiff = differenceInMonths(eventDate, freshCurrentDate);
-            const dayFraction = differenceInDays(eventDate, freshCurrentDate) % 30 / 30;
-            markerPosition = monthDiff + dayFraction;
-          } else {
-            // For events in different years
-            // Calculate total months difference (including fractional months)
-            const monthDiffMs = differenceInMilliseconds(eventDate, freshCurrentDate);
-            // Average month length in milliseconds (30.44 days)
-            const avgMonthMs = 1000 * 60 * 60 * 24 * 30.44;
-            markerPosition = monthDiffMs / avgMonthMs;
-          }
+          // In year view, each marker represents a year
+          // Calculate year difference
+          const yearDiff = eventDate.getFullYear() - freshCurrentDate.getFullYear();
           
-          // Convert month difference to position value
+          // Calculate month position within the year (as a fraction)
+          const yearMonthFraction = eventDate.getMonth() / 12;
+          
+          // Day fraction (0-1 representing position within the month)
+          const yearDayFraction = (eventDate.getDate() - 1) / new Date(eventDate.getFullYear(), eventDate.getMonth() + 1, 0).getDate();
+          
+          // Combine for precise positioning (year + month + day)
+          // The month contributes 1/12 of a year, and the day contributes 1/(12*daysInMonth) of a year
+          const yearMonthContribution = eventDate.getMonth() / 12;
+          const yearDayContribution = yearDayFraction / 12; // Scale day fraction to month's contribution
+          
+          markerPosition = yearDiff + yearMonthContribution + yearDayContribution;
+          
+          // Convert year position to pixel position
           positionValue = markerPosition * markerSpacing;
           
           // For debugging
-          console.log(`Event: ${event.title}, Date: ${eventDate.toLocaleDateString()}, Position: ${markerPosition.toFixed(2)} months, Current: ${freshCurrentDate.toLocaleDateString()}`);
+          console.log(`Event: ${event.title}, Date: ${eventDate.toLocaleDateString()}`);
+          console.log(`Year: ${eventDate.getFullYear()}, Month: ${eventDate.getMonth()}, Day: ${eventDate.getDate()}`);
+          console.log(`Year diff: ${yearDiff}, Month contribution: ${yearMonthContribution.toFixed(3)}, Day contribution: ${yearDayContribution.toFixed(4)}`);
+          console.log(`Final position: ${markerPosition.toFixed(3)} years from current date`);
           break;
           
         default:
