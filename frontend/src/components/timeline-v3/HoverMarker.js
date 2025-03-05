@@ -87,7 +87,7 @@ const HoverMarker = ({
         flexDirection: 'column',
         alignItems: 'center',
         transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
-        zIndex: 0,
+        zIndex: 2, // Higher than background
         pointerEvents: 'none'
       }}
     >

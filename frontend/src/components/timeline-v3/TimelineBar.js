@@ -23,6 +23,7 @@ const TimelineBar = ({
       transform: `translateX(${timelineOffset}px)`,
       transition: 'transform 0.1s ease-out',
       width: barWidth,
+      zIndex: 2, // Higher than background
       ...style
     }} />
   );

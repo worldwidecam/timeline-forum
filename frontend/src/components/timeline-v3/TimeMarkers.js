@@ -128,7 +128,8 @@ const TimeMarkers = ({
       width: '100%',
       display: 'flex',
       alignItems: 'center',
-      pointerEvents: 'none'
+      pointerEvents: 'none',
+      zIndex: 2 // Higher than background
     }}>
       {markers.map((value) => {
         const midnight = is12AM(value);

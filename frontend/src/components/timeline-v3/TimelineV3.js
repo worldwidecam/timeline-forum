@@ -393,7 +393,7 @@ function TimelineV3() {
 
   // Reset current event index if it's out of bounds after events change
   useEffect(() => {
-    if (currentEventIndex >= events.length) {
+    if (currentEventIndex >= events.length && currentEventIndex !== -1) {
       setCurrentEventIndex(Math.max(0, events.length - 1));
     }
   }, [events.length, currentEventIndex]);
@@ -465,6 +465,11 @@ function TimelineV3() {
     `,
     pointerEvents: isRecentering ? 'none' : 'auto',
     willChange: 'transform, opacity'
+  };
+
+  const handleBackgroundClick = () => {
+    setCurrentEventIndex(-1);
+    setSelectedEventId(null);
   };
 
   return (
@@ -570,7 +575,7 @@ function TimelineV3() {
             ...timelineTransitionStyles
           }}
         >
-          <TimelineBackground />
+          <TimelineBackground onBackgroundClick={handleBackgroundClick} />
           <TimelineBar
             timelineOffset={timelineOffset}
             markerSpacing={100}

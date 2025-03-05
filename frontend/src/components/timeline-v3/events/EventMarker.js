@@ -256,7 +256,7 @@ const EventMarker = ({
           // For base coordinate view, center below event counter
           return {
             x: 0,
-            y: -40 // Position below event counter
+            y: 70, // Increased to match active marker height
           };
       }
 
@@ -271,7 +271,7 @@ const EventMarker = ({
       
       return {
         x: Math.round(window.innerWidth/2 + positionValue + timelineOffset),
-        y: 20, // Fixed distance from bottom for time-based views
+        y: 70, // Increased to match active marker height
       };
     } else {
       // For position view, use the index to calculate position
@@ -280,7 +280,7 @@ const EventMarker = ({
       
       return {
         x: Math.round(centerX + positionValue + timelineOffset),
-        y: 20, // Fixed distance from bottom
+        y: 70, // Increased to match active marker height
       };
     }
   };
@@ -329,7 +329,7 @@ const EventMarker = ({
 
   return (
     <>
-      {index === currentIndex ? (
+      {index === currentIndex && currentIndex !== -1 ? (
         <Box
           sx={{
             position: 'absolute',
@@ -339,7 +339,7 @@ const EventMarker = ({
             alignItems: 'center',
             gap: 1,
             transform: 'translateX(-50%)',
-            zIndex: 4,
+            zIndex: 1000, // Higher than background
           }}
         >
           <IconButton 
@@ -414,49 +414,26 @@ const EventMarker = ({
         </Box>
       ) : (
         <Box
-          className={isHovered ? 'pulsing-marker' : ''}
-          onMouseEnter={handleMouseEnterMarker}
-          onMouseLeave={handleMouseLeaveMarker}
-          onClick={handleClick}
           sx={{
             position: 'absolute',
             left: `${position.x}px`,
             bottom: `${position.y}px`,
-            transform: 'translateX(-50%)',
             width: '14px',
             height: '14px',
+            borderRadius: '50%',
+            backgroundColor: getColor(),
+            transform: 'translateX(-50%)',
             cursor: 'pointer',
-            zIndex: 3,
-            '&::before': {
-              content: '""',
-              position: 'absolute',
-              inset: '-4px',
-              background: `radial-gradient(circle, ${getColor()}20 0%, transparent 70%)`,
-              borderRadius: '50%',
-              opacity: 0,
-              transition: 'opacity 0.3s ease-in-out',
+            transition: 'all 0.2s ease-in-out',
+            '&:hover': {
+              backgroundColor: getHoverColor(),
+              transform: 'translateX(-50%) scale(1.2)',
             },
-            '&:hover::before': {
-              opacity: 1,
-            },
-            '&::after': {
-              content: '""',
-              position: 'absolute',
-              inset: 0,
-              background: getColor(),
-              borderRadius: '50%',
-              transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-              boxShadow: `0 0 10px ${getColor()}40`,
-            },
-            '&:hover::after': {
-              transform: 'scale(1.2)',
-              boxShadow: `
-                0 0 0 2px ${theme.palette.background.paper},
-                0 0 0 4px ${getColor()}40,
-                0 0 12px ${getColor()}60
-              `,
-            }
+            zIndex: 1000, // Higher than background
           }}
+          onClick={handleClick}
+          onMouseEnter={handleMouseEnterMarker}
+          onMouseLeave={handleMouseLeaveMarker}
         />
       )}
 
