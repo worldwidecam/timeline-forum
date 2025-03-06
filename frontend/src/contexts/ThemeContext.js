@@ -32,6 +32,44 @@ export const CustomThemeProvider = ({ children }) => {
       divider: 'rgba(255, 255, 255, 0.12)',
     },
     components: {
+      MuiCssBaseline: {
+        styleOverrides: {
+          body: {
+            scrollbarWidth: 'thin',
+            scrollbarColor: 'rgba(100, 100, 100, 0.6) transparent',
+            '&::-webkit-scrollbar': {
+              width: '10px',
+            },
+            '&::-webkit-scrollbar-track': {
+              background: 'transparent',
+              borderRadius: '6px',
+            },
+            '&::-webkit-scrollbar-thumb': {
+              backgroundColor: 'rgba(100, 100, 100, 0.6)',
+              borderRadius: '6px',
+              border: '2px solid transparent',
+            },
+            '&::-webkit-scrollbar-thumb:hover': {
+              backgroundColor: 'rgba(120, 120, 120, 0.8)',
+            },
+            '& *::-webkit-scrollbar': {
+              width: '10px',
+            },
+            '& *::-webkit-scrollbar-track': {
+              background: 'transparent',
+              borderRadius: '6px',
+            },
+            '& *::-webkit-scrollbar-thumb': {
+              backgroundColor: 'rgba(100, 100, 100, 0.6)',
+              borderRadius: '6px',
+              border: '2px solid transparent',
+            },
+            '& *::-webkit-scrollbar-thumb:hover': {
+              backgroundColor: 'rgba(120, 120, 120, 0.8)',
+            },
+          },
+        },
+      },
       MuiPaper: {
         styleOverrides: {
           root: {
@@ -60,26 +98,59 @@ export const CustomThemeProvider = ({ children }) => {
     palette: {
       mode: 'light',
       primary: {
-        main: '#2196f3',
-        light: '#64b5f6',
-        dark: '#1976d2',
+        main: '#1976d2',
+        light: '#42a5f5',
+        dark: '#1565c0',
       },
       secondary: {
-        main: '#e91e63',
-        light: '#f06292',
-        dark: '#c2185b',
+        main: '#9c27b0',
+        light: '#ba68c8',
+        dark: '#7b1fa2',
       },
       background: {
-        default: '#f8f5f0',
+        default: '#f5f5f5',
         paper: '#ffffff',
       },
-      text: {
-        primary: 'rgba(0, 0, 0, 0.87)',
-        secondary: 'rgba(0, 0, 0, 0.6)',
-      },
-      divider: 'rgba(0, 0, 0, 0.12)',
     },
     components: {
+      MuiCssBaseline: {
+        styleOverrides: {
+          body: {
+            scrollbarWidth: 'thin',
+            scrollbarColor: 'rgba(180, 180, 180, 0.8) transparent',
+            '&::-webkit-scrollbar': {
+              width: '10px',
+            },
+            '&::-webkit-scrollbar-track': {
+              background: 'transparent',
+              borderRadius: '6px',
+            },
+            '&::-webkit-scrollbar-thumb': {
+              backgroundColor: 'rgba(180, 180, 180, 0.8)',
+              borderRadius: '6px',
+              border: '2px solid transparent',
+            },
+            '&::-webkit-scrollbar-thumb:hover': {
+              backgroundColor: 'rgba(150, 150, 150, 0.9)',
+            },
+            '& *::-webkit-scrollbar': {
+              width: '10px',
+            },
+            '& *::-webkit-scrollbar-track': {
+              background: 'transparent',
+              borderRadius: '6px',
+            },
+            '& *::-webkit-scrollbar-thumb': {
+              backgroundColor: 'rgba(180, 180, 180, 0.8)',
+              borderRadius: '6px',
+              border: '2px solid transparent',
+            },
+            '& *::-webkit-scrollbar-thumb:hover': {
+              backgroundColor: 'rgba(150, 150, 150, 0.9)',
+            },
+          },
+        },
+      },
       MuiPaper: {
         styleOverrides: {
           root: {
@@ -117,6 +188,20 @@ export const CustomThemeProvider = ({ children }) => {
       setIsDarkMode(savedMode === 'true');
     }
   }, []);
+
+  useEffect(() => {
+    // Apply to both HTML and body elements
+    const htmlElement = document.documentElement;
+    const bodyElement = document.body;
+    
+    if (isDarkMode) {
+      htmlElement.classList.add('dark-mode');
+      bodyElement.classList.add('dark-mode');
+    } else {
+      htmlElement.classList.remove('dark-mode');
+      bodyElement.classList.remove('dark-mode');
+    }
+  }, [isDarkMode]);
 
   return (
     <ThemeContext.Provider value={{ isDarkMode, toggleTheme }}>
