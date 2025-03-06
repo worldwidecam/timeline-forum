@@ -33,7 +33,14 @@ import NewsCard from './cards/NewsCard';
 import MediaCard from './cards/MediaCard';
 import EventCounter from './EventCounter';
 
-const EventList = ({ events, onEventEdit, onEventDelete, selectedEventId, onEventSelect }) => {
+const EventList = ({ 
+  events, 
+  onEventEdit, 
+  onEventDelete, 
+  selectedEventId, 
+  onEventSelect,
+  shouldScrollToEvent = true // Default to true for backward compatibility
+}) => {
   const theme = useTheme();
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedType, setSelectedType] = useState(null);
@@ -89,7 +96,15 @@ const EventList = ({ events, onEventEdit, onEventDelete, selectedEventId, onEven
     const eventElement = eventRefs.current[eventId];
     console.log('Scrolling to event:', eventId, 'Element:', eventElement); // Debug log
     if (eventElement) {
-      eventElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      // Use a small timeout to ensure the DOM has updated
+      setTimeout(() => {
+        const { top, height } = eventElement.getBoundingClientRect();
+        const centerOffset = (window.innerHeight / 2) - (height / 2);
+        window.scrollTo({
+          top: top + window.scrollY - centerOffset,
+          behavior: 'smooth'
+        });
+      }, 100);
     } else {
       console.error('Event element not found:', eventId); // Debug log
     }
@@ -101,7 +116,7 @@ const EventList = ({ events, onEventEdit, onEventDelete, selectedEventId, onEven
 
   // Handle selection changes and scrolling
   useEffect(() => {
-    if (selectedEventId !== previousSelectedId) {
+    if (selectedEventId !== previousSelectedId && shouldScrollToEvent) {
       // Set a timeout to allow the fade-out animation of the previous selection
       const timeoutId = setTimeout(() => {
         if (selectedEventId && eventRefs.current[selectedEventId]) {
@@ -114,12 +129,15 @@ const EventList = ({ events, onEventEdit, onEventDelete, selectedEventId, onEven
 
       setPreviousSelectedId(selectedEventId);
       return () => clearTimeout(timeoutId);
+    } else if (selectedEventId !== previousSelectedId) {
+      // Still update previousSelectedId even if we don't scroll
+      setPreviousSelectedId(selectedEventId);
     }
-  }, [selectedEventId, previousSelectedId]);
+  }, [selectedEventId, previousSelectedId, shouldScrollToEvent]);
 
   // Centering the focused card
   useEffect(() => {
-    if (selectedEventId && eventRefs.current[selectedEventId]) {
+    if (selectedEventId && eventRefs.current[selectedEventId] && shouldScrollToEvent) {
       const cardElement = eventRefs.current[selectedEventId];
       const { top, height } = cardElement.getBoundingClientRect();
       const centerOffset = (window.innerHeight / 2) - (height / 2);
@@ -128,7 +146,7 @@ const EventList = ({ events, onEventEdit, onEventDelete, selectedEventId, onEven
         behavior: 'smooth'
       });
     }
-  }, [selectedEventId]);
+  }, [selectedEventId, shouldScrollToEvent]);
 
   const renderEventCard = (event) => {
     const isSelected = event.id === selectedEventId;

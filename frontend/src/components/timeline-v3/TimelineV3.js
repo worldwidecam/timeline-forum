@@ -197,6 +197,7 @@ function TimelineV3() {
   const [hoverPosition, setHoverPosition] = useState(getExactTimePosition());
   const [currentEventIndex, setCurrentEventIndex] = useState(0);
   const [selectedEventId, setSelectedEventId] = useState(null);
+  const [shouldScrollToEvent, setShouldScrollToEvent] = useState(true);
 
   // Add new state for events and event form
   const [events, setEvents] = useState([]);
@@ -241,11 +242,27 @@ function TimelineV3() {
 
   const handleEventSelect = (event) => {
     setSelectedEventId(event.id);
+    setShouldScrollToEvent(true);
   };
 
   const handleDotClick = (event) => {
     console.log('Dot clicked for event:', event); // Debug log
-    setSelectedEventId(event.id);
+    
+    // Find the index of the clicked event in the events array
+    const eventIndex = events.findIndex(e => e.id === event.id);
+    
+    if (viewMode !== 'position') {
+      // In filter views (day, week, month, year), focus on the event marker
+      setCurrentEventIndex(eventIndex);
+      // Still set the selectedEventId so the event is highlighted in the list
+      // but don't scroll to it
+      setShouldScrollToEvent(false);
+      setSelectedEventId(event.id);
+    } else {
+      // In coordinate view, focus on the event in the list and scroll to it
+      setShouldScrollToEvent(true);
+      setSelectedEventId(event.id);
+    }
   };
 
   // Fetch events when timeline ID changes
@@ -688,6 +705,7 @@ function TimelineV3() {
           onEventDelete={handleEventDelete}
           selectedEventId={selectedEventId}
           onEventSelect={handleEventSelect}
+          shouldScrollToEvent={shouldScrollToEvent}
         />
       </Box>
 

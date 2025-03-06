@@ -6,7 +6,7 @@
 // to the timeline, especially in year view where many events may be displayed.
 
 import React, { useState, useEffect } from 'react';
-import { Box, Paper, Popper, Fade, Typography, useTheme, IconButton } from '@mui/material';
+import { Box, Paper, Typography, useTheme, IconButton } from '@mui/material';
 import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
 import ChevronRightIcon from '@mui/icons-material/ChevronRight';
 import TimelineEvent from './TimelineEvent';
@@ -39,10 +39,8 @@ const EventMarker = ({
   maxMarker
 }) => {
   const theme = useTheme();
-  const [anchorEl, setAnchorEl] = useState(null);
+  const markerRef = React.useRef(null);
   const [isHovered, setIsHovered] = useState(false);
-  const [showHover, setShowHover] = useState(false);
-  const [hoverPosition, setHoverPosition] = useState({ x: 0, y: 0 });
   const [freshCurrentDate, setFreshCurrentDate] = useState(new Date());
   const [overlappingFactor, setOverlappingFactor] = useState(1);
   const [horizontalOffset, setHorizontalOffset] = useState(0);
@@ -153,6 +151,12 @@ const EventMarker = ({
       }
     }
   }, [event.id, event.type, viewMode, position]);
+
+  useEffect(() => {
+    if (index === currentIndex && markerRef.current) {
+      // No need to set anchorEl here
+    }
+  }, [index, currentIndex]);
 
   const calculatePosition = () => {
     if (viewMode !== 'position') {
@@ -304,14 +308,6 @@ const EventMarker = ({
     setPosition(position);
   }, [viewMode, freshCurrentDate, index, currentIndex, timelineOffset, markerSpacing, minMarker, maxMarker]);
 
-  const handleMouseEnter = () => {
-    setIsHovered(true);
-  };
-
-  const handleMouseLeave = () => {
-    setIsHovered(false);
-  };
-
   const getColor = () => {
     const typeColors = EVENT_TYPE_COLORS[event.type] || EVENT_TYPE_COLORS[EVENT_TYPES.REMARK];
     return theme.palette.mode === 'dark' ? typeColors.dark : typeColors.light;
@@ -322,30 +318,21 @@ const EventMarker = ({
     return theme.palette.mode === 'dark' ? typeColors.hover.dark : typeColors.hover.light;
   };
 
-  const handleMouseEnterMarker = (e) => {
-    const rect = e.currentTarget.getBoundingClientRect();
-    setHoverPosition({
-      x: rect.left + rect.width / 2,
-      y: rect.top
-    });
-    setShowHover(true);
-    setAnchorEl(e.currentTarget);
-  };
-
-  const handleMouseLeaveMarker = () => {
-    setShowHover(false);
-    setAnchorEl(null);
-  };
-
-  const handleClick = () => {
-    onChangeIndex(index);
+  const handleMarkerClick = () => {
+    // Only change the index if we're not already on this marker
+    if (index !== currentIndex) {
+      onChangeIndex(index);
+    }
   };
 
   if (!position) return null;
 
+  // Determine if this marker is the currently selected one
+  const isSelected = index === currentIndex && currentIndex !== -1;
+
   return (
     <>
-      {index === currentIndex && currentIndex !== -1 ? (
+      {isSelected ? (
         <Box
           sx={{
             position: 'absolute',
@@ -358,19 +345,19 @@ const EventMarker = ({
           }}
         >
           <Box
+            ref={markerRef}
             className="active-marker"
-            onMouseEnter={handleMouseEnterMarker}
-            onMouseLeave={handleMouseLeaveMarker}
-            onClick={handleClick}
+            onClick={handleMarkerClick}
             sx={{
               width: `${4 + (overlappingFactor - 1) * 0.5}px`, // Increase width slightly for overlapping events
               height: `${40 * overlappingFactor}px`, // Adjust height based on overlapping factor
               cursor: 'pointer',
               position: 'relative',
+              // Increased click area with pseudo-element
               '&::before': {
                 content: '""',
                 position: 'absolute',
-                inset: '-8px',
+                inset: '-15px', // Increased from -8px to -15px for larger click area
                 background: `radial-gradient(ellipse at center, ${getColor()}30 0%, transparent 70%)`,
                 borderRadius: '4px',
                 animation: 'pulse 2s infinite',
@@ -394,9 +381,58 @@ const EventMarker = ({
               }
             }}
           />
+          
+          {/* Popup for selected marker */}
+          <Paper
+            elevation={3}
+            sx={{
+              position: 'absolute',
+              bottom: `${45 + (overlappingFactor - 1) * 20}px`, // Dynamic positioning based on marker height
+              left: '50%',
+              transform: 'translateX(-50%)',
+              p: 1.5,
+              maxWidth: 280,
+              width: 'max-content', // Allow width to adjust to content
+              bgcolor: theme.palette.mode === 'dark' ? 'rgba(0,0,0,0.85)' : 'rgba(255,255,255,0.95)',
+              backdropFilter: 'blur(8px)',
+              borderRadius: '12px',
+              border: `1px solid ${theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)'}`,
+              boxShadow: theme.palette.mode === 'dark' 
+                ? '0 8px 16px rgba(0,0,0,0.5)' 
+                : '0 8px 16px rgba(0,0,0,0.1)',
+              zIndex: 900,
+              '&::after': {
+                content: '""',
+                position: 'absolute',
+                top: '100%',
+                left: '50%',
+                transform: 'translateX(-50%)',
+                border: '8px solid transparent',
+                borderTopColor: theme.palette.mode === 'dark' ? 'rgba(0,0,0,0.85)' : 'rgba(255,255,255,0.95)',
+              }
+            }}
+          >
+            <Typography variant="subtitle1" sx={{ fontWeight: 'bold', mb: 0.5, lineHeight: 1.2 }}>
+              {event.title}
+            </Typography>
+            <Typography variant="body2" color="text.secondary" sx={{ 
+              display: '-webkit-box',
+              WebkitLineClamp: 2,
+              WebkitBoxOrient: 'vertical',
+              overflow: 'hidden',
+              mb: 0.5,
+              lineHeight: 1.3
+            }}>
+              {event.description}
+            </Typography>
+            <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.5 }}>
+              {event && event.event_date ? new Date(event.event_date).toLocaleString() : ''}
+            </Typography>
+          </Paper>
         </Box>
       ) : (
         <Box
+          ref={markerRef}
           sx={{
             position: 'absolute',
             left: `${position.x + horizontalOffset}px`, // Add horizontal offset
@@ -408,71 +444,23 @@ const EventMarker = ({
             transform: 'translateX(-50%)',
             cursor: 'pointer',
             transition: 'all 0.2s ease-in-out',
+            // Add a larger invisible click area using ::before pseudo-element
+            '&::before': {
+              content: '""',
+              position: 'absolute',
+              inset: '-15px', // Creates a 15px invisible padding around the marker
+              zIndex: 1, // Ensures it's clickable
+            },
             '&:hover': {
               background: `linear-gradient(to top, ${getHoverColor()}90, ${getHoverColor()})`,
               transform: 'translateX(-50%) scaleY(1.2) scaleX(1.3)',
               boxShadow: `0 0 8px ${getColor()}40`,
             },
-            zIndex: 1000,
+            zIndex: 800, // Reduced from 1000 to 800 (below hover marker at 900)
           }}
-          onClick={handleClick}
-          onMouseEnter={handleMouseEnterMarker}
-          onMouseLeave={handleMouseLeaveMarker}
+          onClick={handleMarkerClick}
         />
       )}
-
-      <Popper
-        open={showHover}
-        anchorEl={anchorEl}
-        placement="top"
-        transition
-        sx={{ zIndex: 5 }}
-      >
-        {({ TransitionProps }) => (
-          <Fade {...TransitionProps} timeout={200}>
-            <Paper
-              elevation={3}
-              sx={{
-                p: 1.5,
-                maxWidth: 280,
-                bgcolor: theme.palette.mode === 'dark' ? 'rgba(0,0,0,0.85)' : 'rgba(255,255,255,0.95)',
-                backdropFilter: 'blur(8px)',
-                borderRadius: '12px',
-                border: `1px solid ${theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)'}`,
-                boxShadow: theme.palette.mode === 'dark' 
-                  ? '0 8px 16px rgba(0,0,0,0.5)' 
-                  : '0 8px 16px rgba(0,0,0,0.1)',
-                mb: 1,
-                '&::before': {
-                  content: '""',
-                  position: 'absolute',
-                  top: '100%',
-                  left: '50%',
-                  transform: 'translateX(-50%)',
-                  border: '8px solid transparent',
-                  borderTopColor: theme.palette.mode === 'dark' ? 'rgba(0,0,0,0.85)' : 'rgba(255,255,255,0.95)',
-                }
-              }}
-            >
-              <Typography variant="subtitle1" sx={{ fontWeight: 'bold', mb: 0.5 }}>
-                {event.title}
-              </Typography>
-              <Typography variant="body2" color="text.secondary" sx={{ 
-                display: '-webkit-box',
-                WebkitLineClamp: 2,
-                WebkitBoxOrient: 'vertical',
-                overflow: 'hidden',
-                mb: 0.5
-              }}>
-                {event.description}
-              </Typography>
-              <Typography variant="caption" color="text.secondary">
-                {event && event.event_date ? new Date(event.event_date).toLocaleString() : ''}
-              </Typography>
-            </Paper>
-          </Fade>
-        )}
-      </Popper>
     </>
   );
 };
