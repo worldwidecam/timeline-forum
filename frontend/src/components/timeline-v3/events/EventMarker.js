@@ -166,35 +166,34 @@ const EventMarker = ({
       
       switch (viewMode) {
         case 'day':
+          // First determine if the event is on the same day as the reference point [0]
+          const isSameDayAsRef = eventDate ? isSameDay(eventDate, freshCurrentDate) : false;
+          
+          // For day view, we need to align with how TimeMarkers.js represents hours
+          // In TimeMarkers.js, each marker represents an hour, with special markers at 12AM for each day
+          
+          // Calculate day difference
           const dayDiffMs = eventDate ? differenceInMilliseconds(
-            new Date(
-              eventDate.getFullYear(),
-              eventDate.getMonth(),
-              eventDate.getDate()
-            ),
-            new Date(
-              freshCurrentDate.getFullYear(),
-              freshCurrentDate.getMonth(),
-              freshCurrentDate.getDate()
-            )
+            new Date(eventDate.getFullYear(), eventDate.getMonth(), eventDate.getDate()),
+            new Date(freshCurrentDate.getFullYear(), freshCurrentDate.getMonth(), freshCurrentDate.getDate())
           ) : 0;
           
           const dayDiff = dayDiffMs / (1000 * 60 * 60 * 24);
           
-          if (dayDiff === 0) {
-            if (eventDate && eventDate.getHours() === freshCurrentDate.getHours()) {
-              const minuteFraction = eventDate.getMinutes() / 60;
-              markerPosition = minuteFraction;
-            } else {
-              const hourDiff = eventDate ? eventDate.getHours() - freshCurrentDate.getHours() : 0;
-              const minuteFraction = eventDate ? eventDate.getMinutes() / 60 : 0;
-              markerPosition = hourDiff + minuteFraction;
-            }
-          } else {
-            const hourDiffInDay = eventDate ? eventDate.getHours() : 0;
-            const minuteFraction = eventDate ? eventDate.getMinutes() / 60 : 0;
-            markerPosition = (dayDiff * 24) + hourDiffInDay + minuteFraction;
-          }
+          // Calculate hours from midnight of the reference day
+          const currentHour = freshCurrentDate.getHours();
+          const eventHour = eventDate ? eventDate.getHours() : 0;
+          const eventMinute = eventDate ? eventDate.getMinutes() : 0;
+          
+          // Position calculation:
+          // 1. Start with the day difference in hours (dayDiff * 24)
+          // 2. Add the event's hour position relative to midnight (eventHour)
+          // 3. Subtract the current hour to align with reference point [0]
+          // 4. Add minute fraction for precise positioning
+          
+          // This formula ensures the event is positioned at the correct hour marker
+          // based on its actual hour value (0-23) and day offset
+          markerPosition = (dayDiff * 24) + eventHour - currentHour + (eventMinute / 60);
           
           positionValue = markerPosition * markerSpacing;
           break;
