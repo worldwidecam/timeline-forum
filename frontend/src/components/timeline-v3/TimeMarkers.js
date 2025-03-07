@@ -101,6 +101,12 @@ const TimeMarkers = ({
     return hourOffset === 0;
   };
 
+  const isDestinationMarker = (value) => {
+    // We don't want to highlight the destination marker differently
+    // This ensures all markers have consistent styling
+    return false;
+  };
+
   const isSunday = (value) => {
     if (viewMode !== 'week') return false;
     const currentDate = getCurrentDateTime();
@@ -136,6 +142,10 @@ const TimeMarkers = ({
         const sunday = isSunday(value);
         const january = isJanuary(value);
         const isSpecialMarker = midnight || sunday || january;
+        
+        // Don't apply special styling to markers that were just navigated to
+        const isDestination = isDestinationMarker(value);
+        
         return (
           <Box
             key={value}
@@ -166,7 +176,8 @@ const TimeMarkers = ({
                 transition: 'all 0.2s ease-out',
                 transform: 'translateY(-50%)',
                 height: isSpecialMarker ? '25px' : '15px',
-                width: isSpecialMarker ? '3px' : '2px'
+                width: isSpecialMarker ? '3px' : '2px',
+                backgroundColor: isDestination ? theme.palette.text.secondary : undefined
               }}
             />
             <Typography 

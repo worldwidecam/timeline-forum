@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { Box, Container, useTheme, Button, Fade, Stack, Typography, Fab, Tooltip } from '@mui/material';
 import { useAuth } from '../../contexts/AuthContext';
 import api from '../../utils/api';
+import { differenceInMilliseconds } from 'date-fns';
 import TimelineBackground from './TimelineBackground';
 import TimelineBar from './TimelineBar';
 import TimeMarkers from './TimeMarkers';
@@ -198,6 +199,7 @@ function TimelineV3() {
   const [currentEventIndex, setCurrentEventIndex] = useState(0);
   const [selectedEventId, setSelectedEventId] = useState(null);
   const [shouldScrollToEvent, setShouldScrollToEvent] = useState(true);
+  const [isNavigating, setIsNavigating] = useState(false);
 
   // Add new state for events and event form
   const [events, setEvents] = useState([]);
@@ -258,6 +260,9 @@ function TimelineV3() {
       // but don't scroll to it
       setShouldScrollToEvent(false);
       setSelectedEventId(event.id);
+      
+      // Navigate to the marker using sequential button presses
+      navigateToEvent(event);
     } else {
       // In coordinate view, focus on the event in the list and scroll to it
       setShouldScrollToEvent(true);
@@ -428,44 +433,144 @@ function TimelineV3() {
   }, [events.length, currentEventIndex]);
 
   const handleLeft = () => {
+    console.log('Executing LEFT button press');
     const minMarker = Math.min(...markers);
-    setMarkers([...markers, minMarker - 1]);
-    setTimelineOffset(timelineOffset + 100);
+    setMarkers(prevMarkers => [...prevMarkers, minMarker - 1]);
+    setTimelineOffset(prevOffset => prevOffset + 100);
   };
 
   const handleRight = () => {
+    console.log('Executing RIGHT button press');
     const maxMarker = Math.max(...markers);
-    setMarkers([...markers, maxMarker + 1]);
-    setTimelineOffset(timelineOffset - 100);
+    setMarkers(prevMarkers => [...prevMarkers, maxMarker + 1]);
+    setTimelineOffset(prevOffset => prevOffset - 100);
   };
 
-  const handleRecenter = () => {
-    setIsRecentering(true);
-
-    // Wait for fade out to complete
+  // Navigate to an event using sequential button presses
+  const navigateToEvent = (event) => {
+    if (!event || !event.event_date || viewMode === 'position' || isNavigating) return;
+    
+    // Calculate the temporal distance between the event and current reference point
+    const distance = calculateTemporalDistance(event.event_date);
+    
+    // Calculate how many steps (button presses) we need
+    // Each button press moves by 1 marker, which is 100px
+    // For day view, each marker is an hour, so we need to round to the nearest hour
+    let stepsNeeded;
+    
+    if (viewMode === 'day') {
+      // In day view, each marker represents an hour
+      stepsNeeded = Math.round(distance);
+    } else if (viewMode === 'week') {
+      // In week view, each marker represents a day
+      stepsNeeded = Math.round(distance);
+    } else if (viewMode === 'month') {
+      // In month view, each marker represents a month
+      stepsNeeded = Math.round(distance);
+    } else if (viewMode === 'year') {
+      // In year view, each marker represents a year
+      stepsNeeded = Math.round(distance);
+    } else {
+      stepsNeeded = Math.round(distance);
+    }
+    
+    // Don't navigate if the event is already centered or very close
+    if (Math.abs(stepsNeeded) === 0) return;
+    
+    console.log(`Navigating to event: ${event.title}`);
+    console.log(`Event date: ${new Date(event.event_date).toLocaleString()}`);
+    console.log(`Current date: ${new Date().toLocaleString()}`);
+    console.log(`Calculated distance: ${distance}`);
+    console.log(`Steps needed: ${stepsNeeded}`);
+    
+    // Determine which button to press (left or right)
+    // IMPORTANT: Past events (negative distance) need LEFT button
+    // Future events (positive distance) need RIGHT button
+    const direction = stepsNeeded > 0 ? 'right' : 'left';
+    const numberOfPresses = Math.abs(stepsNeeded);
+    
+    console.log(`Direction: ${direction}`);
+    console.log(`Number of presses: ${numberOfPresses}`);
+    
+    // Start the navigation process
+    setIsNavigating(true);
+    
+    // Preload markers before starting navigation
+    preloadMarkersForNavigation(direction, numberOfPresses).then(() => {
+      // After preloading, execute the button presses
+      executeButtonPresses(direction, numberOfPresses);
+    });
+  };
+  
+  // Preload markers in the direction we're going to navigate
+  const preloadMarkersForNavigation = (direction, numberOfPresses) => {
+    console.log(`Preloading ${numberOfPresses} markers in ${direction} direction`);
+    
+    return new Promise((resolve) => {
+      // Calculate buffer based on screen width (more buffer for wider screens)
+      const screenWidth = window.innerWidth;
+      const bufferMultiplier = 1.5; // Add 50% more markers than needed
+      const bufferSize = Math.ceil(numberOfPresses * bufferMultiplier);
+      
+      console.log(`Buffer size: ${bufferSize} markers`);
+      
+      // Create new markers to preload
+      if (direction === 'left') {
+        const minMarker = Math.min(...markers);
+        const newMarkers = Array.from(
+          { length: bufferSize },
+          (_, i) => minMarker - (i + 1)
+        );
+        console.log(`Preloading left markers: ${minMarker} to ${minMarker - bufferSize}`);
+        setMarkers(prevMarkers => [...prevMarkers, ...newMarkers]);
+      } else {
+        const maxMarker = Math.max(...markers);
+        const newMarkers = Array.from(
+          { length: bufferSize },
+          (_, i) => maxMarker + (i + 1)
+        );
+        console.log(`Preloading right markers: ${maxMarker} to ${maxMarker + bufferSize}`);
+        setMarkers(prevMarkers => [...prevMarkers, ...newMarkers]);
+      }
+      
+      // Give a short delay for the markers to render before starting navigation
+      setTimeout(resolve, 100);
+    });
+  };
+  
+  // Create a function to handle a single button press
+  const performButtonPress = (direction) => {
+    if (direction === 'left') {
+      const minMarker = Math.min(...markers);
+      setMarkers(prevMarkers => [...prevMarkers, minMarker - 1]);
+      setTimelineOffset(prevOffset => prevOffset + 100);
+    } else {
+      const maxMarker = Math.max(...markers);
+      setMarkers(prevMarkers => [...prevMarkers, maxMarker + 1]);
+      setTimelineOffset(prevOffset => prevOffset - 100);
+    }
+  };
+  
+  // Function to execute button presses with delay
+  const executeButtonPresses = (direction, totalPresses, pressCount = 0) => {
+    // Add debug log to track progress
+    console.log(`Press ${pressCount + 1}/${totalPresses}, Remaining: ${totalPresses - pressCount}`);
+    
+    if (pressCount >= totalPresses) {
+      console.log('Navigation complete');
+      setIsNavigating(false);
+      return;
+    }
+    
+    // Press the button using our direct function instead of the handler
+    performButtonPress(direction);
+    
+    // Schedule the next button press after delay
     setTimeout(() => {
-      setIsFullyFaded(true);
-      
-      // Reset timeline offset and markers
-      setTimelineOffset(0);
-      setMarkers(getInitialMarkers());
-      
-      // Update URL without page reload
-      const searchParams = new URLSearchParams(window.location.search);
-      searchParams.set('view', viewMode);
-      navigate(`/timeline-v3/${timelineId}?${searchParams.toString()}`, { replace: true });
-
-      // Start fade in animation after a short delay
-      setTimeout(() => {
-        setIsFullyFaded(false);
-        setTimeout(() => {
-          setIsRecentering(false);
-        }, 50);
-      }, 100);
-    }, 400); // Match the transition duration
+      executeButtonPresses(direction, totalPresses, pressCount + 1);
+    }, 300); // 300ms delay between presses
   };
 
-  // Marker styles
   const markerStyles = {
     reference: {
       '& .marker-line': {
@@ -498,6 +603,130 @@ function TimelineV3() {
   const handleBackgroundClick = () => {
     setCurrentEventIndex(-1);
     setSelectedEventId(null);
+  };
+
+  // Calculate the temporal distance between an event and the current reference point
+  const calculateTemporalDistance = (eventDate) => {
+    if (!eventDate) return 0;
+    
+    const currentDate = new Date();
+    const eventDateObj = new Date(eventDate);
+    
+    // Add debug logs to see the dates we're comparing
+    console.log('Calculating temporal distance:');
+    console.log(`Event date: ${eventDateObj.toLocaleString()}`);
+    console.log(`Current date: ${currentDate.toLocaleString()}`);
+    
+    let distance = 0;
+    
+    switch (viewMode) {
+      case 'day': {
+        // Calculate day difference and hour/minute position
+        const dayDiffMs = differenceInMilliseconds(
+          new Date(eventDateObj.getFullYear(), eventDateObj.getMonth(), eventDateObj.getDate()),
+          new Date(currentDate.getFullYear(), currentDate.getMonth(), currentDate.getDate())
+        );
+        
+        const dayDiff = dayDiffMs / (1000 * 60 * 60 * 24);
+        const currentHour = currentDate.getHours();
+        const eventHour = eventDateObj.getHours();
+        const eventMinute = eventDateObj.getMinutes();
+        
+        // Position calculation (same as in EventMarker)
+        distance = (dayDiff * 24) + eventHour - currentHour + (eventMinute / 60);
+        
+        console.log(`Day diff: ${dayDiff}`);
+        console.log(`Current hour: ${currentHour}`);
+        console.log(`Event hour: ${eventHour}`);
+        console.log(`Event minute: ${eventMinute}`);
+        break;
+      }
+      
+      case 'week': {
+        const dayDiffMs = differenceInMilliseconds(
+          new Date(eventDateObj.getFullYear(), eventDateObj.getMonth(), eventDateObj.getDate()),
+          new Date(currentDate.getFullYear(), currentDate.getMonth(), currentDate.getDate())
+        );
+        
+        const dayDiff = dayDiffMs / (1000 * 60 * 60 * 24);
+        
+        if (dayDiff === 0) {
+          const totalMinutesInDay = 24 * 60;
+          const eventMinutesIntoDay = eventDateObj.getHours() * 60 + eventDateObj.getMinutes();
+          distance = eventMinutesIntoDay / totalMinutesInDay;
+        } else {
+          const eventHour = eventDateObj.getHours();
+          const eventMinute = eventDateObj.getMinutes();
+          
+          const totalMinutesInDay = 24 * 60;
+          const eventMinutesIntoDay = eventHour * 60 + eventMinute;
+          const eventFractionOfDay = eventMinutesIntoDay / totalMinutesInDay;
+          
+          distance = Math.floor(dayDiff) + eventFractionOfDay;
+        }
+        break;
+      }
+      
+      case 'month': {
+        const eventYear = eventDateObj.getFullYear();
+        const currentYear = currentDate.getFullYear();
+        const eventMonth = eventDateObj.getMonth();
+        const currentMonth = currentDate.getMonth();
+        const eventDay = eventDateObj.getDate();
+        const daysInMonth = new Date(eventYear, eventMonth + 1, 0).getDate();
+        
+        const monthYearDiff = eventYear - currentYear;
+        const monthDiff = eventMonth - currentMonth + (monthYearDiff * 12);
+        
+        const monthDayFraction = (eventDay - 1) / daysInMonth;
+        
+        distance = monthDiff + monthDayFraction;
+        break;
+      }
+      
+      case 'year': {
+        const yearDiff = eventDateObj.getFullYear() - currentDate.getFullYear();
+        
+        const yearMonthContribution = eventDateObj.getMonth() / 12;
+        const yearDayFraction = (eventDateObj.getDate() - 1) / new Date(eventDateObj.getFullYear(), eventDateObj.getMonth() + 1, 0).getDate();
+        const yearDayContribution = yearDayFraction / 12;
+        
+        distance = yearDiff + yearMonthContribution + yearDayContribution;
+        break;
+      }
+      
+      default:
+        distance = 0;
+    }
+    
+    console.log(`Calculated distance: ${distance}`);
+    return distance;
+  };
+  
+  const handleRecenter = () => {
+    setIsRecentering(true);
+
+    // Wait for fade out to complete
+    setTimeout(() => {
+      setIsFullyFaded(true);
+      
+      // Reset timeline offset and markers
+      setTimelineOffset(0);
+      setMarkers(getInitialMarkers());
+      
+      // Update URL without page reload
+      const searchParams = new URLSearchParams(window.location.search);
+      searchParams.set('view', viewMode);
+      navigate(`/timeline-v3/${timelineId}?${searchParams.toString()}`, { replace: true });
+
+      // Start fade in animation after a short delay
+      setTimeout(() => {
+        setIsFullyFaded(false);
+        setTimeout(() => {
+          setIsRecentering(false);
+        }, 50);
+      }, 100);
+    }, 400); // Match the transition duration
   };
 
   return (
