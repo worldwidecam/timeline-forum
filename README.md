@@ -108,39 +108,6 @@ The EventMarker component uses a sophisticated hierarchical time-based positioni
 - Timeline scroll position context  
 - Event dot portal rendering
 
-### Note on EventMarker Component
-- The EventMarker component requires accurate date/time information for proper functionality. There are additional considerations to ensure it works correctly.
-
-### EventMarker Improvements Roadmap
-Based on recent brainstorming sessions, the following improvements are planned for the EventMarker component:
-
-1. **Vertical Positioning Adjustment**:
-   - Move event markers to be positioned directly on the timeline line for better visual alignment
-   - Adjust vertical offset calculations to ensure consistent positioning across all views
-
-2. **Overlapping Events Solution**:
-   - Implement visual solutions for handling overlapping events in larger views (especially year view)
-   - Potential approaches include:
-     - Color gradient vertical lines that grow taller with more events
-     - Tooltip/popup information showing multiple events at the same position
-     - Animation effects to improve clarity when hovering over densely populated areas
-
-3. **Selection Indicator**:
-   - Add a modern up arrow indicator below the timeline to mark the user's selected position
-   - Animate the indicator for better visibility
-   - Use the selected position to maintain context when switching between views
-   - Allow clicking in empty space to clear the selection
-
-4. **Unified Interaction Model**:
-   - Create consistency between clicking on event markers, event counter, and event list cards
-   - Ensure visual feedback is consistent across all interactive elements
-   - Improve the connection between the base coordinate view and time-based views
-
-5. **Cross-View Navigation**:
-   - Implement a system to remember the user's selected position when switching views
-   - Automatically scroll to the corresponding position in the new view
-   - Update the event counter and event list to show relevant events for the selected time frame
-
 ### Recent Fixes and Improvements
 
 #### Timezone Handling
@@ -158,6 +125,12 @@ Based on recent brainstorming sessions, the following improvements are planned f
   - Full descriptions remain accessible in event popups
   - Implemented in all card types (News, Remark, Media)
 - **Consistent Date Formatting**: Standardized date display across all components
+
+#### Cross-View Navigation System
+- We are currently in the thought process of creating a cross-view navigation system. The idea is to implement an arrow pointing to the last clicked position on the timeline, whether it be a time marker or an event marker.
+
+#### Hardcoded Values Review
+- During recent reviews, it was noted that the code has hardcoded values for specific ports (e.g., 3000, 5000) which complicates deployment and communication between frontend, backend, and database. This is an area that needs addressing to facilitate easier publishing of the site.
 
 ### Future Enhancements
 1. **Profile Personalization**: Users can customize their profile backgrounds, similar to Tumblr and MySpace.

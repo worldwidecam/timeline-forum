@@ -233,11 +233,18 @@ const EventMarker = ({
           
           positionValue = markerPosition * markerSpacing;
           
+          // Check if the marker is within the visible range on the timeline
+          // This is determined by the minMarker and maxMarker props
+          const isWithinVisibleRange = minMarker <= markerPosition && markerPosition <= maxMarker;
+          
+          // We'll keep the week interval check, but only use it for debugging purposes
           const weekStart = startOfWeek(freshCurrentDate, { weekStartsOn: 0 });
           const weekEnd = endOfWeek(freshCurrentDate, { weekStartsOn: 0 });
           const isWithinWeek = eventDate ? isWithinInterval(eventDate, { start: weekStart, end: weekEnd }) : false;
           
-          if (!isWithinWeek && index !== currentIndex) {
+          // For week view, we'll show all events within the visible timeline range
+          // regardless of whether they're in the current week
+          if (!isWithinVisibleRange && index !== currentIndex) {
             return null;
           }
           break;
@@ -328,6 +335,12 @@ const EventMarker = ({
 
   // Determine if this marker is the currently selected one
   const isSelected = index === currentIndex && currentIndex !== -1;
+  
+  // Determine if this marker should be visible
+  const isVisible = position !== null;
+  
+  // Add a debug class to help identify markers in different states
+  const markerClass = isSelected ? 'selected-marker' : 'normal-marker';
 
   return (
     <>
@@ -432,6 +445,7 @@ const EventMarker = ({
       ) : (
         <Box
           ref={markerRef}
+          className={markerClass}
           sx={{
             position: 'absolute',
             left: `${position.x + horizontalOffset}px`, // Add horizontal offset
@@ -443,6 +457,15 @@ const EventMarker = ({
             transform: 'translateX(-50%)',
             cursor: 'pointer',
             transition: 'all 0.2s ease-in-out',
+            // Enhanced visual appearance for all filter views (day, week, month, year)
+            ...(viewMode !== 'position' && {
+              boxShadow: `0 0 6px ${getColor()}40`,
+              // Special styling for week view
+              ...(viewMode === 'week' && {
+                width: '4px',
+                boxShadow: `0 0 8px ${getColor()}60`
+              })
+            }),
             // Add a larger invisible click area using ::before pseudo-element
             '&::before': {
               content: '""',
@@ -453,7 +476,14 @@ const EventMarker = ({
             '&:hover': {
               background: `linear-gradient(to top, ${getHoverColor()}90, ${getHoverColor()})`,
               transform: 'translateX(-50%) scaleY(1.2) scaleX(1.3)',
-              boxShadow: `0 0 8px ${getColor()}40`,
+              boxShadow: `0 0 8px ${getColor()}60`,
+              ...(viewMode !== 'position' && {
+                boxShadow: `0 0 10px ${getColor()}70`,
+                // Enhanced hover effect for week view
+                ...(viewMode === 'week' && {
+                  boxShadow: `0 0 12px ${getColor()}80`
+                })
+              })
             },
             zIndex: 800, // Reduced from 1000 to 800 (below hover marker at 900)
           }}
