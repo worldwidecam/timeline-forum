@@ -1,5 +1,4 @@
 from flask import Flask, request, jsonify, send_from_directory
-from flask_sqlalchemy import SQLAlchemy
 from flask_jwt_extended import (
     JWTManager, create_access_token, create_refresh_token,
     jwt_required, get_jwt_identity, get_jwt, decode_token,
@@ -10,6 +9,8 @@ from flask_cors import CORS
 from datetime import datetime, timedelta
 from werkzeug.security import generate_password_hash, check_password_hash
 from werkzeug.utils import secure_filename
+from extensions.db import db
+from extensions.jwt import jwt
 import os
 import logging
 import time
@@ -33,8 +34,9 @@ app.config.update(
 )
 
 # Initialize extensions
-db = SQLAlchemy(app)
-jwt = JWTManager(app)
+db.init_app(app)
+jwt.init_app(app)
+
 
 # Ensure the database exists
 with app.app_context():
@@ -69,259 +71,6 @@ app.config['STATIC_FOLDER'] = os.path.join(base_dir, 'static')
 os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
 os.makedirs(app.config['STATIC_FOLDER'], exist_ok=True)
 
-# File upload configuration
-ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif'}
-ALLOWED_AUDIO_EXTENSIONS = {'mp3', 'wav', 'ogg'}
-
-def allowed_file(filename):
-    return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
-
-def allowed_audio_file(filename):
-    return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_AUDIO_EXTENSIONS
-
-# Models
-class UserMusic(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), unique=True)
-    music_url = db.Column(db.String(500), nullable=True)
-    music_platform = db.Column(db.String(20), nullable=True)  # 'youtube', 'soundcloud', or 'spotify'
-    created_at = db.Column(db.DateTime, default=datetime.now())
-    updated_at = db.Column(db.DateTime, default=datetime.now(), onupdate=datetime.now())
-
-class User(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    username = db.Column(db.String(80), unique=True, nullable=False)
-    email = db.Column(db.String(120), unique=True, nullable=False)
-    password_hash = db.Column(db.String(128))
-    created_at = db.Column(db.DateTime, default=datetime.now())
-    bio = db.Column(db.Text, nullable=True)
-    avatar_url = db.Column(db.String(200), nullable=True)
-    music = db.relationship('UserMusic', backref='user', uselist=False)
-
-    def set_password(self, password):
-        self.password_hash = generate_password_hash(password)
-
-    def check_password(self, password):
-        return check_password_hash(self.password_hash, password)
-
-class Timeline(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    name = db.Column(db.String(100), unique=True, nullable=False)
-    description = db.Column(db.Text)
-    created_by = db.Column(db.Integer, db.ForeignKey('user.id'))
-    created_at = db.Column(db.DateTime, default=datetime.now())
-
-class Post(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    title = db.Column(db.String(200), nullable=False)
-    content = db.Column(db.Text, nullable=False)
-    event_date = db.Column(db.DateTime, nullable=False)
-    url = db.Column(db.String(500))
-    url_title = db.Column(db.String(500))
-    url_description = db.Column(db.Text)
-    url_image = db.Column(db.String(500))
-    image = db.Column(db.String(500))  # New field for uploaded images
-    timeline_id = db.Column(db.Integer, db.ForeignKey('timeline.id'))
-    created_by = db.Column(db.Integer, db.ForeignKey('user.id'))
-    created_at = db.Column(db.DateTime, default=datetime.now())
-    upvotes = db.Column(db.Integer, default=0)
-    comments = db.relationship('Comment', backref='post', lazy=True)
-    promoted_to_event = db.Column(db.Boolean, default=False)
-    promotion_score = db.Column(db.Float, default=0.0)
-    source_count = db.Column(db.Integer, default=0)
-    promotion_votes = db.Column(db.Integer, default=0)
-
-    def update_promotion_score(self):
-        """
-        Updates the promotion score of a post and determines if it should be promoted to timeline view.
-        
-        Note: This promotion system may be updated in the future to implement a new visual spacing
-        system where promoted events will take up visual space according to their correlated marker
-        spacing in the timeline. This will provide a more integrated and visually consistent
-        experience between posts and their timeline representations.
-        """
-        # Calculate base score from votes and sources
-        base_score = (self.promotion_votes * 0.7) + (self.source_count * 0.3)
-        
-        # Apply time decay factor (posts older than 7 days get penalized)
-        days_old = (datetime.now() - self.created_at).days
-        time_factor = 1.0 if days_old <= 7 else (1.0 - (0.1 * (days_old - 7)))
-        time_factor = max(0.1, time_factor)  # Don't let it go below 0.1
-        
-        # Calculate final score
-        self.promotion_score = base_score * time_factor
-        
-        # Determine if post should be promoted based on score threshold
-        # This threshold might need tuning based on usage patterns
-        PROMOTION_THRESHOLD = 5.0
-        self.promoted_to_event = self.promotion_score >= PROMOTION_THRESHOLD
-        
-        return self.promotion_score
-
-class Tag(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    name = db.Column(db.String(100), unique=True, nullable=False)
-    created_at = db.Column(db.DateTime, default=datetime.now)
-    timeline_id = db.Column(db.Integer, db.ForeignKey('timeline.id'), nullable=True)
-
-    def __repr__(self):
-        return f'<Tag {self.name}>'
-
-# Event-Tag Association Table
-event_tags = db.Table('event_tags',
-    db.Column('event_id', db.Integer, db.ForeignKey('event.id')),
-    db.Column('tag_id', db.Integer, db.ForeignKey('tag.id')),
-    db.Column('created_at', db.DateTime, default=datetime.now)
-)
-
-# Event-Timeline Reference Table (for events referenced in multiple timelines)
-event_timeline_refs = db.Table('event_timeline_refs',
-    db.Column('event_id', db.Integer, db.ForeignKey('event.id')),
-    db.Column('timeline_id', db.Integer, db.ForeignKey('timeline.id')),
-    db.Column('created_at', db.DateTime, default=datetime.now)
-)
-
-class Event(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    title = db.Column(db.String(200), nullable=False)
-    description = db.Column(db.Text, nullable=True, default='')
-    event_date = db.Column(db.DateTime, nullable=False)
-    type = db.Column(db.String(50), nullable=False, default='remark')
-    url = db.Column(db.String(500), nullable=True)
-    url_title = db.Column(db.String(500), nullable=True)
-    url_description = db.Column(db.Text, nullable=True)
-    url_image = db.Column(db.String(500), nullable=True)
-    media_url = db.Column(db.String(500), nullable=True)
-    media_type = db.Column(db.String(50), nullable=True)
-    timeline_id = db.Column(db.Integer, db.ForeignKey('timeline.id'), nullable=False)
-    created_by = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
-    created_at = db.Column(db.DateTime, default=datetime.now)
-    updated_at = db.Column(db.DateTime, default=datetime.now, onupdate=datetime.now)
-    tags = db.relationship('Tag', secondary=event_tags, backref=db.backref('events', lazy='dynamic'))
-    referenced_in = db.relationship('Timeline', secondary=event_timeline_refs, backref=db.backref('referenced_events', lazy='dynamic'))
-
-    def __repr__(self):
-        return f'<Event {self.title}>'
-
-class Comment(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    content = db.Column(db.Text, nullable=False)
-    post_id = db.Column(db.Integer, db.ForeignKey('post.id'))
-    user_id = db.Column(db.Integer, db.ForeignKey('user.id'))
-    created_at = db.Column(db.DateTime, default=datetime.now())
-    updated_at = db.Column(db.DateTime, default=datetime.now(), onupdate=datetime.now())
-
-class TokenBlocklist(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    jti = db.Column(db.String(36), nullable=False, unique=True)
-    created_at = db.Column(db.DateTime, nullable=False, default=datetime.now)
-    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
-
-# JWT Configuration
-@jwt.token_in_blocklist_loader
-def check_if_token_revoked(jwt_header, jwt_payload):
-    jti = jwt_payload["jti"]
-    token = TokenBlocklist.query.filter_by(jti=jti).first()
-    return token is not None
-
-@jwt.unauthorized_loader
-def unauthorized_callback(error):
-    return jsonify({
-        'error': 'Unauthorized',
-        'message': 'Missing or invalid authentication token',
-        'details': str(error)
-    }), 401
-
-@jwt.invalid_token_loader
-def invalid_token_callback(error):
-    return jsonify({
-        'error': 'Unauthorized',
-        'message': 'Invalid authentication token format or signature',
-        'details': str(error)
-    }), 401
-
-@jwt.expired_token_loader
-def expired_token_callback(jwt_header, jwt_data):
-    return jsonify({
-        'error': 'Unauthorized',
-        'message': 'Authentication token has expired. Please refresh your token or login again.',
-        'is_expired': True
-    }), 401
-
-@jwt.needs_fresh_token_loader
-def token_not_fresh_callback(jwt_header, jwt_data):
-    return jsonify({
-        'error': 'Unauthorized',
-        'message': 'Fresh token required. Please login again.'
-    }), 401
-
-@jwt.revoked_token_loader
-def revoked_token_callback(jwt_header, jwt_data):
-    return jsonify({
-        'error': 'Unauthorized',
-        'message': 'Token has been revoked. Please login again.'
-    }), 401
-
-# Routes
-@app.route('/api/upload', methods=['POST'])
-@jwt_required()
-def upload_file():
-    try:
-        logger.info("Starting file upload process")
-        logger.info(f"Request files: {request.files}")
-        logger.info(f"Request headers: {dict(request.headers)}")
-        
-        if 'file' not in request.files:
-            logger.error("No file part in request")
-            return jsonify({'error': 'No file part'}), 400
-        
-        file = request.files['file']
-        if file.filename == '':
-            logger.error("No selected file")
-            return jsonify({'error': 'No selected file'}), 400
-        
-        if not allowed_file(file.filename):
-            logger.error(f"Invalid file type: {file.filename}")
-            return jsonify({'error': 'Invalid file type'}), 400
-        
-        # Generate secure filename
-        filename = secure_filename(file.filename)
-        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S_')
-        filename = timestamp + filename
-        
-        # Save file
-        file_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
-        logger.info(f"Saving file to: {file_path}")
-        file.save(file_path)
-        
-        # Generate URL
-        file_url = f'/static/uploads/{filename}'
-        logger.info(f"File saved successfully. URL: {file_url}")
-        
-        return jsonify({
-            'url': file_url,
-            'filename': filename
-        })
-    
-    except Exception as e:
-        logger.error(f"Error in upload_file: {str(e)}", exc_info=True)
-        return jsonify({'error': str(e)}), 500
-
-@app.route('/static/uploads/<path:filename>')
-def serve_file(filename):
-    return send_from_directory(app.config['UPLOAD_FOLDER'], filename)
-
-@app.route('/api/timeline', methods=['POST'])
-def create_timeline():
-    data = request.get_json()
-    new_timeline = Timeline(
-        name=data['name'],
-        description=data['description'],
-        created_by=1  # Temporary default user ID
-    )
-    db.session.add(new_timeline)
-    db.session.commit()
-    return jsonify({'message': 'Timeline created successfully', 'id': new_timeline.id}), 201
 
 @app.route('/api/timeline/<int:timeline_id>', methods=['GET'])
 def get_timeline(timeline_id):
