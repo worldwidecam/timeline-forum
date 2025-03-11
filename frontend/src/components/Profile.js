@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import axios from 'axios';
+import api from '../utils/api';
 import {
   Container,
   Paper,
@@ -21,9 +21,7 @@ const Profile = () => {
   useEffect(() => {
     const fetchMusicPreferences = async () => {
       try {
-        const response = await axios.get('http://localhost:5000/api/profile/music', {
-          headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
-        });
+        const response = await api.get('/api/profile/music');
         if (response.data.music_url) {
           setMusicData(response.data);
           // Slight delay before showing music player for a smoother experience

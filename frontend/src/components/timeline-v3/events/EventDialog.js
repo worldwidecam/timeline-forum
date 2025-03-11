@@ -28,7 +28,7 @@ import {
   Add as AddIcon,
   CloudUpload as UploadIcon,
 } from '@mui/icons-material';
-import axios from 'axios';
+import api from '../../../utils/api';
 import { EVENT_TYPES, EVENT_TYPE_COLORS } from './EventTypes';
 
 const EventDialog = ({ open, onClose, onSave, initialEvent = null }) => {
@@ -67,11 +67,7 @@ const EventDialog = ({ open, onClose, onSave, initialEvent = null }) => {
       
       try {
         setIsLoadingPreview(true);
-        const response = await axios.post('/api/url-preview', { url }, {
-          headers: {
-            'Authorization': `Bearer ${localStorage.getItem('token')}`
-          }
-        });
+        const response = await api.post('/api/url-preview', { url });
         setUrlPreview(response.data);
       } catch (error) {
         console.error('Error fetching URL preview:', error);

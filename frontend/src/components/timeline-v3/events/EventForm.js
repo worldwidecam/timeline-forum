@@ -31,7 +31,7 @@ import {
   Movie as MediaIcon,
 } from '@mui/icons-material';
 import { DateTimePicker } from '@mui/x-date-pickers/DateTimePicker';
-import axios from 'axios';
+import api from '../../../utils/api';
 import { EVENT_TYPES, EVENT_TYPE_METADATA } from './EventTypes';
 
 const EventForm = ({ open, onClose, timelineId, onEventCreated }) => {
@@ -135,7 +135,7 @@ const EventForm = ({ open, onClose, timelineId, onEventCreated }) => {
     
     try {
       setUrlLoading(true);
-      const response = await axios.get(`/api/fetch-url-metadata?url=${encodeURIComponent(formData.url)}`);
+      const response = await api.get(`/api/fetch-url-metadata?url=${encodeURIComponent(formData.url)}`);
       setUrlData(response.data);
       
       // Auto-fill URL metadata
@@ -190,7 +190,7 @@ const EventForm = ({ open, onClose, timelineId, onEventCreated }) => {
         ...formData
       };
 
-      const response = await axios.post(
+      const response = await api.post(
         `/api/timeline-v3/${timelineId}/events`,
         eventData,
         {

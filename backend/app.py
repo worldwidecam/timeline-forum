@@ -47,7 +47,11 @@ CORS(app, resources={
             'http://localhost:3000',
             'http://localhost:3001',
             'http://localhost:3002',
-            'http://localhost:3003'
+            'http://localhost:3003',
+            'https://timeline-forum.onrender.com',
+            'https://timeline-forum-frontend.onrender.com',
+            'https://worldwidecam.com',
+            'https://www.worldwidecam.com'
         ],
         "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
         "allow_headers": ["Content-Type", "Authorization", "X-Refresh-Token"],
