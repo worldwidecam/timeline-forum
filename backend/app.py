@@ -13,6 +13,9 @@ from werkzeug.utils import secure_filename
 import os
 import logging
 import time
+import requests
+from bs4 import BeautifulSoup
+from urllib.parse import urlparse
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -78,6 +81,46 @@ def allowed_file(filename):
 
 def allowed_audio_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_AUDIO_EXTENSIONS
+
+# Function to extract link preview data
+def get_link_preview(url):
+    try:
+        headers = {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+        }
+        response = requests.get(url, headers=headers, timeout=10)
+        response.raise_for_status()
+        
+        soup = BeautifulSoup(response.text, 'html.parser')
+        
+        # Get title
+        title = soup.title.string if soup.title else ''
+        
+        # Try to get meta description
+        description = ''
+        description_meta = soup.find('meta', attrs={'name': 'description'}) or soup.find('meta', attrs={'property': 'og:description'})
+        if description_meta and description_meta.get('content'):
+            description = description_meta.get('content')
+        
+        # Try to get image
+        image = ''
+        image_meta = soup.find('meta', attrs={'property': 'og:image'}) or soup.find('meta', attrs={'name': 'twitter:image'})
+        if image_meta and image_meta.get('content'):
+            image = image_meta.get('content')
+        
+        # Get source domain
+        source = urlparse(url).netloc
+        
+        return {
+            'title': title,
+            'description': description,
+            'image': image,
+            'source': source,
+            'url': url
+        }
+    except Exception as e:
+        app.logger.error(f'Error fetching link preview: {str(e)}')
+        return None
 
 # Models
 class UserMusic(db.Model):
@@ -1382,6 +1425,24 @@ def get_timeline_v3_by_name(timeline_name):
     except Exception as e:
         app.logger.error(f'Error fetching timeline by name: {str(e)}')
         return jsonify({'error': 'Failed to fetch timeline'}), 500
+
+@app.route('/api/url-preview', methods=['POST'])
+def url_preview():
+    try:
+        data = request.get_json()
+        if not data or 'url' not in data:
+            return jsonify({'error': 'URL is required'}), 400
+            
+        url = data['url']
+        preview_data = get_link_preview(url)
+        
+        if not preview_data:
+            return jsonify({'error': 'Failed to fetch preview'}), 500
+            
+        return jsonify(preview_data), 200
+    except Exception as e:
+        app.logger.error(f'Error in URL preview endpoint: {str(e)}')
+        return jsonify({'error': str(e)}), 500
 
 if __name__ == '__main__':
     app.run(debug=True)

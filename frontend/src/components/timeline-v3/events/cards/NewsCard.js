@@ -6,6 +6,9 @@ import {
   useTheme,
   Box,
   Chip,
+  Card,
+  CardMedia,
+  CardContent,
 } from '@mui/material';
 import {
   Edit as EditIcon,
@@ -13,6 +16,7 @@ import {
   Article as NewsIcon,
   Event as EventIcon,
   AccessTime as AccessTimeIcon,
+  Language as LanguageIcon,
 } from '@mui/icons-material';
 import { motion } from 'framer-motion';
 import { format, parseISO } from 'date-fns';
@@ -65,6 +69,29 @@ const NewsCard = ({ event, onEdit, onDelete }) => {
     if (words.length <= 15) return text;
     return words.slice(0, 15).join(' ') + '...';
   };
+
+  // Extract domain from URL and format it nicely
+  const getSourceName = (url) => {
+    if (!url) return '';
+    try {
+      const domain = new URL(url).hostname;
+      // Remove www. and .com/.org/etc to get a cleaner name
+      let sourceName = domain.replace(/^www\./i, '');
+      // Split by dots and take the first part (e.g., "nytimes" from "nytimes.com")
+      sourceName = sourceName.split('.')[0];
+      // Capitalize first letter of each word
+      return sourceName
+        .split(/[-_]/)
+        .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+        .join(' ');
+    } catch (error) {
+      console.error('Error extracting domain:', error);
+      return '';
+    }
+  };
+
+  // Check if we have URL preview data
+  const hasUrlPreview = event.url_image || event.url_title || event.url_description;
 
   return (
     <>
@@ -121,6 +148,7 @@ const NewsCard = ({ event, onEdit, onDelete }) => {
             </Box>
           </Box>
 
+          {/* URL Preview Card */}
           {event.url && (
             <Link 
               href={event.url} 
@@ -128,35 +156,114 @@ const NewsCard = ({ event, onEdit, onDelete }) => {
               rel="noopener noreferrer"
               onClick={(e) => e.stopPropagation()}
               sx={{ 
-                display: 'block', 
-                mb: 2,
-                color: color,
                 textDecoration: 'none',
-                '&:hover': {
-                  textDecoration: 'underline'
-                }
-              }}
-            >
-              {event.url}
-            </Link>
-          )}
-
-          {event.description && (
-            <Typography 
-              variant="body2" 
-              sx={{ 
+                display: 'block',
                 mb: 2,
-                color: theme.palette.text.secondary,
-                whiteSpace: 'pre-wrap',
-                display: '-webkit-box',
-                WebkitLineClamp: 3,
-                WebkitBoxOrient: 'vertical',
-                overflow: 'hidden',
-                textOverflow: 'ellipsis',
+                maxWidth: '100%',
               }}
             >
-              {limitDescription(event.description)}
-            </Typography>
+              {hasUrlPreview ? (
+                <Card 
+                  sx={{ 
+                    display: 'flex', 
+                    flexDirection: { xs: 'column', sm: event.url_image ? 'column' : 'row' },
+                    overflow: 'hidden',
+                    maxWidth: '100%',
+                    transition: 'all 0.2s ease-in-out',
+                    '&:hover': {
+                      boxShadow: theme.shadows[4],
+                      transform: 'translateY(-2px)'
+                    }
+                  }}
+                >
+                  {event.url_image && (
+                    <CardMedia
+                      component="img"
+                      height="140"
+                      image={event.url_image}
+                      alt={event.url_title || "Link preview image"}
+                      sx={{ 
+                        objectFit: 'cover',
+                        width: '100%',
+                        maxHeight: '140px',
+                      }}
+                    />
+                  )}
+                  <CardContent sx={{ flex: '1 0 auto', p: 2 }}>
+                    <Box sx={{ display: 'flex', alignItems: 'center', mb: 0.5 }}>
+                      <Chip 
+                        icon={<LanguageIcon />} 
+                        label={getSourceName(event.url)}
+                        size="small"
+                        color="primary"
+                        variant="outlined"
+                        sx={{ 
+                          height: 24,
+                          '& .MuiChip-label': { px: 1 },
+                          '& .MuiChip-icon': { fontSize: 16 }
+                        }}
+                      />
+                    </Box>
+                    {event.url_title && (
+                      <Typography 
+                        variant="subtitle1" 
+                        component="div" 
+                        sx={{ 
+                          fontWeight: 'medium', 
+                          mb: 0.5,
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                          display: '-webkit-box',
+                          WebkitLineClamp: 2,
+                          WebkitBoxOrient: 'vertical',
+                        }}
+                      >
+                        {event.url_title}
+                      </Typography>
+                    )}
+                    {event.url_description && (
+                      <Typography 
+                        variant="body2" 
+                        color="text.secondary" 
+                        sx={{ 
+                          display: '-webkit-box',
+                          WebkitLineClamp: 2,
+                          WebkitBoxOrient: 'vertical',
+                          overflow: 'hidden',
+                        }}
+                      >
+                        {event.url_description}
+                      </Typography>
+                    )}
+                  </CardContent>
+                </Card>
+              ) : (
+                <Box sx={{ 
+                  display: 'flex', 
+                  alignItems: 'center', 
+                  p: 1, 
+                  border: `1px solid ${theme.palette.divider}`,
+                  borderRadius: 1,
+                  maxWidth: '100%',
+                  '&:hover': {
+                    backgroundColor: theme.palette.action.hover
+                  }
+                }}>
+                  <Chip 
+                    icon={<LanguageIcon />} 
+                    label={getSourceName(event.url)}
+                    size="small"
+                    color="primary"
+                    variant="outlined"
+                    sx={{ 
+                      height: 24,
+                      '& .MuiChip-label': { px: 1 },
+                      '& .MuiChip-icon': { fontSize: 16 }
+                    }}
+                  />
+                </Box>
+              )}
+            </Link>
           )}
 
           <Box sx={{ mt: 'auto' }}>
