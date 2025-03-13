@@ -147,6 +147,25 @@ The EventMarker component uses a sophisticated hierarchical time-based positioni
 ### Database Management
 - **DBMS Considerations**: Focus on effective use of records and fields within the database.
 
+### Cloud Storage Integration
+- **Cloudinary Integration**: Implemented Cloudinary for persistent file storage
+  - **Purpose**: Solves the ephemeral file system issue on Render hosting
+  - **Features**:
+    - Automatic image optimization (quality and format)
+    - Image transformations (resizing, cropping, effects)
+    - Audio file optimization
+    - Thumbnail generation
+  - **Implementation**:
+    - Files uploaded to Cloudinary instead of local storage
+    - Images return optimized URLs and thumbnails
+    - Audio files use AAC codec with optimized bitrate
+    - Backward compatibility with existing local files
+  - **Configuration**:
+    - Set environment variables in production:
+      - `CLOUDINARY_CLOUD_NAME`
+      - `CLOUDINARY_API_KEY`
+      - `CLOUDINARY_API_SECRET`
+
 ### Online Mailbox Feature
 - **Mailbox Implementation**: Users can send and receive mail visually, using themed stationery like in Animal Crossing, with a virtual inbox to display messages.
 
@@ -190,6 +209,7 @@ A modern web application for creating and sharing timelines with interactive eve
 - **Framework**: Flask (Python)
 - **Database**: SQLAlchemy with SQLite
 - **Authentication**: Flask-JWT-Extended
+- **File Storage**: Cloudinary cloud storage
 - **File Uploads**: Flask's built-in file handling
 - **Key Dependencies**:
   - `flask`: Web framework
@@ -197,6 +217,7 @@ A modern web application for creating and sharing timelines with interactive eve
   - `flask-jwt-extended`: JWT authentication
   - `flask-cors`: CORS handling
   - `werkzeug`: File upload security
+  - `cloudinary`: Cloud storage for media files
 
 ### Authentication System
 - JWT-based authentication

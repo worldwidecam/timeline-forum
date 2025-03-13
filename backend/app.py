@@ -17,6 +17,7 @@ import requests
 from bs4 import BeautifulSoup
 from urllib.parse import urlparse
 from urllib.parse import parse_qs
+from cloud_storage import upload_file as cloudinary_upload_file
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -55,7 +56,9 @@ CORS(app, resources={
             'https://timeline-forum.onrender.com',
             'https://timeline-forum-frontend.onrender.com',
             'https://worldwidecam.com',
-            'https://www.worldwidecam.com'
+            'https://www.worldwidecam.com',
+            'https://i-timeline.com',
+            'https://www.i-timeline.com'
         ],
         "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
         "allow_headers": ["Content-Type", "Authorization", "X-Refresh-Token"],
@@ -416,19 +419,53 @@ def upload_file():
         timestamp = datetime.now().strftime('%Y%m%d_%H%M%S_')
         filename = timestamp + filename
         
-        # Save file
-        file_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
-        logger.info(f"Saving file to: {file_path}")
-        file.save(file_path)
+        # Upload to Cloudinary with auto-optimization
+        logger.info(f"Uploading file to Cloudinary: {filename}")
         
-        # Generate URL
-        file_url = f'/static/uploads/{filename}'
-        logger.info(f"File saved successfully. URL: {file_url}")
+        # Get width and height parameters if provided
+        width = request.form.get('width')
+        height = request.form.get('height')
+        crop = request.form.get('crop', 'fill')
         
-        return jsonify({
-            'url': file_url,
-            'filename': filename
-        })
+        # Prepare upload options
+        upload_options = {}
+        if width and height:
+            # If dimensions are specified, we'll use them for transformation
+            upload_options['transformation'] = [
+                {'width': int(width), 'height': int(height), 'crop': crop}
+            ]
+        
+        upload_result = cloudinary_upload_file(file, folder="timeline_forum", **upload_options)
+        
+        if not upload_result['success']:
+            logger.error(f"Cloudinary upload failed: {upload_result['error']}")
+            return jsonify({'error': 'File upload failed'}), 500
+        
+        # For images, also provide optimized and thumbnail URLs
+        response_data = {
+            'url': upload_result['url'],
+            'filename': filename,
+            'public_id': upload_result['public_id']
+        }
+        
+        # If it's an image, add optimized URLs
+        if upload_result.get('resource_type') == 'image':
+            from cloud_storage import get_optimized_url, get_transformed_url
+            
+            # Add optimized URL
+            response_data['optimized_url'] = get_optimized_url(upload_result['public_id'])
+            
+            # Add thumbnail URL (200x200)
+            response_data['thumbnail_url'] = get_transformed_url(
+                upload_result['public_id'], 
+                width=200, 
+                height=200, 
+                crop='fill'
+            )
+        
+        logger.info(f"File uploaded successfully to Cloudinary. URL: {upload_result['url']}")
+        
+        return jsonify(response_data)
     
     except Exception as e:
         logger.error(f"Error in upload_file: {str(e)}", exc_info=True)
@@ -436,7 +473,16 @@ def upload_file():
 
 @app.route('/static/uploads/<path:filename>')
 def serve_file(filename):
-    return send_from_directory(app.config['UPLOAD_FOLDER'], filename)
+    # For backward compatibility with existing data
+    # If the file exists locally, serve it
+    if os.path.exists(os.path.join(app.config['UPLOAD_FOLDER'], filename)):
+        return send_from_directory(app.config['UPLOAD_FOLDER'], filename)
+    else:
+        # For files that might have been migrated to Cloudinary
+        # This is a fallback that will redirect to a 404 page
+        # In production, all files should be served directly from Cloudinary URLs
+        logger.warning(f"File {filename} not found locally. It may have been migrated to Cloudinary.")
+        return jsonify({'error': 'File not found or has been migrated to cloud storage'}), 404
 
 @app.route('/api/timeline', methods=['POST'])
 def create_timeline():
@@ -752,17 +798,24 @@ def update_music_preferences():
             return jsonify({'error': 'No selected file'}), 400
             
         if file and allowed_audio_file(file.filename):
-            # Delete old music file if it exists
-            if user.music and user.music.music_url:
-                old_file = user.music.music_url.split('/')[-1]
-                old_file_path = os.path.join(app.config['UPLOAD_FOLDER'], old_file)
-                if os.path.exists(old_file_path):
-                    os.remove(old_file_path)
-            
-            # Save new music file
+            # Generate filename for reference
             filename = secure_filename(f'music_{current_user_id}_{int(time.time())}.{file.filename.rsplit(".", 1)[1].lower()}')
-            file_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
-            file.save(file_path)
+            
+            # Upload to Cloudinary with optimization options
+            app.logger.info(f"Uploading music file to Cloudinary: {filename}")
+            
+            # For audio files, we can specify format and quality
+            upload_options = {
+                'resource_type': 'auto',
+                'audio_codec': 'aac',  # Use AAC codec for better compression
+                'bit_rate': '128k'     # Set bitrate for audio quality
+            }
+            
+            upload_result = cloudinary_upload_file(file, folder="timeline_forum/music", **upload_options)
+            
+            if not upload_result['success']:
+                app.logger.error(f"Cloudinary upload failed: {upload_result['error']}")
+                return jsonify({'error': 'File upload failed'}), 500
             
             # Update or create music preferences
             music_prefs = user.music
@@ -770,20 +823,25 @@ def update_music_preferences():
                 music_prefs = UserMusic(user_id=user.id)
                 db.session.add(music_prefs)
             
-            music_prefs.music_url = f'http://localhost:5000/static/uploads/{filename}'
+            # Store the Cloudinary URL and metadata
+            music_prefs.music_url = upload_result['url']
+            music_prefs.music_platform = 'cloudinary'
+            music_prefs.music_public_id = upload_result['public_id']
             
             db.session.commit()
             app.logger.info('Music preferences updated successfully')
             
             return jsonify({
-                'music_url': music_prefs.music_url
+                'success': True,
+                'music_url': upload_result['url'],
+                'message': 'Music preferences updated successfully'
             })
         else:
-            return jsonify({'error': 'Invalid file type. Please upload an MP3, WAV, or OGG file'}), 400
+            return jsonify({'error': 'Invalid audio file format'}), 400
             
     except Exception as e:
-        app.logger.error(f'Error updating music preferences: {str(e)}')
         db.session.rollback()
+        app.logger.error(f'Error updating music preferences: {str(e)}', exc_info=True)
         return jsonify({'error': str(e)}), 500
 
 @app.route('/api/profile/music', methods=['GET'])
