@@ -245,6 +245,12 @@ function TimelineV3() {
   const handleEventSelect = (event) => {
     setSelectedEventId(event.id);
     setShouldScrollToEvent(true);
+    
+    // Also update the currentEventIndex to keep carousel in sync
+    const eventIndex = events.findIndex(e => e.id === event.id);
+    if (eventIndex !== -1) {
+      setCurrentEventIndex(eventIndex);
+    }
   };
 
   const handleDotClick = (event) => {
@@ -267,7 +273,21 @@ function TimelineV3() {
       // In coordinate view, focus on the event in the list and scroll to it
       setShouldScrollToEvent(true);
       setSelectedEventId(event.id);
+      setCurrentEventIndex(eventIndex);
     }
+  };
+
+  const handleMarkerClick = (event, index) => {
+    console.log('Marker clicked for event:', event, 'at index:', index);
+    
+    // Update the current event index to keep the carousel in sync
+    setCurrentEventIndex(index);
+    
+    // Set the selected event ID to highlight it in the list
+    setSelectedEventId(event.id);
+    
+    // Don't scroll to the event in the list
+    setShouldScrollToEvent(false);
   };
 
   // Fetch events when timeline ID changes
@@ -868,6 +888,7 @@ function TimelineV3() {
               onChangeIndex={setCurrentEventIndex}
               minMarker={Math.min(...markers)}
               maxMarker={Math.max(...markers)}
+              onClick={handleMarkerClick}
               style={timelineTransitionStyles}
             />
           ))}
@@ -898,9 +919,11 @@ function TimelineV3() {
               transform: 'translateY(-50%)',
               minWidth: 100,
               bgcolor: 'background.paper',
-              zIndex: 2, // Higher z-index to stay above hover marker
+              zIndex: 1050, // Increased z-index to be above marker popups
+              boxShadow: 3, // Add shadow to make it stand out
               '&:hover': {
                 bgcolor: 'background.paper',
+                boxShadow: 4, // Enhanced shadow on hover
               }
             }}
           >
@@ -915,9 +938,11 @@ function TimelineV3() {
               transform: 'translateY(-50%)',
               minWidth: 100,
               bgcolor: 'background.paper',
-              zIndex: 2, // Higher z-index to stay above hover marker
+              zIndex: 1050, // Increased z-index to be above marker popups
+              boxShadow: 3, // Add shadow to make it stand out
               '&:hover': {
                 bgcolor: 'background.paper',
+                boxShadow: 4, // Enhanced shadow on hover
               }
             }}
           >

@@ -2,8 +2,8 @@ import React, { useState, useCallback } from 'react';
 import { Box, IconButton, useTheme, Paper, Fade, Popper, Typography } from '@mui/material';
 import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
 import ChevronRightIcon from '@mui/icons-material/ChevronRight';
-import TimelineEvent from './TimelineEvent';
 import { EVENT_TYPE_COLORS } from './EventTypes';
+import EventTooltip from './EventTooltip';
 
 // Empty state component (no hooks)
 const EmptyEventCarousel = () => {
@@ -161,16 +161,18 @@ const PopulatedEventCarousel = ({
         {({ TransitionProps }) => (
           <Fade {...TransitionProps} timeout={200}>
             <Paper 
-              elevation={4}
+              elevation={3}
               sx={{ 
-                p: 1,
+                p: 0.5,
                 bgcolor: 'background.paper',
-                maxWidth: '300px',
+                maxWidth: '250px',
                 border: '1px solid',
-                borderColor: 'divider'
+                borderColor: 'divider',
+                borderRadius: '8px',
+                boxShadow: theme.shadows[3]
               }}
             >
-              <TimelineEvent event={currentEvent} />
+              <EventTooltip event={currentEvent} />
             </Paper>
           </Fade>
         )}

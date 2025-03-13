@@ -36,7 +36,8 @@ const EventMarker = ({
   currentIndex,
   onChangeIndex,
   minMarker,
-  maxMarker
+  maxMarker,
+  onClick
 }) => {
   const theme = useTheme();
   const markerRef = React.useRef(null);
@@ -49,8 +50,8 @@ const EventMarker = ({
   useEffect(() => {
     const intervalId = setInterval(() => {
       setFreshCurrentDate(new Date());
-    }, 1000); // Update every second
-
+    }, 60000); // Update every minute
+    
     return () => clearInterval(intervalId);
   }, []);
 
@@ -325,9 +326,14 @@ const EventMarker = ({
   };
 
   const handleMarkerClick = () => {
-    // Only change the index if we're not already on this marker
-    if (index !== currentIndex) {
-      onChangeIndex(index);
+    // Call the onClick handler if provided
+    if (onClick) {
+      onClick(event, index);
+    } else {
+      // Fallback to the old behavior if onClick is not provided
+      if (index !== currentIndex) {
+        onChangeIndex(index);
+      }
     }
   };
 
