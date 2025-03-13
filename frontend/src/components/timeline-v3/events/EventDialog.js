@@ -69,15 +69,25 @@ const EventDialog = ({ open, onClose, onSave, initialEvent = null }) => {
         setIsLoadingPreview(true);
         const response = await api.post('/api/url-preview', { url });
         setUrlPreview(response.data);
+        
+        // Auto-fill title if empty and URL preview has a title
+        if (!title && response.data.title) {
+          setTitle(response.data.title);
+        }
       } catch (error) {
         console.error('Error fetching URL preview:', error);
       } finally {
         setIsLoadingPreview(false);
       }
     };
-
-    fetchUrlPreview();
-  }, [url, eventType]);
+    
+    // Add a small delay to prevent excessive API calls while typing
+    const timeoutId = setTimeout(() => {
+      fetchUrlPreview();
+    }, 500);
+    
+    return () => clearTimeout(timeoutId);
+  }, [url, eventType, title]);
 
   const resetForm = () => {
     setEventType(EVENT_TYPES.REMARK);

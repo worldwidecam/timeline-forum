@@ -16,6 +16,7 @@ import time
 import requests
 from bs4 import BeautifulSoup
 from urllib.parse import urlparse
+from urllib.parse import parse_qs
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -107,9 +108,92 @@ def get_link_preview(url):
         image_meta = soup.find('meta', attrs={'property': 'og:image'}) or soup.find('meta', attrs={'name': 'twitter:image'})
         if image_meta and image_meta.get('content'):
             image = image_meta.get('content')
+            
+        # If no image found, try to find a significant image on the page
+        if not image:
+            # Look for large images in the page
+            images = soup.find_all('img')
+            for img in images:
+                # Skip tiny images, icons, or images without src
+                src = img.get('src', '')
+                if not src or src.startswith('data:'):
+                    continue
+                    
+                # Check for width/height attributes or style containing dimensions
+                width = img.get('width', '0')
+                height = img.get('height', '0')
+                
+                try:
+                    # Convert to integers if possible
+                    width = int(width) if width and width.isdigit() else 0
+                    height = int(height) if height and height.isdigit() else 0
+                    
+                    # If the image is reasonably sized, use it
+                    if width > 100 and height > 100:
+                        # Convert relative URL to absolute
+                        if not src.startswith(('http://', 'https://')):
+                            base_url = urlparse(url)
+                            base_domain = f"{base_url.scheme}://{base_url.netloc}"
+                            if src.startswith('/'):
+                                src = f"{base_domain}{src}"
+                            else:
+                                src = f"{base_domain}/{src}"
+                        
+                        image = src
+                        break
+                except (ValueError, TypeError):
+                    continue
         
         # Get source domain
-        source = urlparse(url).netloc
+        parsed_url = urlparse(url)
+        source = parsed_url.netloc
+        
+        # Special handling for Google searches
+        if 'google.com' in source and '/search' in parsed_url.path:
+            query_params = parse_qs(parsed_url.query)
+            
+            # Extract search query
+            if 'q' in query_params:
+                search_query = query_params['q'][0]
+                if not title or 'Google Search' in title:
+                    title = f"Google Search: {search_query}"
+                if not description:
+                    description = f"Search results for: {search_query}"
+                
+                # If it's an image search, mention that
+                if '/images' in parsed_url.path or 'tbm=isch' in url:
+                    title = f"Google Image Search: {search_query}"
+                    description = f"Image search results for: {search_query}"
+            
+            # If no image yet, use Google logo
+            if not image:
+                image = "https://www.google.com/images/branding/googlelogo/2x/googlelogo_color_272x92dp.png"
+        
+        # Special handling for YouTube
+        elif 'youtube.com' in source or 'youtu.be' in source:
+            # If no image yet, try to get YouTube thumbnail
+            if not image:
+                video_id = None
+                if 'youtube.com/watch' in url and 'v=' in url:
+                    query_params = parse_qs(parsed_url.query)
+                    if 'v' in query_params:
+                        video_id = query_params['v'][0]
+                elif 'youtu.be/' in url:
+                    video_id = url.split('youtu.be/')[1].split('?')[0]
+                
+                if video_id:
+                    image = f"https://img.youtube.com/vi/{video_id}/hqdefault.jpg"
+            
+            # If no description, provide a generic one
+            if not description:
+                description = "YouTube video"
+        
+        # Special handling for Twitter/X
+        elif 'twitter.com' in source or 'x.com' in source:
+            if not image:
+                image = "https://abs.twimg.com/responsive-web/client-web/icon-default.522d363a.png"
+            if not description:
+                description = "Tweet from Twitter/X"
         
         return {
             'title': title,

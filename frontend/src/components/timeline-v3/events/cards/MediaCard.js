@@ -6,6 +6,10 @@ import {
   useTheme,
   Box,
   Chip,
+  Menu,
+  MenuItem,
+  ListItemIcon,
+  ListItemText,
 } from '@mui/material';
 import {
   Edit as EditIcon,
@@ -14,18 +18,43 @@ import {
   Link as LinkIcon,
   Event as EventIcon,
   AccessTime as AccessTimeIcon,
+  MoreVert as MoreVertIcon,
 } from '@mui/icons-material';
 import { motion } from 'framer-motion';
 import { format, parseISO } from 'date-fns';
 import { EVENT_TYPES, EVENT_TYPE_COLORS } from '../EventTypes';
 import TagList from './TagList';
 import EventPopup from '../EventPopup';
+import PageCornerButton from '../PageCornerButton';
 
 const MediaCard = ({ event, onEdit, onDelete }) => {
   const theme = useTheme();
   const [popupOpen, setPopupOpen] = useState(false);
+  const [menuAnchorEl, setMenuAnchorEl] = useState(null);
   const typeColors = EVENT_TYPE_COLORS[EVENT_TYPES.MEDIA];
   const color = theme.palette.mode === 'dark' ? typeColors.dark : typeColors.light;
+
+  const handleMenuOpen = (event) => {
+    setMenuAnchorEl(event.currentTarget);
+  };
+
+  const handleMenuClose = () => {
+    setMenuAnchorEl(null);
+  };
+
+  const handleEdit = () => {
+    handleMenuClose();
+    onEdit(event);
+  };
+
+  const handleDelete = () => {
+    handleMenuClose();
+    onDelete(event);
+  };
+
+  const handleDetailsClick = () => {
+    setPopupOpen(true);
+  };
 
   const formatDate = (dateStr) => {
     try {
@@ -157,9 +186,8 @@ const MediaCard = ({ event, onEdit, onDelete }) => {
         exit={{ opacity: 0, y: -20 }}
         whileHover={{ y: -4 }}
         whileTap={{ scale: 0.98 }}
-        className="relative w-full cursor-pointer"
+        className="relative w-full"
         style={{ perspective: '1000px' }}
-        onClick={() => setPopupOpen(true)}
       >
         <motion.div
           className={`
@@ -170,9 +198,59 @@ const MediaCard = ({ event, onEdit, onDelete }) => {
             shadow-lg
           `}
         >
+          {/* Page corner button for details */}
+          <PageCornerButton 
+            onClick={handleDetailsClick} 
+            tooltip="View Details"
+            color={color}
+          />
+          
+          {/* Menu for edit and delete options */}
+          <Box 
+            sx={{ 
+              position: 'absolute', 
+              top: 8, 
+              right: 45, 
+              zIndex: 10 
+            }}
+          >
+            <IconButton 
+              size="small" 
+              onClick={handleMenuOpen}
+              sx={{ 
+                backgroundColor: theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)',
+                '&:hover': {
+                  backgroundColor: theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.1)',
+                }
+              }}
+            >
+              <MoreVertIcon fontSize="small" />
+            </IconButton>
+            <Menu
+              anchorEl={menuAnchorEl}
+              open={Boolean(menuAnchorEl)}
+              onClose={handleMenuClose}
+              transformOrigin={{ horizontal: 'right', vertical: 'top' }}
+              anchorOrigin={{ horizontal: 'right', vertical: 'bottom' }}
+            >
+              <MenuItem onClick={handleEdit}>
+                <ListItemIcon>
+                  <EditIcon fontSize="small" />
+                </ListItemIcon>
+                <ListItemText>Edit</ListItemText>
+              </MenuItem>
+              <MenuItem onClick={handleDelete}>
+                <ListItemIcon>
+                  <DeleteIcon fontSize="small" />
+                </ListItemIcon>
+                <ListItemText>Delete</ListItemText>
+              </MenuItem>
+            </Menu>
+          </Box>
+
           {renderMedia()}
 
-          <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 1, mb: 2 }}>
+          <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 1, mb: 2, pr: 8 }}>
             <MediaIcon sx={{ color, mt: 0.5 }} />
             <Box sx={{ flex: 1 }}>
               <Typography 
@@ -194,14 +272,6 @@ const MediaCard = ({ event, onEdit, onDelete }) => {
                   sx={{ mb: 1 }}
                 />
               )}
-            </Box>
-            <Box sx={{ display: 'flex', gap: 1 }}>
-              <IconButton size="small" onClick={(e) => { e.stopPropagation(); onEdit(event); }}>
-                <EditIcon fontSize="small" />
-              </IconButton>
-              <IconButton size="small" onClick={(e) => { e.stopPropagation(); onDelete(event); }}>
-                <DeleteIcon fontSize="small" />
-              </IconButton>
             </Box>
           </Box>
 
